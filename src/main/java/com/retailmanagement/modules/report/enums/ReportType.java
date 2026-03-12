@@ -1,0 +1,51 @@
+package com.retailmanagement.modules.report.enums;
+
+public enum ReportType {
+    // Sales Reports
+    SALES_SUMMARY,
+    SALES_DETAILED,
+    SALES_BY_PRODUCT,
+    SALES_BY_CATEGORY,
+    SALES_BY_CUSTOMER,
+    SALES_BY_USER,
+    TOP_PRODUCTS,
+    TOP_CUSTOMERS,
+
+    // Inventory Reports
+    INVENTORY_SUMMARY,
+    INVENTORY_DETAILED,
+    LOW_STOCK_REPORT,
+    STOCK_MOVEMENT,
+    INVENTORY_VALUATION,
+    REORDER_REPORT,
+
+    // Purchase Reports
+    PURCHASE_SUMMARY,
+    PURCHASE_DETAILED,
+    PURCHASE_BY_SUPPLIER,
+    PURCHASE_BY_PRODUCT,
+    SUPPLIER_PERFORMANCE,
+
+    // Financial Reports
+    PROFIT_LOSS,
+    EXPENSE_SUMMARY,
+    EXPENSE_DETAILED,
+    EXPENSE_BY_CATEGORY,
+    REVENUE_REPORT,
+    TAX_REPORT,
+
+    // Customer Reports
+    CUSTOMER_DUES,
+    CUSTOMER_PAYMENTS,
+    CUSTOMER_LIFETIME_VALUE,
+
+    // Distributor Reports
+    DISTRIBUTOR_SALES,
+    DISTRIBUTOR_PERFORMANCE,
+    DISTRIBUTOR_COMMISSION,
+
+    // Audit Reports
+    USER_ACTIVITY,
+    AUDIT_TRAIL,
+    SYSTEM_LOGS
+}
