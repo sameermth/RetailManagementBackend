@@ -12,6 +12,7 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface CustomerDueRepository extends JpaRepository<CustomerDue, Long> {
@@ -39,6 +40,14 @@ public interface CustomerDueRepository extends JpaRepository<CustomerDue, Long> 
             "WHERE d.dueDate < :date AND d.status IN ('PENDING', 'PARTIALLY_PAID')")
     BigDecimal getTotalOverdueAmount(@Param("date") LocalDate date);
 
+    @Query("SELECT COALESCE(SUM(d.remainingAmount), 0) FROM CustomerDue d " +
+            "WHERE d.status IN ('PENDING', 'PARTIALLY_PAID')")
+    BigDecimal getTotalOverdueAmount();
+
+    @Query("SELECT COALESCE(SUM(d.remainingAmount), 0) FROM CustomerDue d " +
+            "WHERE d.dueDate BETWEEN :startDate AND :endDate AND d.status IN ('PENDING', 'PARTIALLY_PAID')")
+    BigDecimal getTotalDueForPeriod(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
     @Query("SELECT d FROM CustomerDue d WHERE d.reminderCount < 3 AND d.status IN ('PENDING', 'PARTIALLY_PAID')")
     List<CustomerDue> findDuesNeedingReminder();
 
@@ -47,4 +56,10 @@ public interface CustomerDueRepository extends JpaRepository<CustomerDue, Long> 
             "FROM CustomerDue d WHERE d.status IN ('PENDING', 'PARTIALLY_PAID') " +
             "GROUP BY d.customer.id, d.customer.name, d.customer.phone")
     List<Object[]> getCustomerDueSummary();
+
+    Integer countOverdue();
+
+    Optional<CustomerDue> findByDueReference(String dueReference);
+
+    List<CustomerDue> getUpcomingDues(LocalDate startDate, LocalDate endDate);
 }

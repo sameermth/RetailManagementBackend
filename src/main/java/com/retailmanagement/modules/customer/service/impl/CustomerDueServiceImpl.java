@@ -12,6 +12,7 @@ import com.retailmanagement.modules.customer.repository.CustomerDueRepository;
 import com.retailmanagement.modules.customer.repository.CustomerRepository;
 import com.retailmanagement.modules.customer.service.CustomerDueService;
 import com.retailmanagement.modules.customer.service.CustomerService;
+import com.retailmanagement.modules.notification.dto.request.SmsRequest;
 import com.retailmanagement.modules.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -193,15 +194,17 @@ public class CustomerDueServiceImpl implements CustomerDueService {
         }
 
         if (customer.getPhone() != null) {
-            notificationService.sendSmsNotification(
-                    customer.getPhone(),
-                    message
-            );
+            SmsRequest smsRequest = SmsRequest.builder()
+                    .phoneNumber(customer.getPhone())
+                    .message(message)
+                    .build();
+            notificationService.sendSms(smsRequest);
         }
 
         // Create in-app notification
         notificationService.sendInAppNotification(
                 customer.getId(),
+                "Payment Received",
                 message
         );
     }
@@ -280,15 +283,17 @@ public class CustomerDueServiceImpl implements CustomerDueService {
         }
 
         if (customer.getPhone() != null) {
-            notificationService.sendSmsNotification(
-                    customer.getPhone(),
-                    message
-            );
+            SmsRequest smsRequest = SmsRequest.builder()
+                    .phoneNumber(customer.getPhone())
+                    .message(message)
+                    .build();
+            notificationService.sendSms(smsRequest);
         }
 
         // Create in-app notification
         notificationService.sendInAppNotification(
                 customer.getId(),
+                "Payment Reminder",
                 message
         );
 

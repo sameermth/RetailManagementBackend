@@ -493,8 +493,8 @@ public class InventoryServiceImpl implements InventoryService {
                 .quantity(quantity)
                 .previousStock(previousStock)
                 .newStock(newStock)
-                .unitCost(product.getCostPrice())
-                .totalCost(product.getCostPrice() != null ? product.getCostPrice() * quantity : null)
+                .unitCost(product.getCostPrice().doubleValue())
+                .totalCost(product.getCostPrice() != null ? product.getCostPrice().multiply(new java.math.BigDecimal(quantity)).doubleValue() : null)
                 .referenceType(referenceType)
                 .reason(reason)
                 .performedBy("SYSTEM") // In real app, get from SecurityContext
@@ -503,4 +503,43 @@ public class InventoryServiceImpl implements InventoryService {
 
         stockMovementRepository.save(movement);
     }
+
+    @Override
+    public void removeStock(Long productId, long quantity, Integer reason) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+        
+        // Find inventory and update stock
+        List<Inventory> inventories = inventoryRepository.findByProductId(productId);
+        if (inventories.isEmpty()) {
+            throw new RuntimeException("No inventory found for product");
+        }
+        
+        Inventory inventory = inventories.get(0);
+        if (inventory.getAvailableQuantity() < quantity) {
+            throw new RuntimeException("Insufficient stock");
+        }
+        
+        inventory.setQuantity((int) (inventory.getQuantity() - quantity));
+        inventory.setAvailableQuantity(inventory.getAvailableQuantity() - (int) quantity);
+        inventoryRepository.save(inventory);
+    }
+
+    @Override
+    public void addStock(Long productId, long quantity, Integer reason) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+        
+        // Find inventory and update stock
+        List<Inventory> inventories = inventoryRepository.findByProductId(productId);
+        if (inventories.isEmpty()) {
+            throw new RuntimeException("No inventory found for product");
+        }
+        
+        Inventory inventory = inventories.get(0);
+        inventory.setQuantity((int) (inventory.getQuantity() + quantity));
+        inventory.setAvailableQuantity(inventory.getAvailableQuantity() + (int) quantity);
+        inventoryRepository.save(inventory);
+    }
 }
+

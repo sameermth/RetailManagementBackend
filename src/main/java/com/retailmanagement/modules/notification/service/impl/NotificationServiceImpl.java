@@ -503,6 +503,35 @@ public class NotificationServiceImpl implements NotificationService {
         return !notificationRepository.existsByNotificationId(notificationId);
     }
 
+    @Override
+    public NotificationResponse sendEmailNotification(String recipientEmail, String subject, String body) {
+        log.info("Sending email notification to: {}", recipientEmail);
+
+        EmailRequest emailRequest = EmailRequest.builder()
+                .to(recipientEmail)
+                .subject(subject)
+                .content(body)
+                .build();
+
+        return sendEmail(emailRequest);
+    }
+
+    @Override
+    public NotificationResponse sendNotificationToRole(String role, String title, String message) {
+        log.info("Sending notification to role: {}", role);
+
+        // Create notification for a specific role
+        NotificationRequest request = NotificationRequest.builder()
+                .type(NotificationType.SYSTEM_ALERT)
+                .channel(NotificationChannel.IN_APP)
+                .priority(NotificationPriority.MEDIUM)
+                .title(title)
+                .content(message)
+                .build();
+
+        return sendNotification(request);
+    }
+
     private String generateNotificationId() {
         String timestamp = String.valueOf(System.currentTimeMillis()).substring(7);
         String randomPart = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
@@ -516,3 +545,4 @@ public class NotificationServiceImpl implements NotificationService {
         return notificationId;
     }
 }
+

@@ -1,6 +1,7 @@
 package com.retailmanagement.modules.sales.repository;
 
-import com.retailmanagement.modules.sales.dto.response.TopProductDTO;
+import com.retailmanagement.modules.dashboard.dto.RecentActivityDTO;
+import com.retailmanagement.modules.dashboard.dto.TopProductDTO;
 import com.retailmanagement.modules.sales.model.Sale;
 import com.retailmanagement.modules.sales.enums.SaleStatus;
 import org.springframework.data.domain.Page;
@@ -14,6 +15,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface SaleRepository extends JpaRepository<Sale, Long> {
@@ -26,6 +28,8 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
 
     List<Sale> findByStatus(SaleStatus status);
 
+    Optional<Sale> findByInvoiceNumber(String invoiceNumber);
+
     List<Sale> findBySaleDateBetween(LocalDateTime startDate, LocalDateTime endDate);
 
     @Query("SELECT s FROM Sale s WHERE DATE(s.saleDate) = :date")
@@ -35,7 +39,7 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
     List<Sale> findOverdueSales(@Param("date") LocalDateTime date);
 
     @Query("SELECT SUM(s.totalAmount) FROM Sale s WHERE s.saleDate BETWEEN :startDate AND :endDate")
-    BigDecimal getTotalSalesForPeriod(@Param("startDate") LocalDateTime startDate,
+    Double getTotalSalesForPeriod(@Param("startDate") LocalDateTime startDate,
                                       @Param("endDate") LocalDateTime endDate);
 
     @Query("SELECT COUNT(s) FROM Sale s WHERE s.saleDate BETWEEN :startDate AND :endDate")
@@ -63,4 +67,6 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
                                        Pageable pageable);
 
     boolean existsByInvoiceNumber(String invoiceNumber);
+
+    List<RecentActivityDTO> getRecentActivities(LocalDateTime localDateTime, int limit);
 }

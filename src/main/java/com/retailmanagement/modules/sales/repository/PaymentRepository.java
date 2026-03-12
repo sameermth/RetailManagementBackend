@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
@@ -17,6 +18,8 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     List<Payment> findBySaleId(Long saleId);
 
     List<Payment> findByPaymentMethod(PaymentMethod paymentMethod);
+
+    Optional<Payment>  findPaymentByPaymentReference(String paymentReference);
 
     List<Payment> findByPaymentDateBetween(LocalDateTime startDate, LocalDateTime endDate);
 

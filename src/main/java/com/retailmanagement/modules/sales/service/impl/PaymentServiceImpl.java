@@ -112,7 +112,7 @@ public class PaymentServiceImpl implements PaymentService {
     public PaymentResponse getPaymentByReference(String reference) {
         log.debug("Fetching payment with reference: {}", reference);
 
-        Payment payment = paymentRepository.findByPaymentReference(reference)
+        Payment payment = paymentRepository.findPaymentByPaymentReference(reference)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found with reference: " + reference));
 
         return paymentMapper.toResponse(payment);

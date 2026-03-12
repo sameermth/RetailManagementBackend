@@ -1,5 +1,6 @@
 package com.retailmanagement.modules.dashboard.service.impl;
 
+import com.retailmanagement.modules.customer.model.CustomerDue;
 import com.retailmanagement.modules.customer.repository.CustomerRepository;
 import com.retailmanagement.modules.customer.repository.CustomerDueRepository;
 import com.retailmanagement.modules.dashboard.dto.*;
@@ -10,6 +11,7 @@ import com.retailmanagement.modules.sales.repository.SaleRepository;
 import com.retailmanagement.modules.sales.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -41,15 +43,15 @@ public class DashboardServiceImpl implements DashboardService {
                 .todaySales(getTodaySales())
                 .weeklySales(getSalesForPeriod(weekStart, today))
                 .monthlySales(getSalesForPeriod(monthStart, today))
-                .totalProducts(productRepository.count())
-                .lowStockCount(inventoryRepository.countLowStock())
-                .outOfStockCount(inventoryRepository.countOutOfStock())
-                .totalCustomers(customerRepository.count())
-                .newCustomersToday(customerRepository.countByCreatedDate(today))
+                .totalProducts((int) productRepository.count())
+                .lowStockCount((int) inventoryRepository.countLowStock())
+                .outOfStockCount((int) inventoryRepository.countOutOfStock())
+                .totalCustomers((int) customerRepository.count())
+                .newCustomersToday((int) customerRepository.countByCreatedDate(today))
                 .totalDueAmount(dueRepository.getTotalDueAmount())
                 .overdueCount(dueRepository.countOverdue())
-                .pendingOrders(saleRepository.countPendingOrders())
-                .completedOrdersToday(saleRepository.countCompletedOrders(today))
+                .pendingOrders(Math.toIntExact(saleRepository.countPendingOrders()))
+                .completedOrdersToday(Math.toIntExact(saleRepository.countCompletedOrders(today)))
                 .build();
     }
 
@@ -64,9 +66,11 @@ public class DashboardServiceImpl implements DashboardService {
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime end = endDate.atTime(23, 59, 59);
 
+        Double totalSales = saleRepository.getTotalSalesForPeriod(start, end);
+        
         return SalesSummaryDTO.builder()
-                .totalAmount(saleRepository.getTotalSalesForPeriod(start, end))
-                .totalTransactions(saleRepository.countSalesForPeriod(start, end))
+                .totalAmount(totalSales != null ? java.math.BigDecimal.valueOf(totalSales) : java.math.BigDecimal.ZERO)
+                .totalTransactions((int) (long) saleRepository.countSalesForPeriod(start, end))
                 .averageTransactionValue(saleRepository.getAverageTransactionValue(start, end))
                 .cashAmount(paymentRepository.getTotalByMethodForPeriod("CASH", start, end))
                 .cardAmount(paymentRepository.getTotalByMethodForPeriod("CARD", start, end))
@@ -78,7 +82,7 @@ public class DashboardServiceImpl implements DashboardService {
     @Override
     public List<TopProductDTO> getTopProducts(int limit) {
         LocalDateTime monthStart = LocalDate.now().minusDays(30).atStartOfDay();
-        return saleRepository.getTopProducts(monthStart, LocalDateTime.now(), limit);
+        return saleRepository.getTopProducts(monthStart, LocalDateTime.now(), Pageable.ofSize(limit));
     }
 
     @Override
@@ -95,7 +99,7 @@ public class DashboardServiceImpl implements DashboardService {
     public DueSummaryDTO getDueSummary() {
         return DueSummaryDTO.builder()
                 .totalDueAmount(dueRepository.getTotalDueAmount())
-                .totalDueCustomers(dueRepository.countCustomersWithDue())
+                .totalDueCustomers((int) dueRepository.countCustomersWithDue())
                 .overdueAmount(dueRepository.getTotalOverdueAmount())
                 .overdueCount(dueRepository.countOverdue())
                 .dueThisWeek(dueRepository.getTotalDueForPeriod(LocalDate.now(), LocalDate.now().plusDays(7)))
@@ -106,6 +110,20 @@ public class DashboardServiceImpl implements DashboardService {
 
     @Override
     public List<DueSummaryDTO.UpcomingDueDTO> getUpcomingDues(int days) {
-        return dueRepository.getUpcomingDues(LocalDate.now(), LocalDate.now().plusDays(days));
+       List<CustomerDue> upcomingDues = dueRepository.findDuesInDateRange(LocalDate.now(), LocalDate.now().plusDays(days));
+
+       return upcomingDues.stream().map(due -> {
+           int daysRemaining = (int) java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), due.getDueDate());
+           String status = daysRemaining < 0 ? "OVERDUE" : (daysRemaining == 0 ? "TODAY" : "UPCOMING");
+           return DueSummaryDTO.UpcomingDueDTO.builder()
+                   .customerId(due.getCustomer().getId())
+                   .customerName(due.getCustomer().getName())
+                   .customerPhone(due.getCustomer().getPhone())
+                   .dueAmount(due.getRemainingAmount())
+                   .dueDate(due.getDueDate())
+                   .daysRemaining(daysRemaining)
+                   .status(status)
+                   .build();
+       }).toList();
     }
 }

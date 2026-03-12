@@ -6,6 +6,7 @@ import com.retailmanagement.modules.expense.dto.request.ExpenseRequest;
 import com.retailmanagement.modules.expense.dto.request.RecurringExpenseRequest;
 import com.retailmanagement.modules.expense.dto.response.RecurringExpenseResponse;
 import com.retailmanagement.modules.expense.enums.ExpenseStatus;
+import com.retailmanagement.modules.expense.enums.PaymentMethod;
 import com.retailmanagement.modules.expense.enums.RecurringFrequency;
 import com.retailmanagement.modules.expense.mapper.RecurringExpenseMapper;
 import com.retailmanagement.modules.expense.model.ExpenseCategory;
@@ -234,9 +235,9 @@ public class RecurringExpenseServiceImpl implements RecurringExpenseService {
     public void generateRecurringExpenses() {
         log.info("Starting recurring expenses generation at {}", LocalDateTime.now());
 
-        List<RecurringExpense> dueExpenses = getRecurringExpensesDueForGeneration();
+        List<RecurringExpenseResponse> dueExpenses = getRecurringExpensesDueForGeneration();
 
-        for (RecurringExpense recurringExpense : dueExpenses) {
+        for (RecurringExpenseResponse recurringExpense : dueExpenses) {
             try {
                 int generated = generateExpensesForRecurring(recurringExpense.getId());
                 log.info("Generated {} expenses for recurring expense ID: {}", generated, recurringExpense.getId());
@@ -303,7 +304,7 @@ public class RecurringExpenseServiceImpl implements RecurringExpenseService {
         return 1;
     }
 
-    private LocalDate calculateNextGenerationDate(LocalDate currentDate, RecurringFrequency frequency) {
+    private LocalDate calculateNextGenerationDate1(LocalDate currentDate, RecurringFrequency frequency) {
         switch (frequency) {
             case DAILY:
                 return currentDate.plusDays(1);

@@ -30,7 +30,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -268,7 +267,7 @@ public class ReportGeneratorServiceImpl implements ReportGeneratorService {
         // Sales Summary
         Double totalSales = saleRepository.getTotalSalesForPeriod(startOfMonth, endOfMonth);
         Long totalOrders = saleRepository.countSalesForPeriod(startOfMonth, endOfMonth);
-        Double avgOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
+        Double avgOrderValue = totalOrders > 0 ? totalSales/totalOrders : 0;
 
         // Inventory Summary
         Long totalProducts = productRepository.count();
@@ -788,4 +787,13 @@ public class ReportGeneratorServiceImpl implements ReportGeneratorService {
                 .createdAt(report.getCreatedAt())
                 .build();
     }
+
+    @Override
+    public byte[] generateExpenseReport(ReportRequest request) {
+        // This is a convenience method that delegates to generateReport
+        // In a real scenario, you would inject user context or use authenticated user
+        // For now, returning null - should be implemented based on your requirements
+        throw new UnsupportedOperationException("Use generateReport() method instead and pass userId");
+    }
 }
+

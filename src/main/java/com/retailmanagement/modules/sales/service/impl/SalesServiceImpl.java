@@ -5,6 +5,7 @@ import com.retailmanagement.common.exceptions.ResourceNotFoundException;
 import com.retailmanagement.modules.customer.model.Customer;
 import com.retailmanagement.modules.customer.repository.CustomerRepository;
 import com.retailmanagement.modules.inventory.service.InventoryService;
+import com.retailmanagement.modules.notification.dto.request.EmailRequest;
 import com.retailmanagement.modules.product.model.Product;
 import com.retailmanagement.modules.product.repository.ProductRepository;
 import com.retailmanagement.modules.sales.dto.request.SaleItemRequest;
@@ -16,6 +17,7 @@ import com.retailmanagement.modules.sales.enums.PaymentStatus;
 import com.retailmanagement.modules.sales.mapper.SaleMapper;
 import com.retailmanagement.modules.sales.model.Sale;
 import com.retailmanagement.modules.sales.model.SaleItem;
+import com.retailmanagement.modules.sales.repository.InvoiceRepository;
 import com.retailmanagement.modules.sales.repository.SaleRepository;
 import com.retailmanagement.modules.sales.service.SalesService;
 import com.retailmanagement.modules.auth.model.User;
@@ -173,11 +175,11 @@ public class SalesServiceImpl implements SalesService {
 
         // Send notification
         if (customer != null && customer.getEmail() != null) {
-            notificationService.sendEmailNotification(
-                    customer.getEmail(),
-                    "Order Confirmation - Invoice " + invoiceNumber,
-                    "Thank you for your order. Your invoice number is " + invoiceNumber
-            );
+            EmailRequest emailRequest = new EmailRequest();
+            emailRequest.setTo(customer.getEmail());
+            emailRequest.setSubject("Order Confirmation - Invoice " + invoiceNumber);
+            emailRequest.setContent("Thank you for your order. Your invoice number is " + invoiceNumber);
+            notificationService.sendEmail(emailRequest);
         }
 
         log.info("Sale created successfully with invoice number: {}", invoiceNumber);
@@ -398,8 +400,8 @@ public class SalesServiceImpl implements SalesService {
 
     @Override
     public Double getTotalSales(LocalDateTime startDate, LocalDateTime endDate) {
-        BigDecimal total = saleRepository.getTotalSalesForPeriod(startDate, endDate);
-        return total != null ? total.doubleValue() : 0.0;
+        Double total = saleRepository.getTotalSalesForPeriod(startDate, endDate);
+        return total != null ? total : 0.0;
     }
 
     @Override

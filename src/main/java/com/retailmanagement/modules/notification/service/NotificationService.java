@@ -59,4 +59,8 @@ public interface NotificationService {
     Long getUnreadCount(Long userId);
 
     boolean isNotificationIdUnique(String notificationId);
+
+    NotificationResponse sendEmailNotification(String recipientEmail, String subject, String body);
+
+    NotificationResponse sendNotificationToRole(String role, String title, String message);
 }

@@ -20,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 import jakarta.mail.internet.MimeMessage;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service

@@ -2,12 +2,18 @@ package com.retailmanagement.modules.notification.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.List;
 import java.util.Map;
 
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class EmailRequest {
 
     @NotBlank(message = "Recipient email is required")

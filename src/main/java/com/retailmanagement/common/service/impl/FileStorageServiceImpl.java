@@ -53,7 +53,7 @@ public class FileStorageServiceImpl implements FileStorageService {
             return directory + "/" + filename;
 
         } catch (IOException ex) {
-            throw new BusinessException("Could not store file. Please try again!", ex);
+            throw new BusinessException("Could not store file. Please try again!", ex.getMessage());
         }
     }
 
@@ -74,7 +74,7 @@ public class FileStorageServiceImpl implements FileStorageService {
                 throw new BusinessException("File not found: " + fileName);
             }
         } catch (MalformedURLException ex) {
-            throw new BusinessException("File not found: " + fileName, ex);
+            throw new BusinessException("File not found: " + fileName, ex.getMessage());
         }
     }
 
@@ -90,7 +90,7 @@ public class FileStorageServiceImpl implements FileStorageService {
             Files.deleteIfExists(filePath);
             log.info("File deleted successfully: {}", fileName);
         } catch (IOException ex) {
-            throw new BusinessException("Could not delete file: " + fileName, ex);
+            throw new BusinessException("Could not delete file: " + fileName, ex.getMessage());
         }
     }
 
@@ -101,7 +101,7 @@ public class FileStorageServiceImpl implements FileStorageService {
                     .map(path -> path.getFileName().toString())
                     .collect(Collectors.toList());
         } catch (IOException ex) {
-            throw new BusinessException("Could not list files in directory: " + directory, ex);
+            throw new BusinessException("Could not list files in directory: " + directory, ex.getMessage());
         }
     }
 
@@ -129,7 +129,7 @@ public class FileStorageServiceImpl implements FileStorageService {
             Path filePath = getFilePath(fileName);
             return Files.size(filePath);
         } catch (IOException ex) {
-            throw new BusinessException("Could not get file size: " + fileName, ex);
+            throw new BusinessException("Could not get file size: " + fileName, ex.getMessage());
         }
     }
 

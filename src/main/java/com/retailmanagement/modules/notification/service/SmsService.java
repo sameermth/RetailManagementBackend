@@ -3,6 +3,8 @@ package com.retailmanagement.modules.notification.service;
 import com.retailmanagement.modules.notification.dto.request.SmsRequest;
 import com.retailmanagement.modules.notification.dto.response.NotificationResponse;
 
+import java.util.List;
+
 public interface SmsService {
 
     NotificationResponse sendSms(SmsRequest request);

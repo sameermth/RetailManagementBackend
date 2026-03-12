@@ -1,5 +1,6 @@
 package com.retailmanagement.modules.inventory.repository;
 
+import com.retailmanagement.modules.dashboard.dto.LowStockAlertDTO;
 import com.retailmanagement.modules.inventory.model.Inventory;
 import com.retailmanagement.modules.inventory.model.Warehouse;
 import com.retailmanagement.modules.product.model.Product;
@@ -37,4 +38,7 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
 
     @Query("SELECT SUM(i.quantity) FROM Inventory i WHERE i.product.id = :productId")
     Integer getTotalStockByProduct(@Param("productId") Long productId);
+
+    @Query("SELECT i from Inventory i WHERE i.quantity <= i.minimumStock")
+    List<LowStockAlertDTO> getLowStockAlerts();
 }

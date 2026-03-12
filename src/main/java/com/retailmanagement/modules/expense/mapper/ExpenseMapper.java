@@ -23,7 +23,6 @@ public interface ExpenseMapper {
     @Mapping(target = "approvedAt", ignore = true)
     @Mapping(target = "approvedBy", ignore = true)
     @Mapping(target = "rejectionReason", ignore = true)
-    @Mapping(target = "attachments", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     @Mapping(target = "createdBy", ignore = true)

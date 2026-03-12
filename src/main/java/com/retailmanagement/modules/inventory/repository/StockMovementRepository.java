@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface StockMovementRepository extends JpaRepository<StockMovement, Long> {
@@ -32,4 +33,7 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
                                         @Param("referenceId") Long referenceId);
 
     boolean existsByReferenceNumber(String referenceNumber);
+
+    @Query("SELECT sm FROM StockMovement sm WHERE sm.referenceNumber = :referenceNumber")
+    Optional<StockMovement> findByReferenceNumber(@Param("referenceNumber") String referenceNumber);
 }

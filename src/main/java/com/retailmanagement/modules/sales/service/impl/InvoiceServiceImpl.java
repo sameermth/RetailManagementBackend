@@ -3,6 +3,7 @@ package com.retailmanagement.modules.sales.service.impl;
 import com.retailmanagement.common.exceptions.BusinessException;
 import com.retailmanagement.common.exceptions.ResourceNotFoundException;
 import com.retailmanagement.common.utils.PdfGenerator;
+import com.retailmanagement.modules.notification.dto.request.EmailRequest;
 import com.retailmanagement.modules.sales.dto.response.InvoiceResponse;
 import com.retailmanagement.modules.sales.mapper.InvoiceMapper;
 import com.retailmanagement.modules.sales.model.Invoice;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -196,10 +198,21 @@ public class InvoiceServiceImpl implements InvoiceService {
                 "Due Date: " + invoice.getDueDate() + "\n\n" +
                 "Thank you for your business!\n\n" +
                 "Regards,\nRetail Management Team";
+        List<EmailRequest.Attachment> attachments = new ArrayList<>();
+        attachments.add(new EmailRequest.Attachment() {{
+            setFileName(invoice.getInvoiceNumber() + ".pdf");
+            setContent(pdfGenerator.generateInvoicePdf(invoiceMapper.toResponse(invoice)));
+            setContentType("application/pdf");
+        }});
+
+        EmailRequest emailRequest = new EmailRequest();
+        emailRequest.setTo(email);
+        emailRequest.setSubject(subject);
+        emailRequest.setContent(body);
+        emailRequest.setAttachments(attachments);
 
         // Send email with attachment
-        notificationService.sendEmailWithAttachment(email, subject, body,
-                generateInvoicePdf(invoiceId), "invoice.pdf");
+        notificationService.sendEmail(emailRequest);
 
         invoice.setIsEmailed(true);
         invoiceRepository.save(invoice);

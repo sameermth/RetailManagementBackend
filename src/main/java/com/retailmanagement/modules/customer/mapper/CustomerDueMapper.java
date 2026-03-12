@@ -2,6 +2,7 @@ package com.retailmanagement.modules.customer.mapper;
 
 import com.retailmanagement.modules.customer.dto.request.CustomerDueRequest;
 import com.retailmanagement.modules.customer.dto.response.CustomerDueResponse;
+import com.retailmanagement.modules.customer.enums.DueStatus;
 import com.retailmanagement.modules.customer.model.CustomerDue;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

@@ -7,6 +7,7 @@ import com.retailmanagement.modules.distributor.dto.request.DistributorOrderRequ
 import com.retailmanagement.modules.distributor.dto.response.DistributorOrderResponse;
 import com.retailmanagement.modules.distributor.dto.response.DistributorOrderSummaryResponse;
 import com.retailmanagement.modules.distributor.enums.DistributorOrderStatus;
+import com.retailmanagement.modules.distributor.enums.DistributorStatus;
 import com.retailmanagement.modules.distributor.mapper.DistributorOrderItemMapper;
 import com.retailmanagement.modules.distributor.mapper.DistributorOrderMapper;
 import com.retailmanagement.modules.distributor.model.Distributor;
