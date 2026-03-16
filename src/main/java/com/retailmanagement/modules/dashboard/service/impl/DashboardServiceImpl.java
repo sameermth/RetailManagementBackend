@@ -7,6 +7,7 @@ import com.retailmanagement.modules.dashboard.dto.*;
 import com.retailmanagement.modules.dashboard.service.DashboardService;
 import com.retailmanagement.modules.inventory.repository.InventoryRepository;
 import com.retailmanagement.modules.product.repository.ProductRepository;
+import com.retailmanagement.modules.sales.enums.PaymentMethod;
 import com.retailmanagement.modules.sales.repository.SaleRepository;
 import com.retailmanagement.modules.sales.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
@@ -72,10 +73,10 @@ public class DashboardServiceImpl implements DashboardService {
                 .totalAmount(totalSales != null ? java.math.BigDecimal.valueOf(totalSales) : java.math.BigDecimal.ZERO)
                 .totalTransactions((int) (long) saleRepository.countSalesForPeriod(start, end))
                 .averageTransactionValue(saleRepository.getAverageTransactionValue(start, end))
-                .cashAmount(paymentRepository.getTotalByMethodForPeriod("CASH", start, end))
-                .cardAmount(paymentRepository.getTotalByMethodForPeriod("CARD", start, end))
-                .upiAmount(paymentRepository.getTotalByMethodForPeriod("UPI", start, end))
-                .creditAmount(paymentRepository.getTotalByMethodForPeriod("CREDIT", start, end))
+                .cashAmount(paymentRepository.getTotalByMethodForPeriod(PaymentMethod.CASH, start, end))
+                .cardAmount(paymentRepository.getTotalByMethodForPeriod(PaymentMethod.CARD, start, end))
+                .upiAmount(paymentRepository.getTotalByMethodForPeriod(PaymentMethod.UPI, start, end))
+                .creditAmount(paymentRepository.getTotalByMethodForPeriod(PaymentMethod.CREDIT, start, end))
                 .build();
     }
 

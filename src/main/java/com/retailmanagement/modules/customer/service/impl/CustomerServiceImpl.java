@@ -367,4 +367,30 @@ public class CustomerServiceImpl implements CustomerService {
             return "BRONZE";
         }
     }
+
+    @Override
+    public List<CustomerSummaryResponse> getAllCustomerSummaries() {
+        log.debug("Fetching all customer summaries for dropdowns");
+
+        return customerRepository.findAll().stream()
+                .map(customer -> {
+                    CustomerSummaryResponse summary = customerMapper.toSummaryResponse(customer);
+                    // Calculate average purchase value if needed
+                    if (customer.getSales() != null && !customer.getSales().isEmpty()) {
+                        BigDecimal totalAmount = customer.getSales().stream()
+                                .map(sale -> sale.getTotalAmount())
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                        BigDecimal average = totalAmount.divide(
+                                BigDecimal.valueOf(customer.getSales().size()),
+                                2,
+                                RoundingMode.HALF_UP
+                        );
+                        summary.setAveragePurchaseValue(average);
+                    } else {
+                        summary.setAveragePurchaseValue(BigDecimal.ZERO);
+                    }
+                    return summary;
+                })
+                .collect(Collectors.toList());
+    }
 }

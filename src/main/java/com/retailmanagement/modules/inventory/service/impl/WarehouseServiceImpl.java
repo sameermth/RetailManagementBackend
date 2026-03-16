@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -83,8 +84,8 @@ public class WarehouseServiceImpl implements WarehouseService {
         warehouse.setPhone(request.getPhone());
         warehouse.setEmail(request.getEmail());
         warehouse.setManager(request.getManager());
-        warehouse.setLatitude(request.getLatitude());
-        warehouse.setLongitude(request.getLongitude());
+        warehouse.setLatitude(BigDecimal.valueOf(request.getLatitude()));
+        warehouse.setLongitude(BigDecimal.valueOf(request.getLongitude()));
         warehouse.setIsActive(request.getIsActive());
         warehouse.setIsPrimary(request.getIsPrimary());
         warehouse.setCapacity(request.getCapacity());

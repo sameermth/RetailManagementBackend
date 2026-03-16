@@ -25,7 +25,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p " +
             "WHERE p.paymentMethod = :method AND p.paymentDate BETWEEN :startDate AND :endDate")
-    BigDecimal getTotalByMethodForPeriod(@Param("method") String method,
+    BigDecimal getTotalByMethodForPeriod(@Param("method") PaymentMethod method,
                                          @Param("startDate") LocalDateTime startDate,
                                          @Param("endDate") LocalDateTime endDate);
 

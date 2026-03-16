@@ -57,9 +57,11 @@ public interface CustomerDueRepository extends JpaRepository<CustomerDue, Long> 
             "GROUP BY d.customer.id, d.customer.name, d.customer.phone")
     List<Object[]> getCustomerDueSummary();
 
+    @Query("Select count(DISTINCT d.customer.id) from CustomerDue d where d.dueDate < CURRENT_TIMESTAMP() and d.status in ('PENDING', 'PARTIALLY_PAID')")
     Integer countOverdue();
 
     Optional<CustomerDue> findByDueReference(String dueReference);
 
+    @Query("SELECT d FROM CustomerDue d WHERE d.dueDate < :endDate AND d.dueDate > :startDate AND d.status IN ('PENDING', 'PARTIALLY_PAID')")
     List<CustomerDue> getUpcomingDues(LocalDate startDate, LocalDate endDate);
 }

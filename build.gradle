@@ -1,7 +1,8 @@
 plugins {
-    id 'org.springframework.boot' version '3.4.0'
-    id 'io.spring.dependency-management' version '1.1.5'
+    id 'org.springframework.boot' version '3.5.6'
+    id 'io.spring.dependency-management' version '1.1.7'
     id 'java'
+    id 'org.liquibase.gradle' version '2.2.0' apply false
 }
 
 group = 'com.retailmanagement'
@@ -18,6 +19,7 @@ configurations {
     }
 }
 
+
 repositories {
     mavenCentral()
 }
@@ -30,9 +32,14 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation 'org.springframework.boot:spring-boot-starter-cache'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
-    
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
     // Database
-    runtimeOnly 'org.postgresql:postgresql'
+    // PostgreSQL Driver - MUST be runtime only, not compile
+    runtimeOnly 'org.postgresql:postgresql:42.6.0'
+
+    // OR if you need it for compilation too:
+    implementation 'org.postgresql:postgresql:42.6.0'
 
     // JWT Authentication
     implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
@@ -40,20 +47,25 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
     
     // OpenAPI / Swagger
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.2.0'
-    
-    // Lombok - with Java 21+ support
-    compileOnly 'org.projectlombok:lombok:1.18.30'
-    annotationProcessor 'org.projectlombok:lombok:1.18.30'
-    
-    // MapStruct for DTO mapping
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.11'
+
+    compileOnly 'org.projectlombok:lombok:1.18.38'
+    annotationProcessor 'org.projectlombok:lombok:1.18.38'
+
+    // MapStruct for DTO mapping - uncommented and properly configured
     implementation 'org.mapstruct:mapstruct:1.5.5.Final'
     annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.5.Final'
 
-    implementation 'org.apache.poi:poi-ooxml:5.2.3'
-    implementation 'com.itextpdf:itext7-core:7.2.5'
+    // Lombok-MapStruct binding for smooth integration
+    annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+
+    implementation 'org.apache.poi:poi-ooxml:5.2.1'
+    implementation 'com.itextpdf:itext7-core:7.2.3'
 
     implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
+
+    // Liquibase for database migrations
+    implementation 'org.liquibase:liquibase-core'
     
     // Testing
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
@@ -64,6 +76,7 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-engine'
 }
 
+
 tasks.named('compileJava') {
     options.compilerArgs.addAll('-parameters', '-Xlint:unchecked', '-Xlint:deprecation')
     // Disable incremental compilation for Lombok compatibility
@@ -73,4 +86,50 @@ tasks.named('compileJava') {
 tasks.named('test') {
     useJUnitPlatform()
     failOnNoDiscoveredTests = false
+}
+
+tasks.named('processResources') {
+    duplicatesStrategy = 'exclude'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs << '-Amapstruct.defaultComponentModel=spring'
+    options.compilerArgs << '-parameters'
+    options.encoding = 'UTF-8'
+
+    // Java 21 specific settings
+    options.fork = true
+    options.forkOptions.jvmArgs += [
+        '-Dorg.gradle.internal.publish.checksums.insecure=true',
+        '--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED',
+        '--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED',
+        '--add-opens=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED',
+        '--add-opens=java.base/java.lang=ALL-UNNAMED',
+        '--add-opens=java.base/sun.reflect.annotation=ALL-UNNAMED',
+        '--add-opens=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED',
+        '--enable-native-access=ALL-UNNAMED'
+    ]
+}
+
+
+if (project.hasProperty('liquibase')) {
+    apply plugin: 'org.liquibase.gradle'
+
+    liquibase {
+        activity(name: 'main') {
+            changelogFile = 'src/main/resources/db/changelog/db.changelog.yaml'
+            url = 'jdbc:postgresql://localhost:5432/retail_management_db?currentSchema=retail_management_schema'
+            username = 'postgres'
+            password = 'password'
+            driver = 'org.postgresql.Driver'
+        }
+    }
+}
+
+sourceSets {
+    main {
+        resources {
+            srcDirs "src/main/resources"
+        }
+    }
 }

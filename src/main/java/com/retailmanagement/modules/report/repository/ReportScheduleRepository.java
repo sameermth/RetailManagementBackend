@@ -23,7 +23,7 @@ public interface ReportScheduleRepository extends JpaRepository<ReportSchedule, 
     @Query("SELECT rs FROM ReportSchedule rs WHERE rs.isActive = true AND rs.nextRunDate <= :date")
     List<ReportSchedule> findSchedulesDueForExecution(@Param("date") LocalDateTime date);
 
-    List<ReportSchedule> findByCreatedByUserId(Long userId);
+    List<ReportSchedule> findByCreatedById(Long userId);
 
     boolean existsByScheduleId(String scheduleId);
 }

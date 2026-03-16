@@ -176,7 +176,7 @@ public class ReportScheduleServiceImpl implements ReportScheduleService {
     public List<ReportScheduleResponse> getSchedulesByUser(Long userId) {
         log.debug("Fetching report schedules for user ID: {}", userId);
 
-        return scheduleRepository.findByCreatedByUserId(userId).stream()
+        return scheduleRepository.findByCreatedById(userId).stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }

@@ -74,7 +74,7 @@ public class Notification {
 
     private String errorMessage;
 
-    private String metadata; // JSON string for additional data
+    //private String metadata; // JSON string for additional data
 
     @CreatedDate
     private LocalDateTime createdAt;

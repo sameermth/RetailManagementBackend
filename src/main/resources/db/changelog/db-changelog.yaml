@@ -1,0 +1,25 @@
+databaseChangeLog:
+  - changeSet:
+      id: 2
+      author: sameermth
+      changes:
+#        - sqlFile:
+#            path: db/migration/create_schema.sql
+#            relativeToChangelogFile: false
+#            encoding: UTF-8
+#            splitStatements: true
+#            stripComments: true
+#        - sqlFile:
+#            path: db/migration/create_indexes.sql
+#            relativeToChangelogFile: false
+#            encoding: UTF-8
+#            splitStatements: true
+#            stripComments: true
+#        - sqlFile:
+#            path: db/migration/insert_master_data.sql
+#            relativeToChangelogFile: false
+#            encoding: UTF-8
+#            splitStatements: true
+#            stripComments: true
+      rollback:
+#        - sql: "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"

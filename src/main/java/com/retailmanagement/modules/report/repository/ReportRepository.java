@@ -22,9 +22,9 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
 
     Page<Report> findByReportType(ReportType reportType, Pageable pageable);
 
-    List<Report> findByGeneratedByUserId(Long userId);
+    List<Report> findByGeneratedById(Long userId);
 
-    Page<Report> findByGeneratedByUserId(Long userId, Pageable pageable);
+    Page<Report> findByGeneratedById(Long userId, Pageable pageable);
 
     List<Report> findByGeneratedDateBetween(LocalDateTime startDate, LocalDateTime endDate);
 

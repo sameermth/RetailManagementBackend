@@ -25,6 +25,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -103,8 +104,8 @@ public class InventoryServiceImpl implements InventoryService {
         inventory.setReorderQuantity(request.getReorderQuantity());
         inventory.setBinLocation(request.getBinLocation());
         inventory.setShelfNumber(request.getShelfNumber());
-        inventory.setAverageCost(request.getAverageCost());
-        inventory.setLastPurchasePrice(request.getLastPurchasePrice());
+        inventory.setAverageCost(BigDecimal.valueOf(request.getAverageCost()));
+        inventory.setLastPurchasePrice(BigDecimal.valueOf(request.getLastPurchasePrice()));
 
         // If quantity is being updated directly (should be rare, use stock movements instead)
         if (request.getQuantity() != null && !request.getQuantity().equals(inventory.getQuantity())) {
@@ -493,8 +494,8 @@ public class InventoryServiceImpl implements InventoryService {
                 .quantity(quantity)
                 .previousStock(previousStock)
                 .newStock(newStock)
-                .unitCost(product.getCostPrice().doubleValue())
-                .totalCost(product.getCostPrice() != null ? product.getCostPrice().multiply(new java.math.BigDecimal(quantity)).doubleValue() : null)
+                .unitCost(product.getCostPrice())
+                .totalCost(product.getCostPrice() != null ? product.getCostPrice().multiply(new java.math.BigDecimal(quantity)) : null)
                 .referenceType(referenceType)
                 .reason(reason)
                 .performedBy("SYSTEM") // In real app, get from SecurityContext

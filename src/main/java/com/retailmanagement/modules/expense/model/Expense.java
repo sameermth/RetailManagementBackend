@@ -93,5 +93,6 @@ public class Expense {
 
     private String updatedBy;
 
+    @OneToMany(mappedBy = "expense", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ExpenseAttachment> attachments;
 }

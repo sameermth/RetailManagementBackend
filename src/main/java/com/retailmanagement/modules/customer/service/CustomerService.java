@@ -55,4 +55,6 @@ public interface CustomerService {
     void updateLoyaltyPoints(Long customerId, int points, String transactionType, Long saleId);
 
     String determineLoyaltyTier(BigDecimal totalPurchaseAmount);
+
+    List<CustomerSummaryResponse> getAllCustomerSummaries();
 }

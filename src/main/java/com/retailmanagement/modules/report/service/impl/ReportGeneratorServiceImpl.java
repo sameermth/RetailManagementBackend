@@ -203,14 +203,14 @@ public class ReportGeneratorServiceImpl implements ReportGeneratorService {
 
     @Override
     public List<ReportResponse> getReportsByUser(Long userId) {
-        return reportRepository.findByGeneratedByUserId(userId).stream()
+        return reportRepository.findByGeneratedById(userId).stream()
                 .map(this::convertToResponse)
                 .toList();
     }
 
     @Override
     public Page<ReportResponse> getReportsByUser(Long userId, Pageable pageable) {
-        return reportRepository.findByGeneratedByUserId(userId, pageable)
+        return reportRepository.findByGeneratedById(userId, pageable)
                 .map(this::convertToResponse);
     }
 

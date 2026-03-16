@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -52,10 +53,10 @@ public class StockMovement {
     private Integer newStock;
 
     @Column(precision = 10, scale = 2)
-    private Double unitCost;
+    private BigDecimal unitCost;
 
     @Column(precision = 10, scale = 2)
-    private Double totalCost;
+    private BigDecimal totalCost;
 
     private String referenceType; // PURCHASE_ORDER, SALES_ORDER, TRANSFER, ADJUSTMENT, RETURN
 

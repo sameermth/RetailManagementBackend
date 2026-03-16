@@ -98,7 +98,7 @@ public class AuthServiceImpl implements AuthService {
 
         // Assign default role (ROLE_USER)
         Set<Role> roles = new HashSet<>();
-        Role userRole = roleRepository.findByName("ROLE_USER")
+        Role userRole = roleRepository.findByName("ROLE_EMPLOYEE")
                 .orElseThrow(() -> new BusinessException("Default role not found"));
         roles.add(userRole);
         user.setRoles(roles);
