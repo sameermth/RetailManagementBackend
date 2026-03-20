@@ -48,7 +48,7 @@ public interface InventoryService {
 
     long getOutOfStockCount();
 
-    void removeStock(Long productId, long quantity, Integer reason);
+    void removeStock(Long productId, long quantity, Long warehouseId);
 
-    void addStock(Long productId, long quantity, Integer reason);
+    void addStock(Long productId, long quantity, Long warehouseId);
 }

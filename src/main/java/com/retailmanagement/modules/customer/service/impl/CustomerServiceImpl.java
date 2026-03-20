@@ -221,6 +221,7 @@ public class CustomerServiceImpl implements CustomerService {
                 .orElseThrow(() -> new ResourceNotFoundException("Customer not found with id: " + id));
 
         customer.setStatus(CustomerStatus.ACTIVE);
+        customer.setIsActive(true);
         customer.setUpdatedBy("SYSTEM");
         customerRepository.save(customer);
     }
@@ -233,6 +234,7 @@ public class CustomerServiceImpl implements CustomerService {
                 .orElseThrow(() -> new ResourceNotFoundException("Customer not found with id: " + id));
 
         customer.setStatus(CustomerStatus.INACTIVE);
+        customer.setIsActive(false);
         customer.setUpdatedBy("SYSTEM");
         customerRepository.save(customer);
     }

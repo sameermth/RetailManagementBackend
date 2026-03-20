@@ -25,7 +25,6 @@ public interface CustomerDueMapper {
     @Mapping(target = "reminderCount", ignore = true)
     @Mapping(target = "lastReminderSent", ignore = true)
     @Mapping(target = "lastPaymentDate", ignore = true)
-    @Mapping(target = "createdAt", ignore = true)
     CustomerDue toEntity(CustomerDueRequest request);
 
     @Mapping(target = "customerId", source = "customer.id")

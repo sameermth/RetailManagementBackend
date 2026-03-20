@@ -55,6 +55,7 @@ public class InvoiceServiceImpl implements InvoiceService {
 
         // Create invoice
         Invoice invoice = invoiceMapper.toEntity(sale);
+        invoice.setSale(sale);
         invoice.setInvoiceNumber(invoiceNumber);
         invoice.setInvoiceDate(LocalDateTime.now());
         invoice.setDueDate(sale.getDueDate());

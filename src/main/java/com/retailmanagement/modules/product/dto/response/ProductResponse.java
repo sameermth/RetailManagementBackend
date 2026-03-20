@@ -36,6 +36,7 @@ public class ProductResponse {
     private Integer shelfLifeDays;
     private List<ProductImageResponse> images;
     private List<ProductVariantResponse> variants;
+    private Integer stockQuantity;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

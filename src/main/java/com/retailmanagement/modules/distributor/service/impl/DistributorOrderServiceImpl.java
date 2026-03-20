@@ -384,7 +384,7 @@ public class DistributorOrderServiceImpl implements DistributorOrderService {
         // Release reserved stock and reduce actual stock
         for (DistributorOrderItem item : order.getItems()) {
             inventoryService.releaseReservedStock(item.getProduct().getId(), 1L, item.getQuantity());
-            inventoryService.removeStock(item.getProduct().getId(), 1L, item.getQuantity());
+            inventoryService.removeStock(item.getProduct().getId(), item.getQuantity(), 1L);
         }
 
         log.info("Order shipped successfully with ID: {}, tracking: {}", id, trackingNumber);

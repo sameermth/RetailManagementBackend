@@ -12,6 +12,9 @@ public class PurchaseReceiptRequest {
     @NotNull(message = "Purchase ID is required")
     private Long purchaseId;
 
+    @NotNull(message = "Warehouse ID is required")
+    private Long warehouseId;
+
     private LocalDateTime receiptDate;
 
     private List<ReceiptItemRequest> items;

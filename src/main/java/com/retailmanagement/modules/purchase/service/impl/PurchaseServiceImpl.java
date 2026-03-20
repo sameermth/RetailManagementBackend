@@ -408,8 +408,8 @@ public class PurchaseServiceImpl implements PurchaseService {
             // Update inventory
             inventoryService.addStock(
                     purchaseItem.getProduct().getId(),
-                    1L, // Default warehouse, should be configurable
-                    itemRequest.getQuantityReceived()
+                    itemRequest.getQuantityReceived(),
+                    request.getWarehouseId()
             );
 
             // Check if all items are received

@@ -2,6 +2,8 @@ package com.retailmanagement.modules.product.service.impl;
 
 import com.retailmanagement.common.exceptions.BusinessException;
 import com.retailmanagement.common.exceptions.ResourceNotFoundException;
+import com.retailmanagement.modules.inventory.model.Inventory;
+import com.retailmanagement.modules.inventory.repository.InventoryRepository;
 import com.retailmanagement.modules.product.dto.request.ProductRequest;
 import com.retailmanagement.modules.product.dto.response.ProductResponse;
 import com.retailmanagement.modules.product.mapper.ProductMapper;
@@ -34,6 +36,7 @@ public class ProductServiceImpl implements ProductService {
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
     private final ProductMapper productMapper;
+    private final InventoryRepository inventoryRepository;
 
     @Override
     public ProductResponse createProduct(ProductRequest request) {
@@ -148,7 +151,12 @@ public class ProductServiceImpl implements ProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
 
-        return productMapper.toResponse(product);
+        Inventory inventory = inventoryRepository.findInventoryByProduct(product);
+
+        ProductResponse productResponse = productMapper.toResponse(product);
+        productResponse.setStockQuantity(inventory != null ? inventory.getAvailableQuantity() : 0);
+
+        return productResponse;
     }
 
     @Override
@@ -166,7 +174,11 @@ public class ProductServiceImpl implements ProductService {
         log.debug("Fetching all products with pagination");
 
         return productRepository.findAll(pageable)
-                .map(productMapper::toResponse);
+                .map(productMapper::toResponse).map(productResponse -> {
+                    Inventory inventory = inventoryRepository.findInventoryByProduct(Product.builder().id(productResponse.getId()).build());
+                    productResponse.setStockQuantity(inventory != null ? inventory.getAvailableQuantity() : 0);
+                    return productResponse;
+                });
     }
 
     @Override

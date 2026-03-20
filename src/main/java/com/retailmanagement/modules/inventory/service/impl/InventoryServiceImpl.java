@@ -506,7 +506,7 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    public void removeStock(Long productId, long quantity, Integer reason) {
+    public void removeStock(Long productId, long quantity, Long warehouseId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
         
@@ -516,7 +516,7 @@ public class InventoryServiceImpl implements InventoryService {
             throw new RuntimeException("No inventory found for product");
         }
         
-        Inventory inventory = inventories.get(0);
+        Inventory inventory = inventories.getFirst();
         if (inventory.getAvailableQuantity() < quantity) {
             throw new RuntimeException("Insufficient stock");
         }
@@ -527,17 +527,26 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    public void addStock(Long productId, long quantity, Integer reason) {
+    public void addStock(Long productId, long quantity, Long warehouseId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
         
         // Find inventory and update stock
         List<Inventory> inventories = inventoryRepository.findByProductId(productId);
         if (inventories.isEmpty()) {
-            throw new RuntimeException("No inventory found for product");
+            // if no inventory exists for product, create inventory
+            Inventory inventory = Inventory.builder()
+                    .product(product)
+                    .warehouse(Warehouse.builder().id(warehouseId).build()) // or assign to a default warehouse
+                    .quantity(0)
+                    .availableQuantity( 0)
+                    .reservedQuantity(0)
+                    .build();
+
+            inventories.add(inventory);
         }
         
-        Inventory inventory = inventories.get(0);
+        Inventory inventory = inventories.getFirst();
         inventory.setQuantity((int) (inventory.getQuantity() + quantity));
         inventory.setAvailableQuantity(inventory.getAvailableQuantity() + (int) quantity);
         inventoryRepository.save(inventory);

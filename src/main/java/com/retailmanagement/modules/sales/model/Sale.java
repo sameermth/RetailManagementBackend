@@ -4,10 +4,7 @@ import com.retailmanagement.modules.customer.model.Customer;
 import com.retailmanagement.modules.sales.enums.SaleStatus;
 import com.retailmanagement.modules.auth.model.User;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -24,6 +21,7 @@ import java.util.List;
 @Entity
 @Table(name = "sales")
 @EntityListeners(AuditingEntityListener.class)
+@ToString( exclude = {"customer", "user", "items", "payments"})
 public class Sale {
 
     @Id

@@ -4,9 +4,11 @@ import com.retailmanagement.modules.auth.security.UserPrincipal;
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
+//@Component("auditorAware")
 public class AuditorAwareImpl implements AuditorAware<String> {
 
     @Override
@@ -21,6 +23,8 @@ public class AuditorAwareImpl implements AuditorAware<String> {
 
         if (principal instanceof UserPrincipal) {
             return Optional.of(((UserPrincipal) principal).getUsername());
+        } else if (principal instanceof String) {
+            return Optional.of((String) principal);
         }
 
         return Optional.of("SYSTEM");
