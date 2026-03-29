@@ -13,10 +13,12 @@ import com.retailmanagement.modules.erp.foundation.repository.OrganizationReposi
 import com.retailmanagement.modules.erp.inventory.entity.InventoryBalance;
 import com.retailmanagement.modules.erp.inventory.repository.InventoryBalanceRepository;
 import com.retailmanagement.modules.erp.party.entity.Customer;
+import com.retailmanagement.modules.erp.party.entity.StoreProductSupplierPreference;
 import com.retailmanagement.modules.erp.party.entity.StoreSupplierTerms;
 import com.retailmanagement.modules.erp.party.entity.Supplier;
 import com.retailmanagement.modules.erp.party.entity.SupplierProduct;
 import com.retailmanagement.modules.erp.party.repository.CustomerRepository;
+import com.retailmanagement.modules.erp.party.repository.StoreProductSupplierPreferenceRepository;
 import com.retailmanagement.modules.erp.party.repository.StoreSupplierTermsRepository;
 import com.retailmanagement.modules.erp.party.repository.SupplierProductRepository;
 import com.retailmanagement.modules.erp.party.repository.SupplierRepository;
@@ -76,6 +78,7 @@ public class WorkflowTriggerService {
     private final CustomerRepository customerRepository;
     private final SupplierRepository supplierRepository;
     private final SupplierProductRepository supplierProductRepository;
+    private final StoreProductSupplierPreferenceRepository storeProductSupplierPreferenceRepository;
     private final StoreSupplierTermsRepository storeSupplierTermsRepository;
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final PurchaseOrderLineRepository purchaseOrderLineRepository;
@@ -440,6 +443,25 @@ public class WorkflowTriggerService {
     }
 
     private java.util.Optional<CandidateSupplierMapping> resolveSupplierMapping(Long organizationId, StoreProduct storeProduct, LocalDate asOfDate) {
+        StoreProductSupplierPreference preference = storeProductSupplierPreferenceRepository
+                .findByOrganizationIdAndStoreProductIdAndIsActiveTrue(organizationId, storeProduct.getId())
+                .orElse(null);
+        if (preference != null) {
+            Supplier supplier = supplierRepository.findByOrganizationIdAndId(organizationId, preference.getSupplierId()).orElse(null);
+            SupplierProduct supplierProduct = supplier == null ? null
+                    : supplierProductRepository.findByIdAndOrganizationId(preference.getSupplierProductId(), organizationId).orElse(null);
+            StoreSupplierTerms terms = supplier == null ? null
+                    : storeSupplierTermsRepository.findByOrganizationIdAndSupplierId(organizationId, supplier.getId()).orElse(null);
+            if (supplier != null
+                    && supplierProduct != null
+                    && isActiveTerms(terms, asOfDate)
+                    && "ACTIVE".equalsIgnoreCase(supplier.getStatus())
+                    && Boolean.TRUE.equals(supplierProduct.getIsActive())
+                    && storeProduct.getProductId().equals(supplierProduct.getProductId())
+                    && supplier.getId().equals(supplierProduct.getSupplierId())) {
+                return java.util.Optional.of(new CandidateSupplierMapping(supplier, supplierProduct, terms));
+            }
+        }
         List<CandidateSupplierMapping> eligibleMappings = new ArrayList<>();
         for (SupplierProduct supplierProduct : supplierProductRepository
                 .findByOrganizationIdAndProductIdAndIsActiveTrueOrderByIsPreferredDescPriorityAscIdAsc(organizationId, storeProduct.getProductId())) {

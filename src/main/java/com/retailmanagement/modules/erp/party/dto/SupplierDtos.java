@@ -113,6 +113,25 @@ public final class SupplierDtos {
             LocalDateTime updatedAt
     ) {}
 
+    public record UpsertStoreProductSupplierPreferenceRequest(
+            @NotNull Long supplierId,
+            @NotNull Long supplierProductId,
+            Boolean isActive,
+            String remarks
+    ) {}
+
+    public record StoreProductSupplierPreferenceResponse(
+            Long id,
+            Long organizationId,
+            Long storeProductId,
+            Long supplierId,
+            Long supplierProductId,
+            Boolean isActive,
+            String remarks,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt
+    ) {}
+
     public record PurchasableStoreProductResponse(
             Long storeProductId,
             Long productId,

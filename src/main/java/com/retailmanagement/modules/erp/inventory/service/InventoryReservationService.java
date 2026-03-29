@@ -116,7 +116,7 @@ public class InventoryReservationService {
                         "ACTIVE"
                 );
         for (InventoryReservation reservation : reservations) {
-            releaseReservedQuantity(reservation);
+            boolean inventoryAdjusted = releaseReservedQuantity(reservation);
             if (reservation.getSerialNumberId() != null) {
                 SerialNumber serial = serialNumberRepository.findById(reservation.getSerialNumberId())
                         .orElseThrow(() -> new ResourceNotFoundException("Serial number not found: " + reservation.getSerialNumberId()));
@@ -138,6 +138,8 @@ public class InventoryReservationService {
                 serialNumberRepository.save(serial);
             }
             reservation.setStatus("CONSUMED");
+            reservation.setReleasedAt(LocalDateTime.now());
+            reservation.setReleaseReason(inventoryAdjusted ? "CONSUMED" : "CONSUMED_STALE_BALANCE");
             inventoryReservationRepository.save(reservation);
         }
     }
@@ -214,7 +216,7 @@ public class InventoryReservationService {
         inventoryBalanceRepository.save(balance);
     }
 
-    private void releaseReservedQuantity(InventoryReservation reservation) {
+    private boolean releaseReservedQuantity(InventoryReservation reservation) {
         InventoryBalance balance = inventoryBalanceRepository
                 .findByOrganizationIdAndBranchIdAndWarehouseIdAndProductIdAndBatchId(
                         reservation.getOrganizationId(),
@@ -223,15 +225,27 @@ public class InventoryReservationService {
                         reservation.getProductId(),
                         reservation.getBatchId()
                 )
-                .orElseThrow(() -> new BusinessException("Inventory balance not found for reservation " + reservation.getId()));
+                .orElse(null);
+
+        if (balance == null) {
+            log.warn("Skipping inventory release for reservation {} because no inventory balance was found", reservation.getId());
+            return false;
+        }
 
         BigDecimal reserved = defaultQuantity(balance.getReservedBaseQuantity());
         if (reserved.compareTo(reservation.getReservedBaseQuantity()) < 0) {
-            throw new BusinessException("Reserved stock is inconsistent for reservation " + reservation.getId());
+            log.warn(
+                    "Skipping inventory release for reservation {} because reserved quantity {} is less than reserved_base_quantity {}",
+                    reservation.getId(),
+                    reserved,
+                    reservation.getReservedBaseQuantity()
+            );
+            return false;
         }
         balance.setReservedBaseQuantity(reserved.subtract(reservation.getReservedBaseQuantity()));
         balance.setAvailableBaseQuantity(defaultQuantity(balance.getAvailableBaseQuantity()).add(reservation.getReservedBaseQuantity()));
         inventoryBalanceRepository.save(balance);
+        return true;
     }
 
     private void saveReservation(SalesInvoice invoice, SalesInvoiceLine line, Long batchId, Long serialNumberId, BigDecimal reservedBaseQuantity) {
@@ -252,7 +266,7 @@ public class InventoryReservationService {
     }
 
     private void releaseReservation(InventoryReservation reservation, String releaseReason, LocalDateTime releasedAt) {
-        releaseReservedQuantity(reservation);
+        boolean inventoryAdjusted = releaseReservedQuantity(reservation);
         if (reservation.getSerialNumberId() != null) {
             serialNumberRepository.findById(reservation.getSerialNumberId()).ifPresent(serial -> {
                 if (ErpDocumentStatuses.ALLOCATED.equals(serial.getStatus())) {
@@ -263,7 +277,7 @@ public class InventoryReservationService {
         }
         reservation.setStatus("RELEASED");
         reservation.setReleasedAt(releasedAt);
-        reservation.setReleaseReason(releaseReason);
+        reservation.setReleaseReason(inventoryAdjusted ? releaseReason : releaseReason + "_STALE_BALANCE");
         inventoryReservationRepository.save(reservation);
     }
 

@@ -24,6 +24,10 @@ public final class ErpSecurityUtils {
         return currentPrincipal().map(UserPrincipal::getId);
     }
 
+    public static Optional<Long> currentAccountId() {
+        return currentPrincipal().map(UserPrincipal::getAccountId);
+    }
+
     public static Optional<String> currentUsername() {
         return currentPrincipal().map(UserPrincipal::getUsername);
     }

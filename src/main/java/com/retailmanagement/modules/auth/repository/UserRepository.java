@@ -19,8 +19,25 @@ public interface UserRepository extends JpaRepository<User, Long> {
             LEFT JOIN u.person p
             WHERE lower(a.loginIdentifier) = lower(:login)
                OR lower(coalesce(p.primaryEmail, '')) = lower(:login)
+            ORDER BY u.active DESC, u.id ASC
             """)
-    Optional<User> findByLogin(@Param("login") String login);
+    List<User> findAllByLogin(@Param("login") String login);
+
+    default Optional<User> findByLogin(@Param("login") String login) {
+        return findAllByLogin(login).stream().findFirst();
+    }
+
+    @Query("""
+            SELECT u
+            FROM User u
+            JOIN u.account a
+            LEFT JOIN u.person p
+            WHERE (lower(a.loginIdentifier) = lower(:login)
+               OR lower(coalesce(p.primaryEmail, '')) = lower(:login))
+              AND u.organizationId = :organizationId
+            ORDER BY u.active DESC, u.id ASC
+            """)
+    Optional<User> findByLoginAndOrganizationId(@Param("login") String login, @Param("organizationId") Long organizationId);
 
     default Optional<User> findByUsername(String username) {
         return findByLogin(username);
@@ -67,4 +84,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
             """)
     List<User> findActiveByOrganizationIdAndRoleCodeIn(@Param("organizationId") Long organizationId,
                                                        @Param("roleCodes") Collection<String> roleCodes);
+
+    List<User> findByOrganizationIdOrderByIdAsc(Long organizationId);
+
+    Optional<User> findByIdAndOrganizationId(Long id, Long organizationId);
 }

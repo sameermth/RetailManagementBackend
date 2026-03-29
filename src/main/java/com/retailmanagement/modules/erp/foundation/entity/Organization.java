@@ -14,6 +14,7 @@ public class Organization extends ErpAuditableEntity {
  @Column(name="phone") private String phone;
  @Column(name="email") private String email;
  @Column(name="gstin") private String gstin;
+ @Column(name="owner_account_id", nullable=false) private Long ownerAccountId;
  @Column(name="gst_threshold_amount", nullable=false, precision=18, scale=2) private BigDecimal gstThresholdAmount = new BigDecimal("4000000.00");
  @Column(name="gst_threshold_alert_enabled", nullable=false) private Boolean gstThresholdAlertEnabled = true;
  @Column(name="subscription_version", nullable=false) private Long subscriptionVersion = 1L;

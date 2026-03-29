@@ -33,6 +33,8 @@ import java.util.List;
 
 import com.retailmanagement.modules.erp.party.repository.SupplierRepository;
 import com.retailmanagement.modules.erp.party.entity.SupplierProduct;
+import com.retailmanagement.modules.erp.party.entity.StoreProductSupplierPreference;
+import com.retailmanagement.modules.erp.party.repository.StoreProductSupplierPreferenceRepository;
 import com.retailmanagement.modules.erp.party.repository.SupplierProductRepository;
 import com.retailmanagement.modules.erp.party.repository.StoreSupplierTermsRepository;
 import com.retailmanagement.modules.erp.subscription.service.SubscriptionAccessService;
@@ -57,6 +59,7 @@ public class ErpPurchaseService {
     private final SupplierRepository supplierRepository;
     private final SupplierProductRepository supplierProductRepository;
     private final StoreSupplierTermsRepository storeSupplierTermsRepository;
+    private final StoreProductSupplierPreferenceRepository storeProductSupplierPreferenceRepository;
     private final StoreProductRepository productRepository;
     private final ProductRepository productMasterRepository;
     private final UomRepository uomRepository;
@@ -121,7 +124,7 @@ public class ErpPurchaseService {
             ensureStoreProductBelongsToOrganization(organizationId, product);
             Product productMaster = productMasterRepository.findById(product.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Product master not found: " + product.getProductId()));
-            SupplierProduct supplierProduct = resolveSupplierProduct(organizationId, supplier.getId(), product.getProductId(), reqLine.supplierProductId());
+            SupplierProduct supplierProduct = resolveSupplierProduct(organizationId, supplier.getId(), product, reqLine.supplierProductId());
             uomRepository.findById(reqLine.uomId())
                     .orElseThrow(() -> new ResourceNotFoundException("UOM not found: " + reqLine.uomId()));
 
@@ -283,7 +286,7 @@ public class ErpPurchaseService {
             ensureStoreProductBelongsToOrganization(organizationId, product);
             Product productMaster = productMasterRepository.findById(product.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Product master not found: " + product.getProductId()));
-            SupplierProduct supplierProduct = resolveSupplierProduct(organizationId, supplier.getId(), product.getProductId(), reqLine.supplierProductId());
+            SupplierProduct supplierProduct = resolveSupplierProduct(organizationId, supplier.getId(), product, reqLine.supplierProductId());
             uomRepository.findById(reqLine.uomId())
                     .orElseThrow(() -> new ResourceNotFoundException("UOM not found: " + reqLine.uomId()));
             validateReceiptTracking(product, reqLine);
@@ -711,7 +714,8 @@ public class ErpPurchaseService {
         }
     }
 
-    private SupplierProduct resolveSupplierProduct(Long organizationId, Long supplierId, Long productMasterId, Long supplierProductId) {
+    private SupplierProduct resolveSupplierProduct(Long organizationId, Long supplierId, StoreProduct storeProduct, Long supplierProductId) {
+        Long productMasterId = storeProduct.getProductId();
         if (supplierProductId != null) {
             SupplierProduct supplierProduct = supplierProductRepository.findByIdAndOrganizationId(supplierProductId, organizationId)
                     .orElseThrow(() -> new ResourceNotFoundException("Supplier product not found: " + supplierProductId));
@@ -725,6 +729,21 @@ public class ErpPurchaseService {
                 throw new BusinessException("Supplier product is inactive: " + supplierProductId);
             }
             return supplierProduct;
+        }
+
+        StoreProductSupplierPreference preference = storeProductSupplierPreferenceRepository
+                .findByOrganizationIdAndStoreProductIdAndIsActiveTrue(organizationId, storeProduct.getId())
+                .orElse(null);
+        if (preference != null && supplierId.equals(preference.getSupplierId())) {
+            SupplierProduct preferredSupplierProduct = supplierProductRepository
+                    .findByIdAndOrganizationId(preference.getSupplierProductId(), organizationId)
+                    .orElse(null);
+            if (preferredSupplierProduct != null
+                    && Boolean.TRUE.equals(preferredSupplierProduct.getIsActive())
+                    && supplierId.equals(preferredSupplierProduct.getSupplierId())
+                    && productMasterId.equals(preferredSupplierProduct.getProductId())) {
+                return preferredSupplierProduct;
+            }
         }
 
         List<SupplierProduct> matches = supplierProductRepository

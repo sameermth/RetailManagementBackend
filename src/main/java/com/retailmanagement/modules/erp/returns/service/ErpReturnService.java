@@ -2,6 +2,8 @@ package com.retailmanagement.modules.erp.returns.service;
 
 import com.retailmanagement.common.exceptions.BusinessException;
 import com.retailmanagement.common.exceptions.ResourceNotFoundException;
+import com.retailmanagement.modules.erp.approval.dto.ErpApprovalDtos;
+import com.retailmanagement.modules.erp.approval.service.ErpApprovalService;
 import com.retailmanagement.modules.erp.audit.service.AuditEventWriter;
 import com.retailmanagement.modules.erp.common.constants.ErpDocumentStatuses;
 import com.retailmanagement.modules.erp.common.constants.ErpInventoryMovementTypes;
@@ -91,6 +93,8 @@ public class ErpReturnService {
     private final AuditEventWriter auditEventWriter;
     private final ErpAccessGuard accessGuard;
     private final SubscriptionAccessService subscriptionAccessService;
+    private final ErpApprovalService approvalService;
+    private final ReturnPostingService returnPostingService;
 
     @Transactional(readOnly = true)
     public List<SalesReturn> listSalesReturns(Long organizationId) {
@@ -157,9 +161,7 @@ public class ErpReturnService {
             if (!invoice.getId().equals(original.getSalesInvoiceId())) {
                 throw new BusinessException("Sales return line does not belong to the selected invoice");
             }
-            BigDecimal previouslyReturned = salesReturnLineRepository.findByOriginalSalesInvoiceLineId(original.getId()).stream()
-                    .map(SalesReturnLine::getBaseQuantity)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal previouslyReturned = salesReturnLineRepository.sumActiveBaseQuantityByOriginalSalesInvoiceLineId(original.getId());
             BigDecimal remaining = original.getBaseQuantity().subtract(previouslyReturned);
             if (reqLine.baseQuantity().compareTo(remaining) > 0) {
                 throw new BusinessException("Return quantity exceeds remaining quantity for invoice line " + original.getId());
@@ -199,6 +201,27 @@ public class ErpReturnService {
             List<SalesLineBatch> originalBatches = salesLineBatchRepository.findBySalesInvoiceLineId(original.getId());
             validateReturnTracking(reqLine.serialNumberIds(), reqLine.batchSelections(), originalSerials, originalBatches, reqLine.baseQuantity(), "sales invoice line " + original.getId());
 
+            if (!originalSerials.isEmpty()) {
+                for (Long serialId : reqLine.serialNumberIds()) {
+                    if (salesReturnLineSerialRepository.existsInActiveReturnBySerialNumberId(serialId)) {
+                        throw new BusinessException("Serial " + serialId + " is already linked to a sales return");
+                    }
+                    SalesReturnLineSerial link = new SalesReturnLineSerial();
+                    link.setSalesReturnLineId(line.getId());
+                    link.setSerialNumberId(serialId);
+                    salesReturnLineSerialRepository.save(link);
+                }
+            } else if (!originalBatches.isEmpty()) {
+                for (ErpReturnDtos.ReturnBatchSelection batchSelection : reqLine.batchSelections()) {
+                    SalesReturnLineBatch link = new SalesReturnLineBatch();
+                    link.setSalesReturnLineId(line.getId());
+                    link.setBatchId(batchSelection.batchId());
+                    link.setQuantity(batchSelection.quantity());
+                    link.setBaseQuantity(batchSelection.baseQuantity());
+                    salesReturnLineBatchRepository.save(link);
+                }
+            }
+
             subtotal = subtotal.add(line.getTaxableAmount());
             taxAmount = taxAmount.add(line.getCgstAmount()).add(line.getSgstAmount()).add(line.getIgstAmount()).add(line.getCessAmount());
             totalAmount = totalAmount.add(line.getLineAmount());
@@ -231,10 +254,6 @@ public class ErpReturnService {
         }
 
         List<SalesReturnLine> lines = salesReturnLineRepository.findBySalesReturnIdOrderByIdAsc(id);
-        BigDecimal inventoryValue = BigDecimal.ZERO;
-        Long originalSalesInvoiceId = header.getOriginalSalesInvoiceId();
-        SalesInvoice invoice = salesInvoiceRepository.findById(originalSalesInvoiceId)
-                .orElseThrow(() -> new ResourceNotFoundException("Sales invoice not found: " + originalSalesInvoiceId));
 
         for (SalesReturnLine line : lines) {
             ErpReturnDtos.InspectSalesReturnLineRequest lineRequest = inspectionByLineId.get(line.getId());
@@ -250,54 +269,44 @@ public class ErpReturnService {
                 continue;
             }
 
-            SalesInvoiceLine original = salesInvoiceLineRepository.findById(line.getOriginalSalesInvoiceLineId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Sales invoice line not found: " + line.getOriginalSalesInvoiceLineId()));
-            List<SalesLineSerial> originalSerials = salesLineSerialRepository.findBySalesInvoiceLineId(original.getId());
-            List<SalesLineBatch> originalBatches = salesLineBatchRepository.findBySalesInvoiceLineId(original.getId());
-
-            if ("RESTOCK".equals(line.getDisposition())) {
-                if (!originalSerials.isEmpty()) {
-                    postApprovedSalesReturnSerials(header, line, original, invoice);
-                } else if (!originalBatches.isEmpty()) {
-                    postApprovedSalesReturnBatches(header, line, invoice);
-                } else {
-                    inventoryPostingService.postMovement(
-                            header.getOrganizationId(),
-                            header.getBranchId(),
-                            header.getWarehouseId(),
-                            line.getProductId(),
-                            null,
-                            line.getUomId(),
-                            line.getQuantity(),
-                            line.getBaseQuantity(),
-                            "IN",
-                            ErpInventoryMovementTypes.SALES_RETURN,
-                            "sales_return",
-                            header.getId(),
-                            header.getReturnNumber(),
-                            line.getUnitCostAtReturn(),
-                            ErpJsonPayloads.of("salesReturnId", header.getId(), "lineId", line.getId(), "sourceInvoiceId", invoice.getId())
-                    );
-                }
-                inventoryValue = inventoryValue.add(line.getTotalCostAtReturn());
-            }
         }
 
-        header.setStatus(ErpDocumentStatuses.POSTED);
         header.setInspectedAt(LocalDateTime.now());
         header.setInspectedBy(com.retailmanagement.modules.erp.common.ErpSecurityUtils.currentUserId().orElse(1L));
         header.setInspectionNotes(request.inspectionNotes());
-        header.setPostedAt(LocalDateTime.now());
         header = salesReturnRepository.save(header);
-        accountingPostingService.postSalesReturn(header, inventoryValue);
-
-        auditEventWriter.write(
-                header.getOrganizationId(), header.getBranchId(), "SALES_RETURN_POSTED", "sales_return", header.getId(), header.getReturnNumber(),
-                "INSPECT_AND_POST", header.getWarehouseId(), header.getCustomerId(), null, "Sales return inspected and posted",
-                ErpJsonPayloads.of("returnId", header.getId(), "originalSalesInvoiceId", header.getOriginalSalesInvoiceId(), "total", header.getTotalAmount())
+        ErpApprovalService.ApprovalEvaluation evaluation = approvalService.evaluate(
+                header.getOrganizationId(),
+                new ErpApprovalDtos.ApprovalEvaluationQuery("sales_return", header.getId(), "SALES_RETURN_POST")
         );
+        if (evaluation.approvalRequired()) {
+            header.setStatus(ErpDocumentStatuses.PENDING_APPROVAL);
+            header = salesReturnRepository.save(header);
+            if (!evaluation.pendingRequestExists()) {
+                approvalService.createRequest(
+                        header.getOrganizationId(),
+                        header.getBranchId(),
+                        new ErpApprovalDtos.CreateApprovalRequest(
+                                "sales_return",
+                                header.getId(),
+                                header.getReturnNumber(),
+                                "SALES_RETURN_POST",
+                                "Sales return inspection matched approval rule",
+                                null,
+                                evaluation.approverRoleCode()
+                        )
+                );
+            }
+            auditEventWriter.write(
+                    header.getOrganizationId(), header.getBranchId(), "SALES_RETURN_PENDING_APPROVAL", "sales_return", header.getId(), header.getReturnNumber(),
+                    "REQUEST_APPROVAL", header.getWarehouseId(), header.getCustomerId(), null, "Sales return inspected and sent for approval",
+                    ErpJsonPayloads.of("returnId", header.getId(), "originalSalesInvoiceId", header.getOriginalSalesInvoiceId(), "total", header.getTotalAmount())
+            );
+            return toSalesReturnResponse(header, salesReturnLineRepository.findBySalesReturnIdOrderByIdAsc(header.getId()));
+        }
 
-        return toSalesReturnResponse(header, salesReturnLineRepository.findBySalesReturnIdOrderByIdAsc(header.getId()));
+        SalesReturn posted = returnPostingService.finalizeApprovedSalesReturn(header.getId());
+        return toSalesReturnResponse(posted, salesReturnLineRepository.findBySalesReturnIdOrderByIdAsc(posted.getId()));
     }
 
     public ErpReturnResponses.PurchaseReturnResponse createPurchaseReturn(Long organizationId, Long branchId, ErpReturnDtos.CreatePurchaseReturnRequest request) {
@@ -322,8 +331,7 @@ public class ErpReturnService {
         header.setPlaceOfSupplyStateCode(receipt.getPlaceOfSupplyStateCode());
         header.setReason(request.reason());
         header.setRemarks(request.remarks());
-        header.setStatus(ErpDocumentStatuses.POSTED);
-        header.setPostedAt(LocalDateTime.now());
+        header.setStatus(ErpDocumentStatuses.SUBMITTED);
         header = purchaseReturnRepository.save(header);
 
         BigDecimal subtotal = BigDecimal.ZERO;
@@ -336,9 +344,7 @@ public class ErpReturnService {
             if (!receipt.getId().equals(original.getPurchaseReceiptId())) {
                 throw new BusinessException("Purchase return line does not belong to the selected receipt");
             }
-            BigDecimal previouslyReturned = purchaseReturnLineRepository.findByOriginalPurchaseReceiptLineId(original.getId()).stream()
-                    .map(PurchaseReturnLine::getBaseQuantity)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal previouslyReturned = purchaseReturnLineRepository.sumActiveBaseQuantityByOriginalPurchaseReceiptLineId(original.getId());
             BigDecimal remaining = original.getBaseQuantity().subtract(previouslyReturned);
             if (reqLine.baseQuantity().compareTo(remaining) > 0) {
                 throw new BusinessException("Return quantity exceeds remaining quantity for receipt line " + original.getId());
@@ -373,65 +379,23 @@ public class ErpReturnService {
 
             if (!originalSerials.isEmpty()) {
                 for (Long serialId : reqLine.serialNumberIds()) {
-                    if (purchaseReturnLineSerialRepository.findBySerialNumberId(serialId).stream().findAny().isPresent()) {
+                    if (purchaseReturnLineSerialRepository.existsInActiveReturnBySerialNumberId(serialId)) {
                         throw new BusinessException("Serial " + serialId + " is already linked to a purchase return");
                     }
-                    SerialNumber serial = serialNumberRepository.findById(serialId)
-                            .orElseThrow(() -> new ResourceNotFoundException("Serial number not found: " + serialId));
-                    serial.setStatus(ErpDocumentStatuses.RETURNED);
-                    serial.setCurrentWarehouseId(null);
-                    serialNumberRepository.save(serial);
-
                     PurchaseReturnLineSerial link = new PurchaseReturnLineSerial();
                     link.setPurchaseReturnLineId(line.getId());
                     link.setSerialNumberId(serialId);
                     purchaseReturnLineSerialRepository.save(link);
-
-                    inventoryPostingService.postMovement(
-                            organizationId, branchId, header.getWarehouseId(), line.getProductId(), serial.getBatchId(),
-                            line.getUomId(), BigDecimal.ONE, BigDecimal.ONE, "OUT",
-                            ErpInventoryMovementTypes.PURCHASE_RETURN, "purchase_return", header.getId(), header.getReturnNumber(),
-                            line.getUnitCost(),
-                            ErpJsonPayloads.of("purchaseReturnId", header.getId(), "lineId", line.getId(), "serialNumberId", serialId, "sourcePurchaseReceiptId", receipt.getId())
-                    );
                 }
             } else if (!originalBatches.isEmpty()) {
                 for (ErpReturnDtos.ReturnBatchSelection batchSelection : reqLine.batchSelections()) {
-                    InventoryBatch batch = inventoryBatchRepository.findById(batchSelection.batchId())
-                            .orElseThrow(() -> new ResourceNotFoundException("Batch not found: " + batchSelection.batchId()));
                     PurchaseReturnLineBatch link = new PurchaseReturnLineBatch();
                     link.setPurchaseReturnLineId(line.getId());
-                    link.setBatchId(batch.getId());
+                    link.setBatchId(batchSelection.batchId());
                     link.setQuantity(batchSelection.quantity());
                     link.setBaseQuantity(batchSelection.baseQuantity());
                     purchaseReturnLineBatchRepository.save(link);
-
-                    inventoryPostingService.postMovement(
-                            organizationId, branchId, header.getWarehouseId(), line.getProductId(), batch.getId(),
-                            line.getUomId(), batchSelection.quantity(), batchSelection.baseQuantity(), "OUT",
-                            ErpInventoryMovementTypes.PURCHASE_RETURN, "purchase_return", header.getId(), header.getReturnNumber(),
-                            line.getUnitCost(),
-                            ErpJsonPayloads.of("purchaseReturnId", header.getId(), "lineId", line.getId(), "batchId", batch.getId(), "sourcePurchaseReceiptId", receipt.getId())
-                    );
                 }
-            } else {
-                inventoryPostingService.postMovement(
-                        organizationId,
-                        branchId,
-                        header.getWarehouseId(),
-                        line.getProductId(),
-                        null,
-                        line.getUomId(),
-                        line.getQuantity(),
-                        line.getBaseQuantity(),
-                        "OUT",
-                        ErpInventoryMovementTypes.PURCHASE_RETURN,
-                        "purchase_return",
-                        header.getId(),
-                        header.getReturnNumber(),
-                        line.getUnitCost(),
-                        ErpJsonPayloads.of("purchaseReturnId", header.getId(), "lineId", line.getId(), "sourcePurchaseReceiptId", receipt.getId())
-                );
             }
 
             subtotal = subtotal.add(line.getTaxableAmount());
@@ -443,15 +407,38 @@ public class ErpReturnService {
         header.setTaxAmount(taxAmount);
         header.setTotalAmount(totalAmount);
         header = purchaseReturnRepository.save(header);
-        accountingPostingService.postPurchaseReturn(header);
-
-        auditEventWriter.write(
-                organizationId, branchId, "PURCHASE_RETURN_POSTED", "purchase_return", header.getId(), header.getReturnNumber(),
-                "POST", header.getWarehouseId(), null, header.getSupplierId(), "Purchase return posted",
-                ErpJsonPayloads.of("returnId", header.getId(), "originalPurchaseReceiptId", header.getOriginalPurchaseReceiptId(), "total", header.getTotalAmount())
+        ErpApprovalService.ApprovalEvaluation evaluation = approvalService.evaluate(
+                header.getOrganizationId(),
+                new ErpApprovalDtos.ApprovalEvaluationQuery("purchase_return", header.getId(), "PURCHASE_RETURN_POST")
         );
+        if (evaluation.approvalRequired()) {
+            header.setStatus(ErpDocumentStatuses.PENDING_APPROVAL);
+            header = purchaseReturnRepository.save(header);
+            if (!evaluation.pendingRequestExists()) {
+                approvalService.createRequest(
+                        header.getOrganizationId(),
+                        header.getBranchId(),
+                        new ErpApprovalDtos.CreateApprovalRequest(
+                                "purchase_return",
+                                header.getId(),
+                                header.getReturnNumber(),
+                                "PURCHASE_RETURN_POST",
+                                "Purchase return amount matched approval rule",
+                                null,
+                                evaluation.approverRoleCode()
+                        )
+                );
+            }
+            auditEventWriter.write(
+                    organizationId, branchId, "PURCHASE_RETURN_PENDING_APPROVAL", "purchase_return", header.getId(), header.getReturnNumber(),
+                    "REQUEST_APPROVAL", header.getWarehouseId(), null, header.getSupplierId(), "Purchase return created and sent for approval",
+                    ErpJsonPayloads.of("returnId", header.getId(), "originalPurchaseReceiptId", header.getOriginalPurchaseReceiptId(), "total", header.getTotalAmount())
+            );
+            return toPurchaseReturnResponse(header, purchaseReturnLineRepository.findByPurchaseReturnIdOrderByIdAsc(header.getId()));
+        }
 
-        return toPurchaseReturnResponse(header, purchaseReturnLineRepository.findByPurchaseReturnIdOrderByIdAsc(header.getId()));
+        PurchaseReturn posted = returnPostingService.finalizeApprovedPurchaseReturn(header.getId());
+        return toPurchaseReturnResponse(posted, purchaseReturnLineRepository.findByPurchaseReturnIdOrderByIdAsc(posted.getId()));
     }
 
     private BigDecimal proportional(BigDecimal amount, BigDecimal ratio) {
@@ -578,52 +565,4 @@ public class ErpReturnService {
         );
     }
 
-    private void postApprovedSalesReturnSerials(SalesReturn header, SalesReturnLine line, SalesInvoiceLine original, SalesInvoice invoice) {
-        List<Long> serialIds = salesReturnLineSerialRepository.findBySalesReturnLineId(line.getId()).stream()
-                .map(SalesReturnLineSerial::getSerialNumberId)
-                .toList();
-        if (serialIds.isEmpty()) {
-            throw new BusinessException("Sales return line " + line.getId() + " is missing serial selections");
-        }
-        for (Long serialId : serialIds) {
-            SerialNumber serial = serialNumberRepository.findById(serialId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Serial number not found: " + serialId));
-            serial.setStatus(ErpDocumentStatuses.RETURNED);
-            serial.setCurrentWarehouseId(header.getWarehouseId());
-            serial.setCurrentCustomerId(null);
-            serialNumberRepository.save(serial);
-
-            inventoryPostingService.postMovement(
-                    header.getOrganizationId(), header.getBranchId(), header.getWarehouseId(), line.getProductId(), serial.getBatchId(),
-                    line.getUomId(), BigDecimal.ONE, BigDecimal.ONE, "IN",
-                    ErpInventoryMovementTypes.SALES_RETURN, "sales_return", header.getId(), header.getReturnNumber(),
-                    line.getUnitCostAtReturn(),
-                    ErpJsonPayloads.of("salesReturnId", header.getId(), "lineId", line.getId(), "serialNumberId", serialId, "sourceInvoiceId", invoice.getId())
-            );
-        }
-        for (ProductOwnership ownership : productOwnershipRepository.findBySalesInvoiceLineId(original.getId())) {
-            if (serialIds.contains(ownership.getSerialNumberId())) {
-                ownership.setStatus(ErpDocumentStatuses.RETURNED);
-                productOwnershipRepository.save(ownership);
-            }
-        }
-    }
-
-    private void postApprovedSalesReturnBatches(SalesReturn header, SalesReturnLine line, SalesInvoice invoice) {
-        List<SalesReturnLineBatch> batchLinks = salesReturnLineBatchRepository.findBySalesReturnLineId(line.getId());
-        if (batchLinks.isEmpty()) {
-            throw new BusinessException("Sales return line " + line.getId() + " is missing batch selections");
-        }
-        for (SalesReturnLineBatch link : batchLinks) {
-            InventoryBatch batch = inventoryBatchRepository.findById(link.getBatchId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Batch not found: " + link.getBatchId()));
-            inventoryPostingService.postMovement(
-                    header.getOrganizationId(), header.getBranchId(), header.getWarehouseId(), line.getProductId(), batch.getId(),
-                    line.getUomId(), link.getQuantity(), link.getBaseQuantity(), "IN",
-                    ErpInventoryMovementTypes.SALES_RETURN, "sales_return", header.getId(), header.getReturnNumber(),
-                    line.getUnitCostAtReturn(),
-                    ErpJsonPayloads.of("salesReturnId", header.getId(), "lineId", line.getId(), "batchId", batch.getId(), "sourceInvoiceId", invoice.getId())
-            );
-        }
-    }
 }

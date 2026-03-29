@@ -35,7 +35,9 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,6 +51,10 @@ public class ErpSalesService {
     private final SalesInvoiceLineRepository salesInvoiceLineRepository;
     private final SalesLineSerialRepository salesLineSerialRepository;
     private final SalesLineBatchRepository salesLineBatchRepository;
+    private final SalesQuoteRepository salesQuoteRepository;
+    private final SalesQuoteLineRepository salesQuoteLineRepository;
+    private final SalesOrderRepository salesOrderRepository;
+    private final SalesOrderLineRepository salesOrderLineRepository;
     private final CustomerReceiptRepository customerReceiptRepository;
     private final CustomerReceiptAllocationRepository customerReceiptAllocationRepository;
     private final StoreProductRepository productRepository;
@@ -76,6 +82,40 @@ public class ErpSalesService {
     }
 
     @Transactional(readOnly = true)
+    public List<SalesQuote> listQuotes(Long organizationId) {
+        accessGuard.assertOrganizationAccess(organizationId);
+        subscriptionAccessService.assertFeature(organizationId, "sales");
+        return salesQuoteRepository.findTop100ByOrganizationIdOrderByQuoteDateDescIdDesc(organizationId);
+    }
+
+    @Transactional(readOnly = true)
+    public ErpSalesResponses.SalesQuoteResponse getQuote(Long id) {
+        SalesQuote quote = salesQuoteRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Sales quote not found: " + id));
+        accessGuard.assertOrganizationAccess(quote.getOrganizationId());
+        accessGuard.assertBranchAccess(quote.getOrganizationId(), quote.getBranchId());
+        subscriptionAccessService.assertFeature(quote.getOrganizationId(), "sales");
+        return toQuoteResponse(quote, salesQuoteLineRepository.findBySalesQuoteIdOrderByIdAsc(id));
+    }
+
+    @Transactional(readOnly = true)
+    public List<SalesOrder> listOrders(Long organizationId) {
+        accessGuard.assertOrganizationAccess(organizationId);
+        subscriptionAccessService.assertFeature(organizationId, "sales");
+        return salesOrderRepository.findTop100ByOrganizationIdOrderByOrderDateDescIdDesc(organizationId);
+    }
+
+    @Transactional(readOnly = true)
+    public ErpSalesResponses.SalesOrderResponse getOrder(Long id) {
+        SalesOrder order = salesOrderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Sales order not found: " + id));
+        accessGuard.assertOrganizationAccess(order.getOrganizationId());
+        accessGuard.assertBranchAccess(order.getOrganizationId(), order.getBranchId());
+        subscriptionAccessService.assertFeature(order.getOrganizationId(), "sales");
+        return toOrderResponse(order, salesOrderLineRepository.findBySalesOrderIdOrderByIdAsc(id));
+    }
+
+    @Transactional(readOnly = true)
     public ErpSalesResponses.SalesInvoiceResponse getInvoice(Long id) {
         SalesInvoice invoice = salesInvoiceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Sales invoice not found: " + id));
@@ -87,9 +127,21 @@ public class ErpSalesService {
     }
 
     public ErpSalesResponses.SalesInvoiceResponse createInvoice(Long organizationId, Long branchId, ErpSalesDtos.CreateSalesInvoiceRequest request) {
-        accessGuard.assertBranchAccess(organizationId, branchId);
+        return createInvoiceInternal(organizationId, branchId, request, true);
+    }
+
+    public ErpSalesResponses.SalesInvoiceResponse createInvoiceSystemGenerated(Long organizationId, Long branchId, ErpSalesDtos.CreateSalesInvoiceRequest request) {
+        return createInvoiceInternal(organizationId, branchId, request, false);
+    }
+
+    private ErpSalesResponses.SalesInvoiceResponse createInvoiceInternal(Long organizationId, Long branchId,
+                                                                         ErpSalesDtos.CreateSalesInvoiceRequest request,
+                                                                         boolean enforceUserContext) {
+        if (enforceUserContext) {
+            accessGuard.assertBranchAccess(organizationId, branchId);
+        }
         subscriptionAccessService.assertFeature(organizationId, "sales");
-        var principal = ErpSecurityUtils.requirePrincipal();
+        var principal = enforceUserContext ? ErpSecurityUtils.requirePrincipal() : null;
         Customer customer = customerRepository.findByIdAndOrganizationId(request.customerId(), organizationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer not found: " + request.customerId()));
 
@@ -137,7 +189,7 @@ public class ErpSalesService {
                             reqLine.baseQuantity(),
                             request.invoiceDate() == null ? LocalDate.now() : request.invoiceDate()
                     );
-            if (reqLine.unitPrice() != null) {
+            if (enforceUserContext && reqLine.unitPrice() != null) {
                 validatePriceOverride(principal, product, resolvedUnitPrice, reqLine.unitPrice(), reqLine.priceOverrideReason());
                 if (reqLine.unitPrice().compareTo(resolvedUnitPrice) != 0) {
                     priceOverrides.add(product.getSku() + ":" + resolvedUnitPrice + "->" + reqLine.unitPrice() + ":" + reqLine.priceOverrideReason().trim());
@@ -299,7 +351,7 @@ public class ErpSalesService {
             invoice = salesInvoicePostingService.finalizeApprovedInvoice(invoice.getId());
         }
 
-        if (!priceOverrides.isEmpty()) {
+        if (enforceUserContext && !priceOverrides.isEmpty()) {
             auditEventWriter.write(
                     organizationId,
                     branchId,
@@ -323,6 +375,187 @@ public class ErpSalesService {
 
         List<SalesInvoiceLine> savedLines = salesInvoiceLineRepository.findBySalesInvoiceIdOrderByIdAsc(invoice.getId());
         return toInvoiceResponse(invoice, savedLines);
+    }
+
+    public ErpSalesResponses.SalesQuoteResponse createQuote(Long organizationId, Long branchId, ErpSalesDtos.CreateSalesQuoteRequest request) {
+        accessGuard.assertBranchAccess(organizationId, branchId);
+        subscriptionAccessService.assertFeature(organizationId, "sales");
+        validateQuoteType(request.quoteType());
+        Customer customer = customerRepository.findByIdAndOrganizationId(request.customerId(), organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found: " + request.customerId()));
+
+        String quoteNumber = quoteNumber(request.quoteType());
+        SalesQuote quote = new SalesQuote();
+        quote.setOrganizationId(organizationId);
+        quote.setBranchId(branchId);
+        quote.setWarehouseId(request.warehouseId());
+        quote.setCustomerId(request.customerId());
+        quote.setQuoteType(request.quoteType().trim().toUpperCase());
+        quote.setQuoteNumber(quoteNumber);
+        quote.setQuoteDate(request.quoteDate() == null ? LocalDate.now() : request.quoteDate());
+        quote.setValidUntil(request.validUntil());
+        quote.setCustomerGstin(customer.getGstin());
+        quote.setPlaceOfSupplyStateCode(request.placeOfSupplyStateCode());
+        quote.setStatus(ErpDocumentStatuses.DRAFT);
+        quote.setRemarks(request.remarks());
+        quote = salesQuoteRepository.save(quote);
+
+        Totals totals = saveQuoteLines(quote, customer, request.lines());
+        quote.setSellerTaxRegistrationId(totals.sellerTaxRegistrationId());
+        quote.setSellerGstin(totals.sellerGstin());
+        quote.setPlaceOfSupplyStateCode(totals.placeOfSupplyStateCode());
+        quote.setSubtotal(totals.subtotal());
+        quote.setDiscountAmount(totals.discount());
+        quote.setTaxAmount(totals.taxAmount());
+        quote.setTotalAmount(totals.total());
+        quote.setStatus(ErpDocumentStatuses.SUBMITTED);
+        quote = salesQuoteRepository.save(quote);
+
+        return toQuoteResponse(quote, salesQuoteLineRepository.findBySalesQuoteIdOrderByIdAsc(quote.getId()));
+    }
+
+    public ErpSalesResponses.SalesOrderResponse createOrder(Long organizationId, Long branchId, ErpSalesDtos.CreateSalesOrderRequest request) {
+        accessGuard.assertBranchAccess(organizationId, branchId);
+        subscriptionAccessService.assertFeature(organizationId, "sales");
+        Customer customer = customerRepository.findByIdAndOrganizationId(request.customerId(), organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found: " + request.customerId()));
+
+        SalesOrder order = new SalesOrder();
+        order.setOrganizationId(organizationId);
+        order.setBranchId(branchId);
+        order.setWarehouseId(request.warehouseId());
+        order.setCustomerId(request.customerId());
+        order.setOrderNumber("SO-" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE) + "-" + System.currentTimeMillis());
+        order.setOrderDate(request.orderDate() == null ? LocalDate.now() : request.orderDate());
+        order.setCustomerGstin(customer.getGstin());
+        order.setPlaceOfSupplyStateCode(request.placeOfSupplyStateCode());
+        order.setStatus(ErpDocumentStatuses.SUBMITTED);
+        order.setRemarks(request.remarks());
+        order = salesOrderRepository.save(order);
+
+        Totals totals = saveOrderLines(order, customer, request.lines(), null);
+        order.setSellerTaxRegistrationId(totals.sellerTaxRegistrationId());
+        order.setSellerGstin(totals.sellerGstin());
+        order.setPlaceOfSupplyStateCode(totals.placeOfSupplyStateCode());
+        order.setSubtotal(totals.subtotal());
+        order.setDiscountAmount(totals.discount());
+        order.setTaxAmount(totals.taxAmount());
+        order.setTotalAmount(totals.total());
+        order = salesOrderRepository.save(order);
+
+        return toOrderResponse(order, salesOrderLineRepository.findBySalesOrderIdOrderByIdAsc(order.getId()));
+    }
+
+    public ErpSalesResponses.SalesOrderResponse convertQuoteToOrder(Long quoteId, ErpSalesDtos.ConvertSalesQuoteRequest request) {
+        SalesQuote quote = salesQuoteRepository.findById(quoteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sales quote not found: " + quoteId));
+        accessGuard.assertBranchAccess(quote.getOrganizationId(), quote.getBranchId());
+        subscriptionAccessService.assertFeature(quote.getOrganizationId(), "sales");
+        if (quote.getConvertedSalesOrderId() != null) {
+            return getOrder(quote.getConvertedSalesOrderId());
+        }
+        List<SalesQuoteLine> quoteLines = salesQuoteLineRepository.findBySalesQuoteIdOrderByIdAsc(quoteId);
+        Customer customer = customerRepository.findByIdAndOrganizationId(quote.getCustomerId(), quote.getOrganizationId())
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found: " + quote.getCustomerId()));
+
+        SalesOrder order = new SalesOrder();
+        order.setOrganizationId(quote.getOrganizationId());
+        order.setBranchId(request.branchId() != null ? request.branchId() : quote.getBranchId());
+        order.setWarehouseId(quote.getWarehouseId());
+        order.setCustomerId(quote.getCustomerId());
+        order.setSourceQuoteId(quote.getId());
+        order.setOrderNumber("SO-" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE) + "-" + System.currentTimeMillis());
+        order.setOrderDate(request.targetDate() == null ? LocalDate.now() : request.targetDate());
+        order.setCustomerGstin(quote.getCustomerGstin());
+        order.setPlaceOfSupplyStateCode(quote.getPlaceOfSupplyStateCode());
+        order.setStatus(ErpDocumentStatuses.SUBMITTED);
+        order.setRemarks(request.remarks() == null ? "Converted from " + quote.getQuoteNumber() : request.remarks());
+        order = salesOrderRepository.save(order);
+
+        Totals totals = saveOrderLines(order, customer, toDocumentLineRequests(quoteLines), quoteLines);
+        order.setSellerTaxRegistrationId(totals.sellerTaxRegistrationId());
+        order.setSellerGstin(totals.sellerGstin());
+        order.setSubtotal(totals.subtotal());
+        order.setDiscountAmount(totals.discount());
+        order.setTaxAmount(totals.taxAmount());
+        order.setTotalAmount(totals.total());
+        order = salesOrderRepository.save(order);
+
+        quote.setConvertedSalesOrderId(order.getId());
+        quote.setStatus("ORDERED");
+        salesQuoteRepository.saveAndFlush(quote);
+        return toOrderResponse(order, salesOrderLineRepository.findBySalesOrderIdOrderByIdAsc(order.getId()));
+    }
+
+    public ErpSalesResponses.SalesInvoiceResponse convertQuoteToInvoice(Long quoteId, ErpSalesDtos.ConvertSalesQuoteRequest request) {
+        SalesQuote quote = salesQuoteRepository.findById(quoteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sales quote not found: " + quoteId));
+        accessGuard.assertBranchAccess(quote.getOrganizationId(), quote.getBranchId());
+        subscriptionAccessService.assertFeature(quote.getOrganizationId(), "sales");
+        if (quote.getConvertedSalesInvoiceId() != null) {
+            return getInvoice(quote.getConvertedSalesInvoiceId());
+        }
+
+        ErpSalesDtos.CreateSalesInvoiceRequest invoiceRequest = new ErpSalesDtos.CreateSalesInvoiceRequest(
+                request.organizationId() != null ? request.organizationId() : quote.getOrganizationId(),
+                request.branchId() != null ? request.branchId() : quote.getBranchId(),
+                quote.getWarehouseId(),
+                quote.getCustomerId(),
+                null,
+                request.targetDate() == null ? LocalDate.now() : request.targetDate(),
+                request.targetDate() == null ? LocalDate.now() : request.targetDate(),
+                quote.getPlaceOfSupplyStateCode(),
+                request.remarks() == null ? "Converted from " + quote.getQuoteNumber() : request.remarks(),
+                toInvoiceLineRequests(
+                        salesQuoteLineRepository.findBySalesQuoteIdOrderByIdAsc(quoteId),
+                        quote.getQuoteNumber(),
+                        trackedSelectionsByProduct(request.trackedLines())
+                )
+        );
+        ErpSalesResponses.SalesInvoiceResponse response = createInvoice(quote.getOrganizationId(), invoiceRequest.branchId(), invoiceRequest);
+        quote.setConvertedSalesInvoiceId(response.id());
+        quote.setStatus("INVOICED");
+        salesQuoteRepository.saveAndFlush(quote);
+        return response;
+    }
+
+    public ErpSalesResponses.SalesInvoiceResponse convertOrderToInvoice(Long orderId, ErpSalesDtos.ConvertSalesOrderRequest request) {
+        SalesOrder order = salesOrderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sales order not found: " + orderId));
+        accessGuard.assertBranchAccess(order.getOrganizationId(), order.getBranchId());
+        subscriptionAccessService.assertFeature(order.getOrganizationId(), "sales");
+        if (order.getConvertedSalesInvoiceId() != null) {
+            return getInvoice(order.getConvertedSalesInvoiceId());
+        }
+
+        ErpSalesDtos.CreateSalesInvoiceRequest invoiceRequest = new ErpSalesDtos.CreateSalesInvoiceRequest(
+                request.organizationId() != null ? request.organizationId() : order.getOrganizationId(),
+                request.branchId() != null ? request.branchId() : order.getBranchId(),
+                order.getWarehouseId(),
+                order.getCustomerId(),
+                null,
+                request.targetDate() == null ? LocalDate.now() : request.targetDate(),
+                request.targetDate() == null ? LocalDate.now() : request.targetDate(),
+                order.getPlaceOfSupplyStateCode(),
+                request.remarks() == null ? "Converted from " + order.getOrderNumber() : request.remarks(),
+                toInvoiceLineRequestsFromOrder(
+                        salesOrderLineRepository.findBySalesOrderIdOrderByIdAsc(orderId),
+                        order.getOrderNumber(),
+                        trackedSelectionsByProduct(request.trackedLines())
+                )
+        );
+        ErpSalesResponses.SalesInvoiceResponse response = createInvoice(order.getOrganizationId(), invoiceRequest.branchId(), invoiceRequest);
+        order.setConvertedSalesInvoiceId(response.id());
+        order.setStatus("INVOICED");
+        salesOrderRepository.saveAndFlush(order);
+        if (order.getSourceQuoteId() != null) {
+            salesQuoteRepository.findById(order.getSourceQuoteId()).ifPresent(quote -> {
+                quote.setConvertedSalesInvoiceId(response.id());
+                quote.setStatus("INVOICED");
+                salesQuoteRepository.saveAndFlush(quote);
+            });
+        }
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -533,6 +766,311 @@ public class ErpSalesService {
         );
     }
 
+    private ErpSalesResponses.SalesQuoteResponse toQuoteResponse(SalesQuote quote, List<SalesQuoteLine> lines) {
+        return new ErpSalesResponses.SalesQuoteResponse(
+                quote.getId(),
+                quote.getOrganizationId(),
+                quote.getBranchId(),
+                quote.getWarehouseId(),
+                quote.getCustomerId(),
+                quote.getQuoteType(),
+                quote.getQuoteNumber(),
+                quote.getQuoteDate(),
+                quote.getValidUntil(),
+                quote.getSellerGstin(),
+                quote.getCustomerGstin(),
+                quote.getPlaceOfSupplyStateCode(),
+                quote.getSubtotal(),
+                quote.getDiscountAmount(),
+                quote.getTaxAmount(),
+                quote.getTotalAmount(),
+                quote.getConvertedSalesOrderId(),
+                quote.getConvertedSalesInvoiceId(),
+                quote.getStatus(),
+                quote.getRemarks(),
+                lines.stream().map(this::toSalesDocumentLineResponse).toList()
+        );
+    }
+
+    private ErpSalesResponses.SalesOrderResponse toOrderResponse(SalesOrder order, List<SalesOrderLine> lines) {
+        return new ErpSalesResponses.SalesOrderResponse(
+                order.getId(),
+                order.getOrganizationId(),
+                order.getBranchId(),
+                order.getWarehouseId(),
+                order.getCustomerId(),
+                order.getSourceQuoteId(),
+                order.getOrderNumber(),
+                order.getOrderDate(),
+                order.getSellerGstin(),
+                order.getCustomerGstin(),
+                order.getPlaceOfSupplyStateCode(),
+                order.getSubtotal(),
+                order.getDiscountAmount(),
+                order.getTaxAmount(),
+                order.getTotalAmount(),
+                order.getConvertedSalesInvoiceId(),
+                order.getStatus(),
+                order.getRemarks(),
+                lines.stream().map(this::toSalesDocumentLineResponse).toList()
+        );
+    }
+
+    private ErpSalesResponses.SalesDocumentLineResponse toSalesDocumentLineResponse(SalesQuoteLine line) {
+        return new ErpSalesResponses.SalesDocumentLineResponse(
+                line.getId(), line.getProductId(), line.getUomId(), line.getHsnSnapshot(), line.getQuantity(), line.getBaseQuantity(),
+                line.getUnitPrice(), line.getDiscountAmount(), line.getTaxableAmount(), line.getTaxRate(), line.getCgstRate(),
+                line.getCgstAmount(), line.getSgstRate(), line.getSgstAmount(), line.getIgstRate(), line.getIgstAmount(),
+                line.getCessRate(), line.getCessAmount(), line.getLineAmount(), line.getRemarks()
+        );
+    }
+
+    private ErpSalesResponses.SalesDocumentLineResponse toSalesDocumentLineResponse(SalesOrderLine line) {
+        return new ErpSalesResponses.SalesDocumentLineResponse(
+                line.getId(), line.getProductId(), line.getUomId(), line.getHsnSnapshot(), line.getQuantity(), line.getBaseQuantity(),
+                line.getUnitPrice(), line.getDiscountAmount(), line.getTaxableAmount(), line.getTaxRate(), line.getCgstRate(),
+                line.getCgstAmount(), line.getSgstRate(), line.getSgstAmount(), line.getIgstRate(), line.getIgstAmount(),
+                line.getCessRate(), line.getCessAmount(), line.getLineAmount(), line.getRemarks()
+        );
+    }
+
+    private Totals saveQuoteLines(SalesQuote quote, Customer customer, List<ErpSalesDtos.CreateSalesDocumentLineRequest> requestLines) {
+        return saveDocumentLines(
+                quote.getOrganizationId(),
+                quote.getBranchId(),
+                quote.getWarehouseId(),
+                quote.getQuoteDate(),
+                quote.getPlaceOfSupplyStateCode(),
+                customer,
+                requestLines,
+                (reqLine, pricing, master, taxContext) -> {
+                    SalesQuoteLine line = new SalesQuoteLine();
+                    line.setSalesQuoteId(quote.getId());
+                    line.setProductId(reqLine.productId());
+                    line.setUomId(reqLine.uomId());
+                    line.setHsnSnapshot(master.getHsnCode());
+                    applyDocumentPricing(line, reqLine, pricing, taxContext);
+                    line.setRemarks(reqLine.remarks());
+                    salesQuoteLineRepository.save(line);
+                }
+        );
+    }
+
+    private Totals saveOrderLines(SalesOrder order,
+                                  Customer customer,
+                                  List<ErpSalesDtos.CreateSalesDocumentLineRequest> requestLines,
+                                  List<SalesQuoteLine> sourceQuoteLines) {
+        return saveDocumentLines(
+                order.getOrganizationId(),
+                order.getBranchId(),
+                order.getWarehouseId(),
+                order.getOrderDate(),
+                order.getPlaceOfSupplyStateCode(),
+                customer,
+                requestLines,
+                (reqLine, pricing, master, taxContext) -> {
+                    SalesOrderLine line = new SalesOrderLine();
+                    line.setSalesOrderId(order.getId());
+                    if (sourceQuoteLines != null) {
+                        SalesQuoteLine match = sourceQuoteLines.stream()
+                                .filter(source -> source.getProductId().equals(reqLine.productId()) && source.getUomId().equals(reqLine.uomId()))
+                                .findFirst()
+                                .orElse(null);
+                        line.setSourceQuoteLineId(match == null ? null : match.getId());
+                    }
+                    line.setProductId(reqLine.productId());
+                    line.setUomId(reqLine.uomId());
+                    line.setHsnSnapshot(master.getHsnCode());
+                    applyDocumentPricing(line, reqLine, pricing, taxContext);
+                    line.setRemarks(reqLine.remarks());
+                    salesOrderLineRepository.save(line);
+                }
+        );
+    }
+
+    private Totals saveDocumentLines(Long organizationId,
+                                     Long branchId,
+                                     Long warehouseId,
+                                     LocalDate documentDate,
+                                     String placeOfSupplyStateCode,
+                                     Customer customer,
+                                     List<ErpSalesDtos.CreateSalesDocumentLineRequest> requestLines,
+                                     DocumentLineSaver saver) {
+        BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal discount = BigDecimal.ZERO;
+        BigDecimal taxAmount = BigDecimal.ZERO;
+        BigDecimal total = BigDecimal.ZERO;
+        Long sellerTaxRegistrationId = null;
+        String sellerGstin = null;
+        String resolvedPos = placeOfSupplyStateCode;
+
+        for (ErpSalesDtos.CreateSalesDocumentLineRequest reqLine : requestLines) {
+            StoreProduct product = productRepository.findById(reqLine.productId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + reqLine.productId()));
+            Product productMaster = productMasterRepository.findById(product.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product master not found: " + product.getProductId()));
+            uomRepository.findById(reqLine.uomId())
+                    .orElseThrow(() -> new ResourceNotFoundException("UOM not found: " + reqLine.uomId()));
+
+            BigDecimal unitPrice = reqLine.unitPrice() != null
+                    ? reqLine.unitPrice()
+                    : storeProductPricingService.resolveUnitPrice(
+                            organizationId,
+                            reqLine.productId(),
+                            customer.getId(),
+                            reqLine.baseQuantity(),
+                            documentDate
+                    );
+            BigDecimal lineDiscount = reqLine.discountAmount() == null ? BigDecimal.ZERO : reqLine.discountAmount();
+            BigDecimal lineBase = unitPrice.multiply(reqLine.quantity());
+            BigDecimal lineTaxable = lineBase.subtract(lineDiscount);
+            GstTaxService.TaxContext taxContext = gstTaxService.resolveSalesTax(
+                    organizationId,
+                    branchId,
+                    documentDate,
+                    product.getTaxGroupId(),
+                    customer.getGstin(),
+                    placeOfSupplyStateCode,
+                    lineTaxable
+            );
+
+            if (sellerTaxRegistrationId == null) {
+                sellerTaxRegistrationId = taxContext.sellerTaxRegistrationId();
+                sellerGstin = taxContext.sellerGstin();
+                resolvedPos = taxContext.placeOfSupplyStateCode();
+            }
+
+            saver.save(reqLine, new PricingSnapshot(unitPrice, lineDiscount), productMaster, taxContext);
+            subtotal = subtotal.add(lineBase);
+            discount = discount.add(lineDiscount);
+            taxAmount = taxAmount.add(taxContext.totalTaxAmount());
+            total = total.add(taxContext.lineTotal());
+        }
+
+        return new Totals(subtotal, discount, taxAmount, total, sellerTaxRegistrationId, sellerGstin, resolvedPos);
+    }
+
+    private void applyDocumentPricing(SalesQuoteLine line,
+                                      ErpSalesDtos.CreateSalesDocumentLineRequest reqLine,
+                                      PricingSnapshot pricing,
+                                      GstTaxService.TaxContext taxContext) {
+        line.setQuantity(reqLine.quantity());
+        line.setBaseQuantity(reqLine.baseQuantity());
+        line.setUnitPrice(pricing.unitPrice());
+        line.setDiscountAmount(pricing.discountAmount());
+        line.setTaxableAmount(taxContext.taxableAmount());
+        line.setTaxRate(taxContext.effectiveTaxRate());
+        line.setCgstRate(taxContext.cgstRate());
+        line.setCgstAmount(taxContext.cgstAmount());
+        line.setSgstRate(taxContext.sgstRate());
+        line.setSgstAmount(taxContext.sgstAmount());
+        line.setIgstRate(taxContext.igstRate());
+        line.setIgstAmount(taxContext.igstAmount());
+        line.setCessRate(taxContext.cessRate());
+        line.setCessAmount(taxContext.cessAmount());
+        line.setLineAmount(taxContext.lineTotal());
+    }
+
+    private void applyDocumentPricing(SalesOrderLine line,
+                                      ErpSalesDtos.CreateSalesDocumentLineRequest reqLine,
+                                      PricingSnapshot pricing,
+                                      GstTaxService.TaxContext taxContext) {
+        line.setQuantity(reqLine.quantity());
+        line.setBaseQuantity(reqLine.baseQuantity());
+        line.setUnitPrice(pricing.unitPrice());
+        line.setDiscountAmount(pricing.discountAmount());
+        line.setTaxableAmount(taxContext.taxableAmount());
+        line.setTaxRate(taxContext.effectiveTaxRate());
+        line.setCgstRate(taxContext.cgstRate());
+        line.setCgstAmount(taxContext.cgstAmount());
+        line.setSgstRate(taxContext.sgstRate());
+        line.setSgstAmount(taxContext.sgstAmount());
+        line.setIgstRate(taxContext.igstRate());
+        line.setIgstAmount(taxContext.igstAmount());
+        line.setCessRate(taxContext.cessRate());
+        line.setCessAmount(taxContext.cessAmount());
+        line.setLineAmount(taxContext.lineTotal());
+    }
+
+    private List<ErpSalesDtos.CreateSalesDocumentLineRequest> toDocumentLineRequests(List<SalesQuoteLine> quoteLines) {
+        return quoteLines.stream()
+                .map(line -> new ErpSalesDtos.CreateSalesDocumentLineRequest(
+                        line.getProductId(),
+                        line.getUomId(),
+                        line.getQuantity(),
+                        line.getBaseQuantity(),
+                        line.getUnitPrice(),
+                        line.getDiscountAmount(),
+                        line.getRemarks()
+                ))
+                .toList();
+    }
+
+    private List<ErpSalesDtos.CreateSalesInvoiceLineRequest> toInvoiceLineRequests(List<SalesQuoteLine> quoteLines,
+                                                                                   String sourceNumber,
+                                                                                   Map<Long, ErpSalesDtos.ConvertTrackedSalesLineRequest> trackedSelectionsByProduct) {
+        return quoteLines.stream()
+                .map(line -> new ErpSalesDtos.CreateSalesInvoiceLineRequest(
+                        line.getProductId(),
+                        line.getUomId(),
+                        line.getQuantity(),
+                        line.getBaseQuantity(),
+                        line.getUnitPrice(),
+                        "Converted from " + sourceNumber,
+                        line.getTaxRate(),
+                        line.getDiscountAmount(),
+                        trackedSelectionsByProduct.get(line.getProductId()) == null ? null : trackedSelectionsByProduct.get(line.getProductId()).serialNumberIds(),
+                        trackedSelectionsByProduct.get(line.getProductId()) == null ? null : trackedSelectionsByProduct.get(line.getProductId()).batchSelections(),
+                        null
+                ))
+                .toList();
+    }
+
+    private List<ErpSalesDtos.CreateSalesInvoiceLineRequest> toInvoiceLineRequestsFromOrder(List<SalesOrderLine> orderLines,
+                                                                                            String sourceNumber,
+                                                                                            Map<Long, ErpSalesDtos.ConvertTrackedSalesLineRequest> trackedSelectionsByProduct) {
+        return orderLines.stream()
+                .map(line -> new ErpSalesDtos.CreateSalesInvoiceLineRequest(
+                        line.getProductId(),
+                        line.getUomId(),
+                        line.getQuantity(),
+                        line.getBaseQuantity(),
+                        line.getUnitPrice(),
+                        "Converted from " + sourceNumber,
+                        line.getTaxRate(),
+                        line.getDiscountAmount(),
+                        trackedSelectionsByProduct.get(line.getProductId()) == null ? null : trackedSelectionsByProduct.get(line.getProductId()).serialNumberIds(),
+                        trackedSelectionsByProduct.get(line.getProductId()) == null ? null : trackedSelectionsByProduct.get(line.getProductId()).batchSelections(),
+                        null
+                ))
+                .toList();
+    }
+
+    private Map<Long, ErpSalesDtos.ConvertTrackedSalesLineRequest> trackedSelectionsByProduct(List<ErpSalesDtos.ConvertTrackedSalesLineRequest> trackedLines) {
+        Map<Long, ErpSalesDtos.ConvertTrackedSalesLineRequest> result = new HashMap<>();
+        if (trackedLines == null) {
+            return result;
+        }
+        for (ErpSalesDtos.ConvertTrackedSalesLineRequest trackedLine : trackedLines) {
+            if (result.put(trackedLine.productId(), trackedLine) != null) {
+                throw new BusinessException("Duplicate tracked selection for product " + trackedLine.productId());
+            }
+        }
+        return result;
+    }
+
+    private void validateQuoteType(String quoteType) {
+        String normalized = quoteType == null ? "" : quoteType.trim().toUpperCase();
+        if (!"ESTIMATE".equals(normalized) && !"QUOTATION".equals(normalized)) {
+            throw new BusinessException("Quote type must be ESTIMATE or QUOTATION");
+        }
+    }
+
+    private String quoteNumber(String quoteType) {
+        String prefix = "ESTIMATE".equals(quoteType == null ? "" : quoteType.trim().toUpperCase()) ? "EST" : "QTN";
+        return prefix + "-" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE) + "-" + System.currentTimeMillis();
+    }
+
     private BigDecimal allocatedAmount(Long salesInvoiceId) {
         return customerReceiptAllocationRepository.findBySalesInvoiceIdOrderByIdAsc(salesInvoiceId).stream()
                 .map(CustomerReceiptAllocation::getAllocatedAmount)
@@ -541,5 +1079,25 @@ public class ErpSalesService {
 
     private BigDecimal outstandingAmount(Long salesInvoiceId, BigDecimal totalAmount) {
         return totalAmount.subtract(allocatedAmount(salesInvoiceId)).max(BigDecimal.ZERO);
+    }
+
+    private record Totals(
+            BigDecimal subtotal,
+            BigDecimal discount,
+            BigDecimal taxAmount,
+            BigDecimal total,
+            Long sellerTaxRegistrationId,
+            String sellerGstin,
+            String placeOfSupplyStateCode
+    ) {}
+
+    private record PricingSnapshot(BigDecimal unitPrice, BigDecimal discountAmount) {}
+
+    @FunctionalInterface
+    private interface DocumentLineSaver {
+        void save(ErpSalesDtos.CreateSalesDocumentLineRequest reqLine,
+                  PricingSnapshot pricing,
+                  Product productMaster,
+                  GstTaxService.TaxContext taxContext);
     }
 }

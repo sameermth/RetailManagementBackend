@@ -114,6 +114,23 @@ public class SalesInvoicePostingService {
                         ownership.setStatus(ErpDocumentStatuses.ACTIVE);
                         productOwnershipRepository.save(ownership);
                     }
+                    inventoryPostingService.postMovement(
+                            invoice.getOrganizationId(),
+                            invoice.getBranchId(),
+                            invoice.getWarehouseId(),
+                            line.getProductId(),
+                            null,
+                            line.getUomId(),
+                            BigDecimal.ONE,
+                            BigDecimal.ONE,
+                            "OUT",
+                            "SALES_INVOICE",
+                            "sales_invoice",
+                            invoice.getId(),
+                            invoice.getInvoiceNumber(),
+                            BigDecimal.ZERO,
+                            payloadJson(invoice, line.getProductId(), line.getId(), "SERIAL")
+                    );
                     soldSerialCount++;
                 }
                 continue;

@@ -23,6 +23,84 @@ public class ErpSalesController {
 
     private final ErpSalesService erpSalesService;
 
+    @GetMapping("/quotes")
+    @Operation(summary = "List sales estimates and quotations")
+    @PreAuthorize("hasAuthority('sales.view')")
+    public ErpApiResponse<List<ErpSalesResponses.SalesQuoteSummaryResponse>> listQuotes(@RequestParam(required = false) Long organizationId) {
+        Long orgId = organizationId != null ? organizationId : ErpSecurityUtils.currentOrganizationId().orElse(1L);
+        return ErpApiResponse.ok(erpSalesService.listQuotes(orgId).stream().map(this::toSalesQuoteSummary).toList());
+    }
+
+    @GetMapping("/quotes/{id}")
+    @Operation(summary = "Get sales estimate or quotation by id")
+    @PreAuthorize("hasAuthority('sales.view')")
+    public ErpApiResponse<ErpSalesResponses.SalesQuoteResponse> getQuote(@PathVariable Long id) {
+        return ErpApiResponse.ok(erpSalesService.getQuote(id));
+    }
+
+    @PostMapping("/quotes")
+    @Operation(summary = "Create sales estimate or quotation")
+    @PreAuthorize("hasAuthority('sales.create')")
+    public ErpApiResponse<ErpSalesResponses.SalesQuoteResponse> createQuote(@RequestBody @Valid ErpSalesDtos.CreateSalesQuoteRequest request) {
+        Long orgId = request.organizationId() != null ? request.organizationId() : ErpSecurityUtils.currentOrganizationId().orElse(1L);
+        Long branchId = request.branchId() != null ? request.branchId() : ErpSecurityUtils.currentBranchId().orElse(1L);
+        return ErpApiResponse.ok(erpSalesService.createQuote(orgId, branchId, request), "Sales quote created");
+    }
+
+    @PostMapping("/quotes/{id}/convert-to-order")
+    @Operation(summary = "Convert estimate or quotation to sales order")
+    @PreAuthorize("hasAuthority('sales.create')")
+    public ErpApiResponse<ErpSalesResponses.SalesOrderResponse> convertQuoteToOrder(@PathVariable Long id, @RequestBody(required = false) ErpSalesDtos.ConvertSalesQuoteRequest request) {
+        ErpSalesDtos.ConvertSalesQuoteRequest safeRequest = request == null
+                ? new ErpSalesDtos.ConvertSalesQuoteRequest(null, null, null, null, null)
+                : request;
+        return ErpApiResponse.ok(erpSalesService.convertQuoteToOrder(id, safeRequest), "Sales quote converted to order");
+    }
+
+    @PostMapping("/quotes/{id}/convert-to-invoice")
+    @Operation(summary = "Convert estimate or quotation to sales invoice")
+    @PreAuthorize("hasAnyAuthority('sales.create','sales.post')")
+    public ErpApiResponse<ErpSalesResponses.SalesInvoiceResponse> convertQuoteToInvoice(@PathVariable Long id, @RequestBody(required = false) ErpSalesDtos.ConvertSalesQuoteRequest request) {
+        ErpSalesDtos.ConvertSalesQuoteRequest safeRequest = request == null
+                ? new ErpSalesDtos.ConvertSalesQuoteRequest(null, null, null, null, null)
+                : request;
+        return ErpApiResponse.ok(erpSalesService.convertQuoteToInvoice(id, safeRequest), "Sales quote converted to invoice");
+    }
+
+    @GetMapping("/orders")
+    @Operation(summary = "List sales orders")
+    @PreAuthorize("hasAuthority('sales.view')")
+    public ErpApiResponse<List<ErpSalesResponses.SalesOrderSummaryResponse>> listOrders(@RequestParam(required = false) Long organizationId) {
+        Long orgId = organizationId != null ? organizationId : ErpSecurityUtils.currentOrganizationId().orElse(1L);
+        return ErpApiResponse.ok(erpSalesService.listOrders(orgId).stream().map(this::toSalesOrderSummary).toList());
+    }
+
+    @GetMapping("/orders/{id}")
+    @Operation(summary = "Get sales order by id")
+    @PreAuthorize("hasAuthority('sales.view')")
+    public ErpApiResponse<ErpSalesResponses.SalesOrderResponse> getOrder(@PathVariable Long id) {
+        return ErpApiResponse.ok(erpSalesService.getOrder(id));
+    }
+
+    @PostMapping("/orders")
+    @Operation(summary = "Create sales order")
+    @PreAuthorize("hasAuthority('sales.create')")
+    public ErpApiResponse<ErpSalesResponses.SalesOrderResponse> createOrder(@RequestBody @Valid ErpSalesDtos.CreateSalesOrderRequest request) {
+        Long orgId = request.organizationId() != null ? request.organizationId() : ErpSecurityUtils.currentOrganizationId().orElse(1L);
+        Long branchId = request.branchId() != null ? request.branchId() : ErpSecurityUtils.currentBranchId().orElse(1L);
+        return ErpApiResponse.ok(erpSalesService.createOrder(orgId, branchId, request), "Sales order created");
+    }
+
+    @PostMapping("/orders/{id}/convert-to-invoice")
+    @Operation(summary = "Convert sales order to sales invoice")
+    @PreAuthorize("hasAnyAuthority('sales.create','sales.post')")
+    public ErpApiResponse<ErpSalesResponses.SalesInvoiceResponse> convertOrderToInvoice(@PathVariable Long id, @RequestBody(required = false) ErpSalesDtos.ConvertSalesOrderRequest request) {
+        ErpSalesDtos.ConvertSalesOrderRequest safeRequest = request == null
+                ? new ErpSalesDtos.ConvertSalesOrderRequest(null, null, null, null, null)
+                : request;
+        return ErpApiResponse.ok(erpSalesService.convertOrderToInvoice(id, safeRequest), "Sales order converted to invoice");
+    }
+
     @GetMapping("/invoices")
     @Operation(summary = "List sales invoices")
     @PreAuthorize("hasAuthority('sales.view')")
@@ -77,6 +155,40 @@ public class ErpSalesController {
                 invoice.getDueDate(), invoice.getSellerGstin(), invoice.getCustomerGstin(), invoice.getPlaceOfSupplyStateCode(),
                 invoice.getSubtotal(), invoice.getDiscountAmount(), invoice.getTaxAmount(), invoice.getTotalAmount(),
                 null, null, invoice.getStatus());
+    }
+
+    private ErpSalesResponses.SalesQuoteSummaryResponse toSalesQuoteSummary(com.retailmanagement.modules.erp.sales.entity.SalesQuote quote) {
+        return new ErpSalesResponses.SalesQuoteSummaryResponse(
+                quote.getId(),
+                quote.getOrganizationId(),
+                quote.getBranchId(),
+                quote.getWarehouseId(),
+                quote.getCustomerId(),
+                quote.getQuoteType(),
+                quote.getQuoteNumber(),
+                quote.getQuoteDate(),
+                quote.getValidUntil(),
+                quote.getTotalAmount(),
+                quote.getConvertedSalesOrderId(),
+                quote.getConvertedSalesInvoiceId(),
+                quote.getStatus()
+        );
+    }
+
+    private ErpSalesResponses.SalesOrderSummaryResponse toSalesOrderSummary(com.retailmanagement.modules.erp.sales.entity.SalesOrder order) {
+        return new ErpSalesResponses.SalesOrderSummaryResponse(
+                order.getId(),
+                order.getOrganizationId(),
+                order.getBranchId(),
+                order.getWarehouseId(),
+                order.getCustomerId(),
+                order.getSourceQuoteId(),
+                order.getOrderNumber(),
+                order.getOrderDate(),
+                order.getTotalAmount(),
+                order.getConvertedSalesInvoiceId(),
+                order.getStatus()
+        );
     }
 
     private ErpSalesResponses.CustomerReceiptResponse toCustomerReceiptResponse(CustomerReceipt receipt) {

@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class UserPrincipal implements UserDetails {
     private Long id;
+    private Long accountId;
     private String username;
     private String email;
     private Long organizationId;
@@ -47,6 +48,7 @@ public class UserPrincipal implements UserDetails {
         boolean accountNonLocked = user.getAccount() == null || !Boolean.TRUE.equals(user.getAccount().getLocked());
         return UserPrincipal.builder()
                 .id(user.getId())
+                .accountId(user.getAccountId())
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .organizationId(user.getOrganizationId())

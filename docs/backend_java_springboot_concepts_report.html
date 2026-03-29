@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Java and Spring Boot Concepts Achieved</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+      margin: 36px;
+      color: #1f2937;
+    }
+    h1, h2, h3 {
+      color: #111827;
+      margin-top: 1.2em;
+    }
+    h1 {
+      font-size: 28px;
+      border-bottom: 2px solid #d1d5db;
+      padding-bottom: 10px;
+    }
+    h2 {
+      font-size: 20px;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 6px;
+    }
+    h3 {
+      font-size: 14px;
+      margin-bottom: 0.3em;
+    }
+    p, li {
+      font-size: 12px;
+    }
+    code, pre {
+      font-family: Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+    }
+    pre {
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      padding: 10px;
+      border-radius: 6px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+    .path {
+      color: #0f766e;
+      font-weight: 600;
+    }
+    .section {
+      page-break-inside: avoid;
+      margin-bottom: 18px;
+    }
+    .meta {
+      color: #4b5563;
+      margin-bottom: 24px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Java and Spring Boot Concepts Achieved In This Backend</h1>
+  <p class="meta">
+    Project: <strong>retail-management-backend</strong><br>
+    Focus: Java, Spring Boot, Spring Security, JPA/Hibernate, scheduling, transactions, configuration, and SQL migration patterns implemented in this codebase.
+  </p>
+
+  <div class="section">
+    <h2>1. Spring Boot Modular Architecture</h2>
+    <p>We implemented a modular backend structure where business domains are split into packages like sales, purchase, finance, tax, inventory, service, approval, and workflow instead of mixing everything into one large service layer.</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/sales/service/ErpSalesService.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/purchase/service/ErpPurchaseService.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/finance/service/ErpFinanceService.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/workflow/service/WorkflowTriggerService.java</p>
+  </div>
+
+  <div class="section">
+    <h2>2. Layered Architecture: Controller -> Service -> Repository</h2>
+    <p>The project follows the common Spring layering pattern. Controllers expose APIs, services hold business logic, and repositories talk to the database.</p>
+    <pre>@RestController
+public class ErpSalesController { ... }
+
+@Service
+@Transactional
+public class ErpSalesService { ... }
+
+public interface SalesInvoiceRepository extends JpaRepository&lt;SalesInvoice, Long&gt; { ... }</pre>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/sales/controller/ErpSalesController.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/sales/service/ErpSalesService.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/sales/repository/SalesInvoiceRepository.java</p>
+  </div>
+
+  <div class="section">
+    <h2>3. Dependency Injection And Constructor-Based Wiring</h2>
+    <p>Spring-managed components are injected through constructors, often with Lombok helpers like <code>@RequiredArgsConstructor</code>. This keeps services testable and avoids field injection.</p>
+    <pre>@RestController
+@RequestMapping("/api/erp/organizations")
+@RequiredArgsConstructor
+public class OrganizationController {
+    private final OrganizationService service;
+}</pre>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/foundation/controller/OrganizationController.java</p>
+  </div>
+
+  <div class="section">
+    <h2>4. JPA Entity Modeling</h2>
+    <p>We modeled business tables as JPA entities using <code>@Entity</code>, <code>@Table</code>, indexes, and column mappings for ERP documents, parties, inventory, finance, and service records.</p>
+    <pre>@Entity
+@Table(name = "sales_invoice")
+public class SalesInvoice { ... }
+
+@Entity(name = "ErpSupplier")
+@Table(name = "supplier")
+public class Supplier { ... }</pre>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/sales/entity/SalesInvoice.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/party/entity/Supplier.java</p>
+  </div>
+
+  <div class="section">
+    <h2>5. Spring Data JPA Repository Pattern</h2>
+    <p>The backend uses repository interfaces extending <code>JpaRepository</code> for CRUD, pagination-style access, and custom query composition.</p>
+    <pre>public interface AccountRepository extends JpaRepository&lt;Account, Long&gt; { }
+
+public interface VoucherRepository extends JpaRepository&lt;Voucher, Long&gt; { }</pre>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/finance/repository/AccountRepository.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/finance/repository/VoucherRepository.java</p>
+  </div>
+
+  <div class="section">
+    <h2>6. Custom JPQL Queries</h2>
+    <p>Where derived repository methods were not enough, we used <code>@Query</code> for reporting and domain-specific lookups.</p>
+    <pre>@Query("""
+    select e from ErpExpense e
+    where e.organizationId = :organizationId
+      and e.expenseDate between :fromDate and :toDate
+""")
+List&lt;Expense&gt; ...</pre>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/expense/repository/ExpenseRepository.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/tax/repository/TaxRegistrationRepository.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/notification/repository/NotificationRepository.java</p>
+  </div>
+
+  <div class="section">
+    <h2>7. Transaction Management</h2>
+    <p>We used <code>@Transactional</code> heavily to keep ERP operations atomic, especially in posting flows where inventory, ledger, ownership, and audit data must move together.</p>
+    <pre>@Service
+@Transactional
+public class ErpAccountingPostingService { ... }
+
+@Transactional(readOnly = true)
+public List&lt;VoucherResponse&gt; listVouchers(...) { ... }</pre>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/finance/service/ErpAccountingPostingService.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/finance/service/ErpFinanceService.java</p>
+  </div>
+
+  <div class="section">
+    <h2>8. Split Posting Services For Complex Workflows</h2>
+    <p>We introduced dedicated posting services to isolate final side effects from draft creation. This is a strong service-design pattern for approval-driven ERP systems.</p>
+    <ul>
+      <li><span class="path">SalesInvoicePostingService.java</span></li>
+      <li><span class="path">StockAdjustmentPostingService.java</span></li>
+      <li><span class="path">StockTransferPostingService.java</span></li>
+      <li><span class="path">ServiceReplacementPostingService.java</span></li>
+      <li><span class="path">ReturnPostingService.java</span></li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>9. DTO-Based API Contracts</h2>
+    <p>We refactored APIs away from exposing JPA entities directly and instead return explicit request/response DTOs. That is a core Spring Boot API design improvement.</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/sales/dto/ErpSalesDtos.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/sales/dto/ErpSalesResponses.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/finance/dto/ErpFinanceDtos.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/party/dto/SupplierDtos.java</p>
+  </div>
+
+  <div class="section">
+    <h2>10. Spring Security Filter Chain Configuration</h2>
+    <p>Security is configured centrally through a <code>SecurityFilterChain</code> bean, which is the modern Spring Security approach.</p>
+    <pre>@Configuration
+public class SecurityConfig {
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception { ... }
+}</pre>
+    <p class="path">src/main/java/com/retailmanagement/common/config/SecurityConfig.java</p>
+  </div>
+
+  <div class="section">
+    <h2>11. JWT Authentication And Request Filtering</h2>
+    <p>The backend uses JWT-based stateless authentication with a custom request filter and token provider.</p>
+    <pre>public class JwtAuthenticationFilter extends OncePerRequestFilter { ... }
+public class JwtTokenProvider { ... }</pre>
+    <p class="path">src/main/java/com/retailmanagement/modules/auth/security/JwtAuthenticationFilter.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/auth/security/JwtTokenProvider.java</p>
+  </div>
+
+  <div class="section">
+    <h2>12. Custom UserDetailsService With Organization Awareness</h2>
+    <p>Authentication is not only username-based. We customized user loading so JWT processing can reload the user with organization context.</p>
+    <pre>public class CustomUserDetailsService implements UserDetailsService {
+    public UserDetails loadUserByUsernameAndOrganization(String username, Long organizationId) { ... }
+}</pre>
+    <p class="path">src/main/java/com/retailmanagement/modules/auth/security/CustomUserDetailsService.java</p>
+  </div>
+
+  <div class="section">
+    <h2>13. Method-Level Authorization</h2>
+    <p>We use <code>@PreAuthorize</code> on controllers to enforce module-specific permissions such as sales, purchase, tax, accounting, inventory, and approval access.</p>
+    <pre>@PreAuthorize("hasAuthority('sales.view')")
+@PreAuthorize("hasAuthority('purchase.create')")
+@PreAuthorize("hasAuthority('approval.manage')")</pre>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/sales/controller/ErpSalesController.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/purchase/controller/ErpPurchaseController.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/approval/controller/ErpApprovalController.java</p>
+  </div>
+
+  <div class="section">
+    <h2>14. Global Exception Handling</h2>
+    <p>The application has centralized API error handling through <code>@RestControllerAdvice</code> and <code>@ExceptionHandler</code>, which is a major Spring Boot best practice.</p>
+    <pre>@RestControllerAdvice
+public class GlobalExceptionHandler {
+    @ExceptionHandler(BusinessException.class)
+    ...
+}</pre>
+    <p class="path">src/main/java/com/retailmanagement/common/exceptions/GlobalExceptionHandler.java</p>
+  </div>
+
+  <div class="section">
+    <h2>15. Scheduled Background Jobs</h2>
+    <p>We implemented scheduler-driven backend automation using <code>@Scheduled</code> for recurring business operations and workflow scanning.</p>
+    <ul>
+      <li><span class="path">InventoryReservationService.java</span>: reservation expiry scan</li>
+      <li><span class="path">RecurringSalesInvoiceService.java</span>: recurring invoice scan</li>
+      <li><span class="path">RecurringJournalService.java</span>: recurring journal scan</li>
+      <li><span class="path">NotificationServiceImpl.java</span>: notification processing</li>
+      <li><span class="path">WorkflowTriggerService.java</span>: workflow alert dispatching</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>16. Domain Events Through Audit Writing</h2>
+    <p>We implemented audit persistence as a reusable service, so important document and workflow actions are recorded consistently.</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/audit/service/AuditEventWriter.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/audit/entity/AuditEvent.java</p>
+  </div>
+
+  <div class="section">
+    <h2>17. OpenAPI / Swagger Configuration</h2>
+    <p>We customized Swagger/OpenAPI generation using Spring configuration and grouped ERP modules into cleaner tags instead of leaking controller bean names.</p>
+    <p class="path">src/main/java/com/retailmanagement/common/config/SwaggerConfig.java</p>
+  </div>
+
+  <div class="section">
+    <h2>18. Configuration Classes And Bean Registration</h2>
+    <p>We used Spring <code>@Configuration</code> classes and <code>@Bean</code> methods for infrastructure concerns such as security, CORS, Swagger, async execution, caching, MVC, auditing, and RestTemplate setup.</p>
+    <ul>
+      <li><span class="path">common/config/SecurityConfig.java</span></li>
+      <li><span class="path">common/config/CorsConfig.java</span></li>
+      <li><span class="path">common/config/SwaggerConfig.java</span></li>
+      <li><span class="path">common/config/AsyncConfig.java</span></li>
+      <li><span class="path">common/config/CacheConfig.java</span></li>
+      <li><span class="path">common/config/RestTemplateConfig.java</span></li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>19. Lombok Usage For Boilerplate Reduction</h2>
+    <p>The codebase uses Lombok annotations like <code>@Getter</code>, <code>@Setter</code>, and <code>@RequiredArgsConstructor</code> to keep entities and controllers concise.</p>
+    <pre>@Getter @Setter
+@Entity
+public class Organization { ... }</pre>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/foundation/entity/Organization.java</p>
+  </div>
+
+  <div class="section">
+    <h2>20. ERP-Safe Use Of BigDecimal</h2>
+    <p>Financial and quantity-sensitive code uses <code>BigDecimal</code> rather than floating point types, which is critical in Java accounting and tax logic.</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/finance/service/ErpAccountingPostingService.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/sales/service/ErpSalesService.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/tax/service/GstTaxService.java</p>
+  </div>
+
+  <div class="section">
+    <h2>21. Approval Engine As A Cross-Cutting Spring Service</h2>
+    <p>We built a reusable approval service that evaluates rules, creates approval requests, and finalizes documents through specialized posting services.</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/approval/service/ErpApprovalService.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/approval/entity/ApprovalRule.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/approval/entity/ApprovalRequest.java</p>
+  </div>
+
+  <div class="section">
+    <h2>22. Scheduled Workflow Trigger Engine</h2>
+    <p>We built a workflow engine that scans the ERP state and raises actionable alerts such as low stock, overdue dues, warranty expiry, and GST threshold warnings.</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/workflow/service/WorkflowTriggerService.java</p>
+  </div>
+
+  <div class="section">
+    <h2>23. Recurring Document Processing</h2>
+    <p>Recurring invoices and recurring journals demonstrate reusable scheduling, template persistence, and safe execution through the normal posting flows.</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/sales/service/RecurringSalesInvoiceService.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/finance/service/RecurringJournalService.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/common/util/RecurringScheduleSupport.java</p>
+  </div>
+
+  <div class="section">
+    <h2>24. Bank Reconciliation As A Spring Service Workflow</h2>
+    <p>We implemented statement import, match suggestion, reconciliation, unreconciliation, and summary reporting through a dedicated finance workflow.</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/finance/service/BankReconciliationService.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/finance/entity/BankStatementEntry.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/finance/controller/BankReconciliationController.java</p>
+  </div>
+
+  <div class="section">
+    <h2>25. Liquibase Migration-Driven Database Evolution</h2>
+    <p>Database evolution is handled through ordered SQL changelogs, which is a core Spring Boot production practice for schema versioning.</p>
+    <pre>037_add_recurring_invoice_and_journal_flow.sql
+039_add_bank_reconciliation_flow.sql
+041_expand_return_status_constraints.sql
+042_add_store_product_supplier_preference.sql</pre>
+    <p class="path">src/main/resources/db/changelog/db.changelog-master.yml</p>
+  </div>
+
+  <div class="section">
+    <h2>26. SQL Data Migration And Backfill Strategy</h2>
+    <p>We did not only add tables; we also migrated live semantics through backfills and cleanup SQL, which is a critical backend skill.</p>
+    <pre>032_drop_product_sku_and_backfill_store_product.sql
+036_seed_sales_quote_order_demo.sql</pre>
+    <p>These show schema refactoring and reproducible demo data seeding.</p>
+  </div>
+
+  <div class="section">
+    <h2>27. API Security + Domain Guards Together</h2>
+    <p>Besides Spring Security annotations, the ERP code also uses domain-level access guards to verify organization and branch scope before performing operations.</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/common/security/ErpAccessGuard.java</p>
+  </div>
+
+  <div class="section">
+    <h2>28. Reporting Aggregation In Service Layer</h2>
+    <p>Dashboard and finance reporting are composed in services that aggregate multiple repositories into API-ready summary DTOs.</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/dashboard/service/impl/DashboardServiceImpl.java</p>
+    <p class="path">src/main/java/com/retailmanagement/modules/erp/finance/service/ErpFinanceService.java</p>
+  </div>
+
+  <div class="section">
+    <h2>29. Spring Boot Actuator-Style Health Endpoint Pattern</h2>
+    <p>The project includes a dedicated health controller for runtime health and API liveness checks, which is common in Spring service operations.</p>
+    <p class="path">src/main/java/com/retailmanagement/common/controller/HealthController.java</p>
+  </div>
+
+  <div class="section">
+    <h2>30. Real Production Refactoring Practices</h2>
+    <p>We performed practical refactoring patterns: removing legacy packages, replacing entity-leaking APIs with DTOs, isolating posting services, and evolving the schema without discarding history.</p>
+    <p class="path">src/main/java/com/retailmanagement/RetailManagementApplication.java</p>
+    <p class="path">src/main/java/com/retailmanagement/common/config/SwaggerConfig.java</p>
+    <p class="path">src/main/resources/db/changelog/031_align_product_hsn_and_line_snapshots.sql</p>
+    <p class="path">src/main/resources/db/changelog/032_drop_product_sku_and_backfill_store_product.sql</p>
+  </div>
+
+  <div class="section">
+    <h2>Conclusion</h2>
+    <p>This backend now demonstrates a strong set of real-world Java and Spring Boot concepts: layered architecture, DI, JPA modeling, repositories, JPQL, transaction design, scheduled jobs, JWT security, method authorization, configuration classes, global exception handling, audit/event services, recurring task processing, approval workflows, reporting services, and migration-driven SQL delivery.</p>
+  </div>
+</body>
+</html>

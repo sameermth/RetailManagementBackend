@@ -22,6 +22,62 @@ public final class ErpSalesDtos {
             @NotEmpty List<@Valid CreateSalesInvoiceLineRequest> lines
     ) {}
 
+    public record CreateSalesQuoteRequest(
+            Long organizationId,
+            Long branchId,
+            @NotNull Long warehouseId,
+            @NotNull Long customerId,
+            @NotBlank String quoteType,
+            LocalDate quoteDate,
+            LocalDate validUntil,
+            String placeOfSupplyStateCode,
+            String remarks,
+            @NotEmpty List<@Valid CreateSalesDocumentLineRequest> lines
+    ) {}
+
+    public record CreateSalesOrderRequest(
+            Long organizationId,
+            Long branchId,
+            @NotNull Long warehouseId,
+            @NotNull Long customerId,
+            LocalDate orderDate,
+            String placeOfSupplyStateCode,
+            String remarks,
+            @NotEmpty List<@Valid CreateSalesDocumentLineRequest> lines
+    ) {}
+
+    public record ConvertSalesQuoteRequest(
+            Long organizationId,
+            Long branchId,
+            LocalDate targetDate,
+            String remarks,
+            List<@Valid ConvertTrackedSalesLineRequest> trackedLines
+    ) {}
+
+    public record ConvertSalesOrderRequest(
+            Long organizationId,
+            Long branchId,
+            LocalDate targetDate,
+            String remarks,
+            List<@Valid ConvertTrackedSalesLineRequest> trackedLines
+    ) {}
+
+    public record ConvertTrackedSalesLineRequest(
+            @NotNull Long productId,
+            List<Long> serialNumberIds,
+            List<@Valid BatchSelection> batchSelections
+    ) {}
+
+    public record CreateSalesDocumentLineRequest(
+            @NotNull Long productId,
+            @NotNull Long uomId,
+            @NotNull @DecimalMin(value = "0.000001") BigDecimal quantity,
+            @NotNull @DecimalMin(value = "0.000001") BigDecimal baseQuantity,
+            @DecimalMin(value = "0.00") BigDecimal unitPrice,
+            BigDecimal discountAmount,
+            String remarks
+    ) {}
+
     public record CreateSalesInvoiceLineRequest(
             @NotNull Long productId,
             @NotNull Long uomId,

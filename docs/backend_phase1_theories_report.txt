@@ -1,0 +1,443 @@
+
+
+  
+  Retail Management Backend Phase 1 Theories Achieved
+  
+
+  Retail Management Backend Phase 1 Theories Achieved
+
+  
+    Project: retail-management-backend
+
+    Stack: Java, Spring Boot, Spring Security, JPA/Hibernate, PostgreSQL/Liquibase
+
+    Scope: Implemented backend theories and patterns achieved through Phase 1 ERP build-out.
+  
+
+  
+    1. Modular ERP Domain Architecture
+
+    Theory Achieved
+
+    The backend is organized as a modular ERP, where each business capability is isolated into a Spring Boot module instead of mixing sales, inventory, finance, and tax logic into one service layer.
+
+    Java Examples
+
+    
+       - src/main/java/com/retailmanagement/modules/erp/purchase/service/ErpPurchaseService.java
+
+       - src/main/java/com/retailmanagement/modules/erp/sales/service/ErpSalesService.java
+
+       - src/main/java/com/retailmanagement/modules/erp/finance/service/ErpAccountingPostingService.java
+
+       - src/main/java/com/retailmanagement/modules/erp/workflow/service/WorkflowTriggerService.java
+
+    
+    SQL Example
+
+    Liquibase changelog sequencing reflects module growth from foundational ERP schema into returns, recurring documents, bank reconciliation, and sourcing preferences.
+
+    037_add_recurring_invoice_and_journal_flow.sql
+039_add_bank_reconciliation_flow.sql
+041_expand_return_status_constraints.sql
+042_add_store_product_supplier_preference.sql
+
+  
+
+  
+    2. Authentication Bound To Organization Context
+
+    Theory Achieved
+
+    Security is not just user-based; it is organization-scoped. The JWT carries active organization context, and ERP access guards enforce that every operation stays inside the currently selected organization and branch.
+
+    Java Examples
+
+    // Active org is embedded into JWT claims
+claims.put("organizationId", principal.getOrganizationId());
+
+// Request-time auth reload is org-aware
+Long organizationId = tokenProvider.getOrganizationIdFromToken(jwt);
+userDetailsService.loadUserByUsernameAndOrganization(username, organizationId);
+
+    src/main/java/com/retailmanagement/modules/auth/security/JwtTokenProvider.java
+
+    src/main/java/com/retailmanagement/modules/auth/security/JwtAuthenticationFilter.java
+
+    src/main/java/com/retailmanagement/modules/erp/common/security/ErpAccessGuard.java
+
+  
+
+  
+    3. Multi-Organization Membership Selection
+
+    Theory Achieved
+
+    A single account can now expose multiple organization memberships, while one token still represents one active organization at a time. This preserves strict ERP scoping but supports employees and accountants working across multiple organizations.
+
+    Java Examples
+
+    // Login can target an org explicitly
+private Long organizationId;
+
+// Response exposes all memberships
+private List<MembershipSummary> memberships;
+
+// Switch endpoint reissues token for another org
+POST /api/auth/switch-organization
+
+    src/main/java/com/retailmanagement/modules/auth/dto/request/LoginRequest.java
+
+    src/main/java/com/retailmanagement/modules/auth/dto/response/JwtResponse.java
+
+    src/main/java/com/retailmanagement/modules/auth/service/impl/AuthServiceImpl.java
+
+    src/main/java/com/retailmanagement/modules/auth/controller/AuthController.java
+
+  
+
+  
+    4. Shared Product Master vs Organization-Specific Store Product
+
+    Theory Achieved
+
+    The system separates universal product identity from organization-specific selling identity. HSN belongs to the shared product master, while SKU belongs to the store product.
+
+    Java Examples
+
+    // Shared master carries classification
+Product.hsnCode
+
+// Organization association carries local SKU and pricing/reorder fields
+StoreProduct.sku
+StoreProduct.defaultSalePrice
+StoreProduct.reorderLevelBaseQty
+
+    src/main/java/com/retailmanagement/modules/erp/catalog/entity/Product.java
+
+    src/main/java/com/retailmanagement/modules/erp/catalog/entity/StoreProduct.java
+
+    SQL Example
+
+    031_align_product_hsn_and_line_snapshots.sql
+032_drop_product_sku_and_backfill_store_product.sql
+
+  
+
+  
+    5. Supplier Relationship Modeling
+
+    Theory Achieved
+
+    Supplier data is modeled in layers: supplier business identity, supplier-product supply capability, store-supplier terms, and finally store-product supplier preference for org-specific sourcing defaults.
+
+    Java Examples
+
+    
+       - Supplier.java: supplier business identity
+
+       - SupplierProduct.java: supplier to universal product link
+
+       - StoreSupplierTerms.java: contract-level org-specific commercial terms
+
+       - StoreProductSupplierPreference.java: org-specific preferred path for a specific store product
+
+    
+    SQL Example
+
+    017_add_supplier_relationship_model.sql
+042_add_store_product_supplier_preference.sql
+
+  
+
+  
+    6. Purchase Workflow With Sourcing Resolution
+
+    Theory Achieved
+
+    Purchase order and receipt lines operate on store products while resolving the correct supplier-product path. Manual purchasing and auto-reorder now share sourcing logic.
+
+    Java Example
+
+    private SupplierProduct resolveSupplierProduct(Long organizationId, Long supplierId,
+        StoreProduct storeProduct, Long supplierProductId) {
+    // explicit supplierProductId wins
+    // org-specific store-product preference next
+    // supplier product preferred/priority fallback after that
+}
+
+    src/main/java/com/retailmanagement/modules/erp/purchase/service/ErpPurchaseService.java
+
+  
+
+  
+    7. Quote to Order to Invoice Lifecycle
+
+    Theory Achieved
+
+    The backend supports commercial staging before final billing: quotation/estimate, sales order, then invoice conversion. Tracked items are also supported during conversion.
+
+    Java Examples
+
+    
+       - src/main/java/com/retailmanagement/modules/erp/sales/service/ErpSalesService.java
+
+       - src/main/java/com/retailmanagement/modules/erp/sales/controller/ErpSalesController.java
+
+    
+    SQL Example
+
+    034_add_sales_quote_and_order_flow.sql
+035_expand_sales_invoice_status_constraint.sql
+
+  
+
+  
+    8. Inventory Reservation, Tracking, and Availability
+
+    Theory Achieved
+
+    The system distinguishes on-hand, reserved, and available stock. Sales now reserve stock before final posting, and tracked items use exact serial or batch selections.
+
+    Java Examples
+
+    InventoryReservationService.reserveForSalesInvoice(...)
+InventoryReservationService.releaseSalesInvoiceReservations(...)
+SalesInvoicePostingService.finalizeApprovedInvoice(...)
+
+    src/main/java/com/retailmanagement/modules/erp/inventory/service/InventoryReservationService.java
+
+    src/main/java/com/retailmanagement/modules/erp/sales/service/SalesInvoicePostingService.java
+
+    SQL Example
+
+    026_add_inventory_reservation_tracking.sql
+030_add_inventory_reservation_expiry.sql
+
+  
+
+  
+    9. Returns, Inspection, and Serial State Semantics
+
+    Theory Achieved
+
+    Returns are not only document reversals; they are inspection-driven inventory and accounting events. Approved serial returns now distinguish restocked saleable serials from non-saleable returned serials.
+
+    Java Example
+
+    // RESTOCK -> serial becomes IN_STOCK
+// non-restock approved return -> serial stays RETURNED
+// customer ownership is cleared either way
+
+    src/main/java/com/retailmanagement/modules/erp/returns/service/ReturnPostingService.java
+
+    src/main/java/com/retailmanagement/modules/erp/returns/service/ErpReturnService.java
+
+    SQL Example
+
+    019_add_returns_flow.sql
+020_add_return_tracking_details.sql
+041_expand_return_status_constraints.sql
+
+  
+
+  
+    10. Warranty, Service, and Replacement Integration
+
+    Theory Achieved
+
+    After-sales service is connected to sales history, serial ownership, returns, and replacement issuance. Warranty claims now support upstream routing and approval-aware claim handling.
+
+    Java Examples
+
+    
+       - src/main/java/com/retailmanagement/modules/erp/service/service/ErpServiceWarrantyService.java
+
+       - src/main/java/com/retailmanagement/modules/erp/service/service/ServiceReplacementPostingService.java
+
+    
+    SQL Example
+
+    021_add_service_warranty_integration_links.sql
+022_add_service_replacement_flow.sql
+029_add_warranty_claim_routing_and_replacement_bucket.sql
+
+  
+
+  
+    11. Accounting As A Posting Engine
+
+    Theory Achieved
+
+    Accounting is not handled ad hoc in controllers. Business documents trigger structured voucher and ledger posting through a dedicated posting service.
+
+    Java Example
+
+    postSalesInvoice(...)
+postPurchaseReceipt(...)
+postSalesReturn(...)
+postPurchaseReturn(...)
+postExpenseAccrual(...)
+postServiceReplacement(...)
+
+    src/main/java/com/retailmanagement/modules/erp/finance/service/ErpAccountingPostingService.java
+
+    SQL Example
+
+    014_seed_system_accounts_for_all_orgs.sql
+016_add_erp_expense_accounting.sql
+023_seed_service_replacement_accounts.sql
+
+  
+
+  
+    12. Outstanding, Aging, and Allocation-Driven Dues
+
+    Theory Achieved
+
+    Customer and supplier outstanding are not guessed from raw totals; they are derived from invoice/receipt and bill/payment allocations, due dates, and return adjustments.
+
+    Java Examples
+
+    
+       - src/main/java/com/retailmanagement/modules/erp/finance/service/ErpFinanceService.java
+
+       - src/main/java/com/retailmanagement/modules/erp/sales/repository/CustomerReceiptAllocationRepository.java
+
+       - src/main/java/com/retailmanagement/modules/erp/purchase/repository/SupplierPaymentAllocationRepository.java
+
+    
+    SQL Example
+
+    015_add_due_dates_and_outstanding_support.sql
+
+  
+
+  
+    13. Approval-Driven Operational Control
+
+    Theory Achieved
+
+    Approvals are rule-driven and entity-aware. High-impact transactions can be created, moved into pending approval, and finalized only after approval.
+
+    Java Examples
+
+    // Supported operational flows now include:
+purchase_order
+sales_invoice
+stock_adjustment
+stock_transfer
+expense
+service_replacement
+sales_return
+purchase_return
+warranty_claim (approval path for APPROVED transition)
+
+    src/main/java/com/retailmanagement/modules/erp/approval/service/ErpApprovalService.java
+
+  
+
+  
+    14. Workflow Triggers and Auto-Reorder
+
+    Theory Achieved
+
+    The backend includes operational workflow scanning for low stock, overdue dues, warranty expiry, and GST threshold alerts. Low-stock events can also create draft purchase orders automatically.
+
+    Java Example
+
+    maybeCreateDraftPurchaseOrder(...)
+resolveSupplierMapping(...)
+recipientRolesFor(triggerType)
+
+    src/main/java/com/retailmanagement/modules/erp/workflow/service/WorkflowTriggerService.java
+
+  
+
+  
+    15. Recurring Commercial and Finance Flows
+
+    Theory Achieved
+
+    The system supports recurring sales invoices and recurring journals using reusable templates instead of one-off documents.
+
+    Java Examples
+
+    
+       - src/main/java/com/retailmanagement/modules/erp/sales/service/RecurringSalesInvoiceService.java
+
+       - src/main/java/com/retailmanagement/modules/erp/finance/service/RecurringJournalService.java
+
+    
+    SQL Example
+
+    037_add_recurring_invoice_and_journal_flow.sql
+
+  
+
+  
+    16. Bank Reconciliation
+
+    Theory Achieved
+
+    Bank statements and bank-ledger lines are now separate concepts. The backend supports import, candidate matching, reconcile, unreconcile, and reconciliation summary.
+
+    Java Example
+
+    BankReconciliationService.importStatementEntries(...)
+BankReconciliationService.candidateLedgerMatches(...)
+BankReconciliationService.reconcile(...)
+BankReconciliationService.summary(...)
+
+    src/main/java/com/retailmanagement/modules/erp/finance/service/BankReconciliationService.java
+
+    SQL Example
+
+    039_add_bank_reconciliation_flow.sql
+
+  
+
+  
+    17. Dashboard and Reporting Layer
+
+    Theory Achieved
+
+    The backend exposes business summary endpoints for profitability, aging, inventory stock summary, and tax summary, turning the ERP model into decision-support APIs.
+
+    Java Examples
+
+    
+       - src/main/java/com/retailmanagement/modules/dashboard/controller/DashboardController.java
+
+       - src/main/java/com/retailmanagement/modules/dashboard/service/impl/DashboardServiceImpl.java
+
+    
+  
+
+  
+    18. Migration-Driven, Reproducible Delivery
+
+    Theory Achieved
+
+    The project uses SQL-first Liquibase changesets as the delivery record. Business capabilities, demo data, and status constraints were all added incrementally through migration files.
+
+    SQL Examples
+
+    033_seed_phase1_demo_enrichment.sql
+036_seed_sales_quote_order_demo.sql
+041_expand_return_status_constraints.sql
+042_add_store_product_supplier_preference.sql
+
+    src/main/resources/db/changelog/db.changelog-master.yml
+
+  
+
+  
+    Conclusion
+
+    Phase 1 achieved a full ERP backend backbone in Spring Boot: modular domains, org-scoped security, catalog separation, procurement, sales, inventory, finance, returns, service, approvals, workflow, recurrence, reconciliation, reporting, and seeded demoability.
+
+    The remaining backlog is no longer about missing core backend theory. It is mostly UX refinement, naming cleanup, and future product expansion.
+
+  
+

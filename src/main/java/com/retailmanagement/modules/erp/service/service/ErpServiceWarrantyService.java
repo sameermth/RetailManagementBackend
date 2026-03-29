@@ -420,6 +420,54 @@ public class ErpServiceWarrantyService {
         WarrantyClaim claim = warrantyClaimRepository.findByOrganizationIdAndId(organizationId, claimId)
                 .orElseThrow(() -> new ResourceNotFoundException("Warranty claim not found: " + claimId));
         String status = normalizeClaimStatus(request.status());
+        if ("APPROVED".equals(status)) {
+            ErpApprovalService.ApprovalEvaluation evaluation = erpApprovalService.evaluate(
+                    organizationId,
+                    new ErpApprovalDtos.ApprovalEvaluationQuery("warranty_claim", claim.getId(), "WARRANTY_CLAIM_APPROVE")
+            );
+            claim.setUpstreamRouteType(normalizeUpstreamRouteType(request.upstreamRouteType(), claim.getSupplierId(), claim.getDistributorId(), request.upstreamCompanyName()));
+            claim.setUpstreamCompanyName(trimToNull(request.upstreamCompanyName()));
+            claim.setUpstreamReferenceNumber(trimToNull(request.upstreamReferenceNumber()));
+            claim.setUpstreamStatus(normalizeUpstreamStatus(request.upstreamStatus()));
+            claim.setRoutedOn(request.routedOn());
+            if (request.claimNotes() != null && !request.claimNotes().isBlank()) {
+                claim.setClaimNotes(request.claimNotes());
+            }
+            if (evaluation.approvalRequired()) {
+                claim.setStatus("SUBMITTED");
+                claim = warrantyClaimRepository.save(claim);
+                if (!evaluation.pendingRequestExists()) {
+                    erpApprovalService.createRequest(
+                            organizationId,
+                            branchId,
+                            new ErpApprovalDtos.CreateApprovalRequest(
+                                    "warranty_claim",
+                                    claim.getId(),
+                                    claim.getClaimNumber(),
+                                    "WARRANTY_CLAIM_APPROVE",
+                                    "Warranty claim approval matched approval rule",
+                                    null,
+                                    evaluation.approverRoleCode()
+                            )
+                    );
+                }
+                auditEventWriter.write(
+                        organizationId,
+                        branchId,
+                        "WARRANTY_CLAIM_PENDING_APPROVAL",
+                        "warranty_claim",
+                        claim.getId(),
+                        claim.getClaimNumber(),
+                        "REQUEST_APPROVAL",
+                        null,
+                        claim.getCustomerId(),
+                        claim.getSupplierId(),
+                        "Warranty claim sent for approval",
+                        ErpJsonPayloads.of("status", "SUBMITTED")
+                );
+                return claim;
+            }
+        }
         claim.setStatus(status);
         if (request.approvedOn() != null) {
             claim.setApprovedOn(request.approvedOn());

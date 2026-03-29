@@ -15,8 +15,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.Month;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,6 +60,7 @@ public class TaxRegistrationService {
         String effectiveScope = effectiveRegistration == null
                 ? "NONE"
                 : (applicableBranch != null && applicableBranch.branchId() != null ? "BRANCH" : "ORGANIZATION");
+        List<String> scopeWarnings = buildScopeWarnings(organizationId, branchId, effectiveDate);
         return new TaxDtos.TaxRegistrationListResponse(
                 branchId,
                 effectiveDate,
@@ -65,16 +68,20 @@ public class TaxRegistrationService {
                 applicable,
                 applicableBranch,
                 effectiveRegistration,
-                effectiveScope
+                effectiveScope,
+                !scopeWarnings.isEmpty(),
+                scopeWarnings
         );
     }
 
     public TaxDtos.TaxRegistrationResponse createRegistration(Long organizationId, TaxDtos.UpsertTaxRegistrationRequest request) {
         accessGuard.assertOrganizationAccess(organizationId);
         validateBranchScope(organizationId, request.branchId());
+        validateDateRange(request.effectiveFrom(), request.effectiveTo());
         if (taxRegistrationRepository.findAll().stream().anyMatch(reg -> reg.getGstin().equalsIgnoreCase(request.gstin().trim()))) {
             throw new BusinessException("GSTIN already exists: " + request.gstin());
         }
+        validateScopeOverlap(organizationId, request.branchId(), request.effectiveFrom(), request.effectiveTo(), null);
         TaxRegistration registration = new TaxRegistration();
         registration.setOrganizationId(organizationId);
         applyRequest(registration, request);
@@ -92,10 +99,12 @@ public class TaxRegistrationService {
             throw new BusinessException("Tax registration does not belong to organization " + organizationId);
         }
         validateBranchScope(organizationId, request.branchId());
+        validateDateRange(request.effectiveFrom(), request.effectiveTo());
         if (taxRegistrationRepository.findAll().stream()
                 .anyMatch(reg -> !reg.getId().equals(registrationId) && reg.getGstin().equalsIgnoreCase(request.gstin().trim()))) {
             throw new BusinessException("GSTIN already exists: " + request.gstin());
         }
+        validateScopeOverlap(organizationId, request.branchId(), request.effectiveFrom(), request.effectiveTo(), registrationId);
         applyRequest(registration, request);
         if (Boolean.TRUE.equals(request.isDefault())) {
             clearExistingDefaults(organizationId, request.branchId(), registrationId);
@@ -192,6 +201,71 @@ public class TaxRegistrationService {
                     reg.setIsDefault(false);
                     taxRegistrationRepository.save(reg);
                 });
+    }
+
+    private void validateDateRange(LocalDate effectiveFrom, LocalDate effectiveTo) {
+        if (effectiveTo != null && effectiveTo.isBefore(effectiveFrom)) {
+            throw new BusinessException("Effective to date cannot be earlier than effective from date");
+        }
+    }
+
+    private void validateScopeOverlap(Long organizationId, Long branchId, LocalDate effectiveFrom, LocalDate effectiveTo, Long currentRegistrationId) {
+        taxRegistrationRepository.findAll().stream()
+                .filter(reg -> organizationId.equals(reg.getOrganizationId()))
+                .filter(reg -> Objects.equals(branchId, reg.getBranchId()))
+                .filter(reg -> currentRegistrationId == null || !currentRegistrationId.equals(reg.getId()))
+                .filter(reg -> Boolean.TRUE.equals(reg.getIsActive()))
+                .filter(reg -> rangesOverlap(effectiveFrom, effectiveTo, reg.getEffectiveFrom(), reg.getEffectiveTo()))
+                .findFirst()
+                .ifPresent(conflict -> {
+                    String scope = branchId == null ? "organization" : "branch " + branchId;
+                    throw new BusinessException("GST registration date range overlaps with existing " + scope
+                            + " registration " + conflict.getGstin()
+                            + " effective from " + conflict.getEffectiveFrom()
+                            + (conflict.getEffectiveTo() == null ? "" : " to " + conflict.getEffectiveTo()));
+                });
+    }
+
+    private List<String> buildScopeWarnings(Long organizationId, Long branchId, LocalDate effectiveDate) {
+        List<String> warnings = new ArrayList<>();
+        List<TaxRegistration> activeOnDate = taxRegistrationRepository.findAll().stream()
+                .filter(reg -> organizationId.equals(reg.getOrganizationId()))
+                .filter(reg -> Boolean.TRUE.equals(reg.getIsActive()))
+                .filter(reg -> !reg.getEffectiveFrom().isAfter(effectiveDate))
+                .filter(reg -> reg.getEffectiveTo() == null || !reg.getEffectiveTo().isBefore(effectiveDate))
+                .toList();
+
+        long orgWideMatches = activeOnDate.stream()
+                .filter(reg -> reg.getBranchId() == null)
+                .count();
+        if (orgWideMatches > 1) {
+            warnings.add("Multiple organization-level GST registrations are active on the requested date.");
+        }
+
+        if (branchId != null) {
+            long branchMatches = activeOnDate.stream()
+                    .filter(reg -> Objects.equals(branchId, reg.getBranchId()))
+                    .count();
+            if (branchMatches > 1) {
+                warnings.add("Multiple branch-level GST registrations are active for branch " + branchId + " on the requested date.");
+            }
+            if (branchMatches == 0 && orgWideMatches == 0) {
+                warnings.add("No active GST registration is available for the requested branch/date.");
+            }
+            if (branchMatches == 0 && orgWideMatches == 1) {
+                warnings.add("This branch currently falls back to the organization-level GST registration.");
+            }
+        } else if (orgWideMatches == 0) {
+            warnings.add("No active organization-level GST registration is available for the requested date.");
+        }
+
+        return warnings;
+    }
+
+    private boolean rangesOverlap(LocalDate leftFrom, LocalDate leftTo, LocalDate rightFrom, LocalDate rightTo) {
+        LocalDate effectiveLeftTo = leftTo == null ? LocalDate.of(9999, 12, 31) : leftTo;
+        LocalDate effectiveRightTo = rightTo == null ? LocalDate.of(9999, 12, 31) : rightTo;
+        return !leftFrom.isAfter(effectiveRightTo) && !rightFrom.isAfter(effectiveLeftTo);
     }
 
     private TaxDtos.TaxRegistrationResponse toResponse(TaxRegistration registration) {

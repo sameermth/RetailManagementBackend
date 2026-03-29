@@ -33,7 +33,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
                 String username = tokenProvider.getUsernameFromToken(jwt);
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                Long organizationId = tokenProvider.getOrganizationIdFromToken(jwt);
+                UserDetails userDetails = organizationId == null
+                        ? userDetailsService.loadUserByUsername(username)
+                        : userDetailsService.loadUserByUsernameAndOrganization(username, organizationId);
                 if (!(userDetails instanceof UserPrincipal principal) || !tokenProvider.isSubscriptionContextValid(jwt, principal)) {
                     filterChain.doFilter(request, response);
                     return;

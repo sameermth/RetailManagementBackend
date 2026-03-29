@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
 import java.util.Set;
 
 @Data
@@ -17,11 +18,30 @@ public class JwtResponse {
     private String type = "Bearer";
     private Long id;
     private Long organizationId;
+    private String organizationCode;
+    private String organizationName;
     private String username;
     private String email;
     private Set<String> roles;
+    private Set<String> permissions;
     private Long subscriptionVersion;
     private String subscriptionPlanCode;
     private String subscriptionStatus;
     private Set<String> subscriptionFeatures;
+    private List<MembershipSummary> memberships;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MembershipSummary {
+        private Long userId;
+        private Long organizationId;
+        private String organizationCode;
+        private String organizationName;
+        private Long defaultBranchId;
+        private String roleCode;
+        private String roleName;
+        private Boolean active;
+    }
 }

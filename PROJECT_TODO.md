@@ -5,15 +5,15 @@ This file tracks deferred design and implementation items so they do not get los
 ## Identity And Access
 - Decide whether `app_user` should later be renamed to `organization_membership`.
 - Add fuller multi-organization session selection flow for accounts with memberships in multiple orgs.
+- Explore cross-organization worker discovery for roles like accountant, electrician, plumber, and similar service providers.
 
 ## Tax
-- Add stronger branch-level GST registration management UX and rules.
 
 ## Product And Pricing
 
+## Sales Flow
+
 ## Inventory And Replenishment
-- Decide final status semantics for returned serials vs saleable serials.
-- Add richer sourcing preferences if `supplier_product` and `store_supplier_terms` need org-specific defaulting.
 
 ## Approvals And Workflow
-- Extend the new approval lifecycle beyond purchase orders, expenses, sales invoices, stock adjustments, stock transfers, and service replacements into other guarded flows.
+- Extend the new approval lifecycle into any remaining niche admin and guarded flows if rollout policy needs them.

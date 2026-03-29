@@ -6,9 +6,11 @@ import com.retailmanagement.modules.erp.catalog.entity.StoreProduct;
 import com.retailmanagement.modules.erp.catalog.repository.StoreProductRepository;
 import com.retailmanagement.modules.erp.common.security.ErpAccessGuard;
 import com.retailmanagement.modules.erp.party.dto.SupplierDtos;
+import com.retailmanagement.modules.erp.party.entity.StoreProductSupplierPreference;
 import com.retailmanagement.modules.erp.party.entity.StoreSupplierTerms;
 import com.retailmanagement.modules.erp.party.entity.Supplier;
 import com.retailmanagement.modules.erp.party.entity.SupplierProduct;
+import com.retailmanagement.modules.erp.party.repository.StoreProductSupplierPreferenceRepository;
 import com.retailmanagement.modules.erp.party.repository.StoreSupplierTermsRepository;
 import com.retailmanagement.modules.erp.party.repository.SupplierProductRepository;
 import com.retailmanagement.modules.erp.party.repository.SupplierRepository;
@@ -30,6 +32,7 @@ public class SupplierManagementService {
     private final SupplierRepository supplierRepository;
     private final SupplierProductRepository supplierProductRepository;
     private final StoreSupplierTermsRepository storeSupplierTermsRepository;
+    private final StoreProductSupplierPreferenceRepository storeProductSupplierPreferenceRepository;
     private final StoreProductRepository storeProductRepository;
     private final ErpAccessGuard accessGuard;
 
@@ -175,6 +178,47 @@ public class SupplierManagementService {
                 .orElse(null);
     }
 
+    @Transactional(readOnly = true)
+    public SupplierDtos.StoreProductSupplierPreferenceResponse getStoreProductSupplierPreference(Long organizationId, Long storeProductId) {
+        accessGuard.assertOrganizationAccess(organizationId);
+        return storeProductSupplierPreferenceRepository.findByOrganizationIdAndStoreProductId(organizationId, storeProductId)
+                .map(this::toStoreProductSupplierPreferenceResponse)
+                .orElse(null);
+    }
+
+    public SupplierDtos.StoreProductSupplierPreferenceResponse upsertStoreProductSupplierPreference(
+            Long organizationId,
+            Long storeProductId,
+            SupplierDtos.UpsertStoreProductSupplierPreferenceRequest request
+    ) {
+        accessGuard.assertOrganizationAccess(organizationId);
+        StoreProduct storeProduct = storeProductRepository.findById(storeProductId)
+                .orElseThrow(() -> new ResourceNotFoundException("Store product not found: " + storeProductId));
+        if (!organizationId.equals(storeProduct.getOrganizationId())) {
+            throw new BusinessException("Store product does not belong to organization " + organizationId + ": " + storeProductId);
+        }
+        Supplier supplier = supplierRepository.findByIdAndOrganizationId(request.supplierId(), organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Supplier not found: " + request.supplierId()));
+        SupplierProduct supplierProduct = supplierProductRepository.findByIdAndOrganizationId(request.supplierProductId(), organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Supplier product not found: " + request.supplierProductId()));
+        if (!supplier.getId().equals(supplierProduct.getSupplierId())) {
+            throw new BusinessException("Supplier product does not belong to supplier " + supplier.getId());
+        }
+        if (!storeProduct.getProductId().equals(supplierProduct.getProductId())) {
+            throw new BusinessException("Supplier product does not match store product master for store product " + storeProductId);
+        }
+        StoreProductSupplierPreference preference = storeProductSupplierPreferenceRepository
+                .findByOrganizationIdAndStoreProductId(organizationId, storeProductId)
+                .orElseGet(StoreProductSupplierPreference::new);
+        preference.setOrganizationId(organizationId);
+        preference.setStoreProductId(storeProductId);
+        preference.setSupplierId(supplier.getId());
+        preference.setSupplierProductId(supplierProduct.getId());
+        preference.setIsActive(request.isActive() == null || Boolean.TRUE.equals(request.isActive()));
+        preference.setRemarks(trimToNull(request.remarks()));
+        return toStoreProductSupplierPreferenceResponse(storeProductSupplierPreferenceRepository.save(preference));
+    }
+
     private void applySupplierRequest(Supplier supplier, SupplierDtos.UpsertSupplierRequest request) {
         supplier.setSupplierCode(request.supplierCode().trim());
         supplier.setName(request.name().trim());
@@ -259,6 +303,20 @@ public class SupplierManagementService {
                 terms.getRemarks(),
                 terms.getCreatedAt(),
                 terms.getUpdatedAt()
+        );
+    }
+
+    private SupplierDtos.StoreProductSupplierPreferenceResponse toStoreProductSupplierPreferenceResponse(StoreProductSupplierPreference preference) {
+        return new SupplierDtos.StoreProductSupplierPreferenceResponse(
+                preference.getId(),
+                preference.getOrganizationId(),
+                preference.getStoreProductId(),
+                preference.getSupplierId(),
+                preference.getSupplierProductId(),
+                preference.getIsActive(),
+                preference.getRemarks(),
+                preference.getCreatedAt(),
+                preference.getUpdatedAt()
         );
     }
 

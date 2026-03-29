@@ -30,9 +30,19 @@ public class CustomUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + username));
+        return toPrincipal(user);
+    }
+
+    @Transactional
+    public UserDetails loadUserByUsernameAndOrganization(String username, Long organizationId) throws UsernameNotFoundException {
+        User user = userRepository.findByLoginAndOrganizationId(username, organizationId)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + username + " in organization: " + organizationId));
+        return toPrincipal(user);
+    }
+
+    private UserDetails toPrincipal(User user) {
         user.setBranchAccesses(userBranchAccessRepository.findByUserId(user.getId()));
 
-        // Add permissions
         List<GrantedAuthority> authorities = user.getRoles().stream()
                 .flatMap(role -> role.getPermissions().stream())
                 .map(permission -> new SimpleGrantedAuthority(permission.getCode()))

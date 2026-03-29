@@ -2,6 +2,7 @@ package com.retailmanagement.modules.auth.controller;
 
 import com.retailmanagement.modules.auth.dto.request.LoginRequest;
 import com.retailmanagement.modules.auth.dto.request.RegisterRequest;
+import com.retailmanagement.modules.auth.dto.request.SwitchOrganizationRequest;
 import com.retailmanagement.modules.auth.dto.response.JwtResponse;
 import com.retailmanagement.modules.auth.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,6 +37,12 @@ public class AuthController {
     public ResponseEntity<Void> logout(@RequestHeader("Authorization") String token) {
         authService.logout(token);
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/switch-organization")
+    @Operation(summary = "Switch active organization for the current account")
+    public ResponseEntity<JwtResponse> switchOrganization(@Valid @RequestBody SwitchOrganizationRequest request) {
+        return ResponseEntity.ok(authService.switchOrganization(request.getOrganizationId()));
     }
 
     @PostMapping("/change-password")

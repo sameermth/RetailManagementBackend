@@ -29,8 +29,15 @@ import com.retailmanagement.modules.erp.inventory.service.StockAdjustmentPosting
 import com.retailmanagement.modules.erp.inventory.service.StockTransferPostingService;
 import com.retailmanagement.modules.erp.purchase.entity.PurchaseOrder;
 import com.retailmanagement.modules.erp.purchase.repository.PurchaseOrderRepository;
+import com.retailmanagement.modules.erp.returns.entity.PurchaseReturn;
+import com.retailmanagement.modules.erp.returns.entity.SalesReturn;
+import com.retailmanagement.modules.erp.returns.repository.PurchaseReturnRepository;
+import com.retailmanagement.modules.erp.returns.repository.SalesReturnRepository;
+import com.retailmanagement.modules.erp.returns.service.ReturnPostingService;
+import com.retailmanagement.modules.erp.service.entity.WarrantyClaim;
 import com.retailmanagement.modules.erp.sales.entity.SalesInvoice;
 import com.retailmanagement.modules.erp.sales.repository.SalesInvoiceRepository;
+import com.retailmanagement.modules.erp.service.repository.WarrantyClaimRepository;
 import com.retailmanagement.modules.erp.sales.service.SalesInvoicePostingService;
 import com.retailmanagement.modules.erp.service.entity.ServiceReplacement;
 import com.retailmanagement.modules.erp.service.repository.ServiceReplacementRepository;
@@ -59,6 +66,9 @@ public class ErpApprovalService {
     private final StockTransferRepository stockTransferRepository;
     private final StockTransferPostingService stockTransferPostingService;
     private final SalesInvoiceRepository salesInvoiceRepository;
+    private final SalesReturnRepository salesReturnRepository;
+    private final PurchaseReturnRepository purchaseReturnRepository;
+    private final WarrantyClaimRepository warrantyClaimRepository;
     private final ServiceReplacementRepository serviceReplacementRepository;
     private final ExpenseRepository expenseRepository;
     private final ExpenseCategoryRepository expenseCategoryRepository;
@@ -68,6 +78,7 @@ public class ErpApprovalService {
     private final InventoryReservationService inventoryReservationService;
     private final SalesInvoicePostingService salesInvoicePostingService;
     private final ServiceReplacementPostingService serviceReplacementPostingService;
+    private final ReturnPostingService returnPostingService;
     private final AuditEventWriter auditEventWriter;
 
     @Transactional(readOnly = true)
@@ -311,6 +322,23 @@ public class ErpApprovalService {
                 if (!organizationId.equals(expense.getOrganizationId())) throw new BusinessException("Entity does not belong to organization");
                 yield new EntityRef(entityType, expense.getId(), expense.getExpenseNumber(), null, expense.getBranchId(), expense.getAmount());
             }
+            case "sales_return" -> {
+                SalesReturn salesReturn = salesReturnRepository.findById(entityId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Sales return not found: " + entityId));
+                if (!organizationId.equals(salesReturn.getOrganizationId())) throw new BusinessException("Entity does not belong to organization");
+                yield new EntityRef(entityType, salesReturn.getId(), salesReturn.getReturnNumber(), null, salesReturn.getBranchId(), salesReturn.getTotalAmount());
+            }
+            case "purchase_return" -> {
+                PurchaseReturn purchaseReturn = purchaseReturnRepository.findById(entityId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Purchase return not found: " + entityId));
+                if (!organizationId.equals(purchaseReturn.getOrganizationId())) throw new BusinessException("Entity does not belong to organization");
+                yield new EntityRef(entityType, purchaseReturn.getId(), purchaseReturn.getReturnNumber(), purchaseReturn.getSupplierId(), purchaseReturn.getBranchId(), purchaseReturn.getTotalAmount());
+            }
+            case "warranty_claim" -> {
+                WarrantyClaim claim = warrantyClaimRepository.findByOrganizationIdAndId(organizationId, entityId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Warranty claim not found: " + entityId));
+                yield new EntityRef(entityType, claim.getId(), claim.getClaimNumber(), claim.getSupplierId(), claim.getBranchId(), BigDecimal.ZERO);
+            }
             case "service_replacement" -> {
                 ServiceReplacement replacement = serviceReplacementRepository.findById(entityId)
                         .orElseThrow(() -> new ResourceNotFoundException("Service replacement not found: " + entityId));
@@ -363,6 +391,18 @@ public class ErpApprovalService {
                 replacement.setStatus(ErpDocumentStatuses.PENDING_APPROVAL);
                 serviceReplacementRepository.save(replacement);
             });
+            case "sales_return" -> salesReturnRepository.findById(ref.entityId()).ifPresent(salesReturn -> {
+                salesReturn.setStatus(ErpDocumentStatuses.PENDING_APPROVAL);
+                salesReturnRepository.save(salesReturn);
+            });
+            case "purchase_return" -> purchaseReturnRepository.findById(ref.entityId()).ifPresent(purchaseReturn -> {
+                purchaseReturn.setStatus(ErpDocumentStatuses.PENDING_APPROVAL);
+                purchaseReturnRepository.save(purchaseReturn);
+            });
+            case "warranty_claim" -> warrantyClaimRepository.findById(ref.entityId()).ifPresent(claim -> {
+                claim.setStatus(ErpDocumentStatuses.SUBMITTED);
+                warrantyClaimRepository.save(claim);
+            });
             default -> { }
         }
     }
@@ -393,6 +433,17 @@ public class ErpApprovalService {
             });
             case "service_replacement" -> serviceReplacementRepository.findById(ref.entityId()).ifPresent(replacement ->
                     serviceReplacementPostingService.finalizeApprovedReplacement(replacement.getId()));
+            case "sales_return" -> salesReturnRepository.findById(ref.entityId()).ifPresent(salesReturn ->
+                    returnPostingService.finalizeApprovedSalesReturn(salesReturn.getId()));
+            case "purchase_return" -> purchaseReturnRepository.findById(ref.entityId()).ifPresent(purchaseReturn ->
+                    returnPostingService.finalizeApprovedPurchaseReturn(purchaseReturn.getId()));
+            case "warranty_claim" -> warrantyClaimRepository.findById(ref.entityId()).ifPresent(claim -> {
+                claim.setStatus(ErpDocumentStatuses.APPROVED);
+                if (claim.getApprovedOn() == null) {
+                    claim.setApprovedOn(java.time.LocalDate.now());
+                }
+                warrantyClaimRepository.save(claim);
+            });
             default -> { }
         }
     }
@@ -432,6 +483,18 @@ public class ErpApprovalService {
             case "service_replacement" -> serviceReplacementRepository.findById(ref.entityId()).ifPresent(replacement -> {
                 replacement.setStatus(ErpDocumentStatuses.REJECTED);
                 serviceReplacementRepository.save(replacement);
+            });
+            case "sales_return" -> salesReturnRepository.findById(ref.entityId()).ifPresent(salesReturn -> {
+                salesReturn.setStatus(ErpDocumentStatuses.REJECTED);
+                salesReturnRepository.save(salesReturn);
+            });
+            case "purchase_return" -> purchaseReturnRepository.findById(ref.entityId()).ifPresent(purchaseReturn -> {
+                purchaseReturn.setStatus(ErpDocumentStatuses.REJECTED);
+                purchaseReturnRepository.save(purchaseReturn);
+            });
+            case "warranty_claim" -> warrantyClaimRepository.findById(ref.entityId()).ifPresent(claim -> {
+                claim.setStatus("OPEN");
+                warrantyClaimRepository.save(claim);
             });
             default -> { }
         }

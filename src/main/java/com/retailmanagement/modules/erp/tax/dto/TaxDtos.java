@@ -69,6 +69,8 @@ public final class TaxDtos {
             TaxRegistrationResponse applicableOrganizationRegistration,
             TaxRegistrationResponse applicableBranchRegistration,
             TaxRegistrationResponse effectiveRegistration,
-            String effectiveRegistrationScope
+            String effectiveRegistrationScope,
+            boolean hasScopeConflict,
+            List<String> scopeWarnings
     ) {}
 }

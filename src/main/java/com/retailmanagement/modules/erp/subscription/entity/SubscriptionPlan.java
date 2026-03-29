@@ -29,6 +29,12 @@ public class SubscriptionPlan extends ErpAuditableEntity {
     @Column(name = "billing_period", nullable = false)
     private String billingPeriod;
 
+    @Column(name = "max_organizations")
+    private Integer maxOrganizations;
+
+    @Column(name = "is_unlimited_organizations", nullable = false)
+    private Boolean unlimitedOrganizations = false;
+
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 

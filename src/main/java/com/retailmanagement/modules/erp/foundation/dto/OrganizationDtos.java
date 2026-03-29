@@ -20,6 +20,18 @@ public final class OrganizationDtos {
             Boolean isActive
     ) {}
 
+    public record UpdateOrganizationRequest(
+            String name,
+            String code,
+            String legalName,
+            String phone,
+            String email,
+            String gstin,
+            BigDecimal gstThresholdAmount,
+            Boolean gstThresholdAlertEnabled,
+            Boolean isActive
+    ) {}
+
     public record OrganizationResponse(
             Long id,
             String name,
@@ -28,6 +40,7 @@ public final class OrganizationDtos {
             String phone,
             String email,
             String gstin,
+            Long ownerAccountId,
             BigDecimal gstThresholdAmount,
             Boolean gstThresholdAlertEnabled,
             Long subscriptionVersion,

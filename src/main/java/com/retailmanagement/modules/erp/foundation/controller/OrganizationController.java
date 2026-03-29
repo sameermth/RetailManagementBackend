@@ -18,6 +18,7 @@ public class OrganizationController {
  @GetMapping @Operation(summary = "List accessible organizations") @PreAuthorize("hasAuthority('org.view')") public ErpApiResponse<List<OrganizationDtos.OrganizationResponse>> list(){ return ErpApiResponse.ok(service.list().stream().map(this::toResponse).toList()); }
  @GetMapping("/{id}") @Operation(summary = "Get organization by id") @PreAuthorize("hasAuthority('org.view')") public ErpApiResponse<OrganizationDtos.OrganizationResponse> get(@PathVariable Long id){ return ErpApiResponse.ok(toResponse(service.get(id))); }
  @PostMapping @Operation(summary = "Create organization") @PreAuthorize("hasAuthority('org.manage')") public ErpApiResponse<OrganizationDtos.OrganizationResponse> create(@RequestBody OrganizationDtos.CreateOrganizationRequest request){ return ErpApiResponse.ok(toResponse(service.create(toEntity(request))), "ERP organization created"); }
+ @PutMapping("/{id}") @Operation(summary = "Update organization") @PreAuthorize("hasAuthority('org.manage')") public ErpApiResponse<OrganizationDtos.OrganizationResponse> update(@PathVariable Long id, @RequestBody OrganizationDtos.UpdateOrganizationRequest request){ return ErpApiResponse.ok(toResponse(service.update(id, request)), "ERP organization updated"); }
 
  private OrganizationDtos.OrganizationResponse toResponse(Organization organization) {
   return new OrganizationDtos.OrganizationResponse(
@@ -28,6 +29,7 @@ public class OrganizationController {
           organization.getPhone(),
           organization.getEmail(),
           organization.getGstin(),
+          organization.getOwnerAccountId(),
           organization.getGstThresholdAmount(),
           organization.getGstThresholdAlertEnabled(),
           organization.getSubscriptionVersion(),

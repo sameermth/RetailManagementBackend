@@ -64,6 +64,11 @@ public class JwtTokenProvider {
         return getClaims(token).getSubject();
     }
 
+    public Long getOrganizationIdFromToken(String token) {
+        Number organizationId = getClaims(token).get("organizationId", Number.class);
+        return organizationId == null ? null : organizationId.longValue();
+    }
+
     public Claims getClaims(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(key())

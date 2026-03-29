@@ -12,6 +12,8 @@ public class SalesInvoice extends ErpOrgBranchScopedEntity {
  @Column(name="warehouse_id", nullable=false) private Long warehouseId;
  @Column(name="customer_id", nullable=false) private Long customerId;
  @Column(name="price_list_id") private Long priceListId;
+ @Column(name="source_quote_id") private Long sourceQuoteId;
+ @Column(name="source_order_id") private Long sourceOrderId;
  @Column(name="invoice_number", nullable=false) private String invoiceNumber;
  @Column(name="invoice_date", nullable=false) private LocalDate invoiceDate;
  @Column(name="due_date", nullable=false) private LocalDate dueDate;

@@ -18,6 +18,7 @@ public final class SubscriptionDtos {
 
     public record OrganizationSubscriptionResponse(
             Long organizationId,
+            Long ownerAccountId,
             Long subscriptionVersion,
             String planCode,
             String planName,
@@ -25,6 +26,10 @@ public final class SubscriptionDtos {
             LocalDate startsOn,
             LocalDate endsOn,
             Boolean autoRenew,
+            Integer maxOrganizations,
+            Boolean unlimitedOrganizations,
+            Long organizationsUsed,
+            Boolean canCreateOrganization,
             Set<String> featureCodes
     ) {}
 }

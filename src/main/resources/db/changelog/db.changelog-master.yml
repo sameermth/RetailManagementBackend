@@ -428,3 +428,121 @@ databaseChangeLog:
       rollback:
         - sql:
             sql: "SELECT 'Manual rollback required for phase 1 demo enrichment seed';"
+
+  - changeSet:
+      id: 034-add-sales-quote-and-order-flow
+      author: openai
+      changes:
+        - sqlFile:
+            path: 034_add_sales_quote_and_order_flow.sql
+            relativeToChangelogFile: true
+  - changeSet:
+      id: 035-expand-sales-invoice-status-constraint
+      author: openai
+      changes:
+        - sqlFile:
+            path: 035_expand_sales_invoice_status_constraint.sql
+            relativeToChangelogFile: true
+  - changeSet:
+      id: 036-seed-sales-quote-order-demo
+      author: openai
+      changes:
+        - sqlFile:
+            path: 036_seed_sales_quote_order_demo.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for sales quote and sales order flow migration';"
+
+  - changeSet:
+      id: 037-add-recurring-invoice-and-journal-flow
+      author: openai
+      changes:
+        - sqlFile:
+            path: 037_add_recurring_invoice_and_journal_flow.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP TABLE IF EXISTS recurring_journal_line; DROP TABLE IF EXISTS recurring_journal; DROP TABLE IF EXISTS recurring_sales_invoice_line; DROP TABLE IF EXISTS recurring_sales_invoice;"
+
+  - changeSet:
+      id: 038-expand-inventory-operation-status-constraints
+      author: openai
+      changes:
+        - sqlFile:
+            path: 038_expand_inventory_operation_status_constraints.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "ALTER TABLE stock_transfer DROP CONSTRAINT IF EXISTS chk_stock_transfer_status; ALTER TABLE stock_transfer ADD CONSTRAINT chk_stock_transfer_status CHECK (status IN ('DRAFT','POSTED','CANCELLED')); ALTER TABLE stock_adjustment DROP CONSTRAINT IF EXISTS chk_stock_adjustment_status; ALTER TABLE stock_adjustment ADD CONSTRAINT chk_stock_adjustment_status CHECK (status IN ('DRAFT','APPROVED','POSTED','CANCELLED'));"
+
+  - changeSet:
+      id: 039-add-bank-reconciliation-flow
+      author: openai
+      changes:
+        - sqlFile:
+            path: 039_add_bank_reconciliation_flow.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP TABLE IF EXISTS bank_statement_entry;"
+
+  - changeSet:
+      id: 040-expand-serial-status-constraint
+      author: openai
+      changes:
+        - sqlFile:
+            path: 040_expand_serial_status_constraint.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "ALTER TABLE serial_number DROP CONSTRAINT IF EXISTS chk_serial_status; ALTER TABLE serial_number ADD CONSTRAINT chk_serial_status CHECK (status IN ('IN_STOCK','RESERVED','SOLD','RETURNED','REPLACED','SCRAPPED','SERVICE_IN','SERVICE_OUT'));"
+
+  - changeSet:
+      id: 041-expand-return-status-constraints
+      author: openai
+      changes:
+        - sqlFile:
+            path: 041_expand_return_status_constraints.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "ALTER TABLE sales_return DROP CONSTRAINT IF EXISTS chk_sales_return_status; ALTER TABLE sales_return ADD CONSTRAINT chk_sales_return_status CHECK (status IN ('DRAFT','POSTED','CANCELLED')); ALTER TABLE purchase_return DROP CONSTRAINT IF EXISTS chk_purchase_return_status; ALTER TABLE purchase_return ADD CONSTRAINT chk_purchase_return_status CHECK (status IN ('DRAFT','POSTED','CANCELLED'));"
+
+  - changeSet:
+      id: 042-add-store-product-supplier-preference
+      author: openai
+      changes:
+        - sqlFile:
+            path: 042_add_store_product_supplier_preference.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP TABLE IF EXISTS store_product_supplier_preference;"
+
+  - changeSet:
+      id: 043-owner-account-subscription-model
+      author: openai
+      changes:
+        - sqlFile:
+            path: 043_owner_account_subscription_model.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for owner-account subscription migration';"

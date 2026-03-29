@@ -1,0 +1,206 @@
+Java and Spring Boot Concepts Achieved In This Backend
+======================================================
+
+Project: retail-management-backend
+Focus: Java, Spring Boot, Spring Security, JPA/Hibernate, scheduling, transactions, configuration, and SQL migration patterns implemented in this codebase.
+
+1. Spring Boot Modular Architecture
+- We implemented a modular backend structure where business domains are split into packages like sales, purchase, finance, tax, inventory, service, approval, and workflow.
+- Examples:
+  - src/main/java/com/retailmanagement/modules/erp/sales/service/ErpSalesService.java
+  - src/main/java/com/retailmanagement/modules/erp/purchase/service/ErpPurchaseService.java
+  - src/main/java/com/retailmanagement/modules/erp/finance/service/ErpFinanceService.java
+  - src/main/java/com/retailmanagement/modules/erp/workflow/service/WorkflowTriggerService.java
+
+2. Layered Architecture: Controller -> Service -> Repository
+- Controllers expose APIs, services hold business logic, and repositories talk to the database.
+- Examples:
+  - src/main/java/com/retailmanagement/modules/erp/sales/controller/ErpSalesController.java
+  - src/main/java/com/retailmanagement/modules/erp/sales/service/ErpSalesService.java
+  - src/main/java/com/retailmanagement/modules/erp/sales/repository/SalesInvoiceRepository.java
+
+3. Dependency Injection And Constructor-Based Wiring
+- Spring-managed components are injected through constructors, often with Lombok @RequiredArgsConstructor.
+- Example:
+  - src/main/java/com/retailmanagement/modules/erp/foundation/controller/OrganizationController.java
+
+4. JPA Entity Modeling
+- Business tables are modeled as JPA entities using @Entity and @Table.
+- Examples:
+  - src/main/java/com/retailmanagement/modules/erp/sales/entity/SalesInvoice.java
+  - src/main/java/com/retailmanagement/modules/erp/party/entity/Supplier.java
+
+5. Spring Data JPA Repository Pattern
+- Repository interfaces extend JpaRepository for CRUD and custom access patterns.
+- Examples:
+  - src/main/java/com/retailmanagement/modules/erp/finance/repository/AccountRepository.java
+  - src/main/java/com/retailmanagement/modules/erp/finance/repository/VoucherRepository.java
+
+6. Custom JPQL Queries
+- We used @Query for reporting and custom data retrieval.
+- Examples:
+  - src/main/java/com/retailmanagement/modules/erp/expense/repository/ExpenseRepository.java
+  - src/main/java/com/retailmanagement/modules/erp/tax/repository/TaxRegistrationRepository.java
+  - src/main/java/com/retailmanagement/modules/notification/repository/NotificationRepository.java
+
+7. Transaction Management
+- @Transactional is used to keep ERP posting flows atomic.
+- Examples:
+  - src/main/java/com/retailmanagement/modules/erp/finance/service/ErpAccountingPostingService.java
+  - src/main/java/com/retailmanagement/modules/erp/finance/service/ErpFinanceService.java
+
+8. Split Posting Services For Complex Workflows
+- Final side effects are isolated in dedicated posting services.
+- Examples:
+  - SalesInvoicePostingService.java
+  - StockAdjustmentPostingService.java
+  - StockTransferPostingService.java
+  - ServiceReplacementPostingService.java
+  - ReturnPostingService.java
+
+9. DTO-Based API Contracts
+- APIs use request/response DTOs instead of leaking JPA entities directly.
+- Examples:
+  - src/main/java/com/retailmanagement/modules/erp/sales/dto/ErpSalesDtos.java
+  - src/main/java/com/retailmanagement/modules/erp/sales/dto/ErpSalesResponses.java
+  - src/main/java/com/retailmanagement/modules/erp/finance/dto/ErpFinanceDtos.java
+  - src/main/java/com/retailmanagement/modules/erp/party/dto/SupplierDtos.java
+
+10. Spring Security Filter Chain Configuration
+- Security is configured centrally with a SecurityFilterChain bean.
+- Example:
+  - src/main/java/com/retailmanagement/common/config/SecurityConfig.java
+
+11. JWT Authentication And Request Filtering
+- The backend uses JWT authentication with a custom filter and token provider.
+- Examples:
+  - src/main/java/com/retailmanagement/modules/auth/security/JwtAuthenticationFilter.java
+  - src/main/java/com/retailmanagement/modules/auth/security/JwtTokenProvider.java
+
+12. Custom UserDetailsService With Organization Awareness
+- Authentication reloads users with organization context.
+- Example:
+  - src/main/java/com/retailmanagement/modules/auth/security/CustomUserDetailsService.java
+
+13. Method-Level Authorization
+- @PreAuthorize is used for module-specific permissions.
+- Examples:
+  - src/main/java/com/retailmanagement/modules/erp/sales/controller/ErpSalesController.java
+  - src/main/java/com/retailmanagement/modules/erp/purchase/controller/ErpPurchaseController.java
+  - src/main/java/com/retailmanagement/modules/erp/approval/controller/ErpApprovalController.java
+
+14. Global Exception Handling
+- @RestControllerAdvice and @ExceptionHandler centralize API error responses.
+- Example:
+  - src/main/java/com/retailmanagement/common/exceptions/GlobalExceptionHandler.java
+
+15. Scheduled Background Jobs
+- @Scheduled powers recurring invoices, recurring journals, reservation expiry, notifications, and workflow scanning.
+- Examples:
+  - src/main/java/com/retailmanagement/modules/erp/inventory/service/InventoryReservationService.java
+  - src/main/java/com/retailmanagement/modules/erp/sales/service/RecurringSalesInvoiceService.java
+  - src/main/java/com/retailmanagement/modules/erp/finance/service/RecurringJournalService.java
+  - src/main/java/com/retailmanagement/modules/notification/service/impl/NotificationServiceImpl.java
+  - src/main/java/com/retailmanagement/modules/erp/workflow/service/WorkflowTriggerService.java
+
+16. Domain Events Through Audit Writing
+- Important business actions are persisted through a reusable audit writer.
+- Examples:
+  - src/main/java/com/retailmanagement/modules/erp/audit/service/AuditEventWriter.java
+  - src/main/java/com/retailmanagement/modules/erp/audit/entity/AuditEvent.java
+
+17. OpenAPI / Swagger Configuration
+- Swagger generation is customized with Spring configuration.
+- Example:
+  - src/main/java/com/retailmanagement/common/config/SwaggerConfig.java
+
+18. Configuration Classes And Bean Registration
+- @Configuration and @Bean are used for app infrastructure.
+- Examples:
+  - common/config/SecurityConfig.java
+  - common/config/CorsConfig.java
+  - common/config/SwaggerConfig.java
+  - common/config/AsyncConfig.java
+  - common/config/CacheConfig.java
+  - common/config/RestTemplateConfig.java
+
+19. Lombok Usage For Boilerplate Reduction
+- Entities and controllers use Lombok like @Getter, @Setter, and @RequiredArgsConstructor.
+- Example:
+  - src/main/java/com/retailmanagement/modules/erp/foundation/entity/Organization.java
+
+20. ERP-Safe Use Of BigDecimal
+- Monetary and quantity logic uses BigDecimal.
+- Examples:
+  - src/main/java/com/retailmanagement/modules/erp/finance/service/ErpAccountingPostingService.java
+  - src/main/java/com/retailmanagement/modules/erp/sales/service/ErpSalesService.java
+  - src/main/java/com/retailmanagement/modules/erp/tax/service/GstTaxService.java
+
+21. Approval Engine As A Cross-Cutting Spring Service
+- Approval rule evaluation and document finalization are centralized in a reusable service.
+- Examples:
+  - src/main/java/com/retailmanagement/modules/erp/approval/service/ErpApprovalService.java
+  - src/main/java/com/retailmanagement/modules/erp/approval/entity/ApprovalRule.java
+  - src/main/java/com/retailmanagement/modules/erp/approval/entity/ApprovalRequest.java
+
+22. Scheduled Workflow Trigger Engine
+- The system scans ERP state and emits workflow alerts.
+- Example:
+  - src/main/java/com/retailmanagement/modules/erp/workflow/service/WorkflowTriggerService.java
+
+23. Recurring Document Processing
+- Recurring invoices and recurring journals reuse the normal posting flows.
+- Examples:
+  - src/main/java/com/retailmanagement/modules/erp/sales/service/RecurringSalesInvoiceService.java
+  - src/main/java/com/retailmanagement/modules/erp/finance/service/RecurringJournalService.java
+  - src/main/java/com/retailmanagement/modules/erp/common/util/RecurringScheduleSupport.java
+
+24. Bank Reconciliation As A Spring Service Workflow
+- We implemented statement import, match suggestion, reconcile, unreconcile, and summary reporting.
+- Examples:
+  - src/main/java/com/retailmanagement/modules/erp/finance/service/BankReconciliationService.java
+  - src/main/java/com/retailmanagement/modules/erp/finance/entity/BankStatementEntry.java
+  - src/main/java/com/retailmanagement/modules/erp/finance/controller/BankReconciliationController.java
+
+25. Liquibase Migration-Driven Database Evolution
+- Schema changes are delivered through ordered SQL changelogs.
+- Examples:
+  - src/main/resources/db/changelog/db.changelog-master.yml
+  - 037_add_recurring_invoice_and_journal_flow.sql
+  - 039_add_bank_reconciliation_flow.sql
+  - 041_expand_return_status_constraints.sql
+  - 042_add_store_product_supplier_preference.sql
+
+26. SQL Data Migration And Backfill Strategy
+- We used SQL backfills and cleanup migrations, not just table creation.
+- Examples:
+  - 032_drop_product_sku_and_backfill_store_product.sql
+  - 036_seed_sales_quote_order_demo.sql
+
+27. API Security + Domain Guards Together
+- Beyond Spring Security annotations, the ERP code uses domain-level access guards.
+- Example:
+  - src/main/java/com/retailmanagement/modules/erp/common/security/ErpAccessGuard.java
+
+28. Reporting Aggregation In Service Layer
+- Dashboard and finance reports are composed in services from multiple repositories.
+- Examples:
+  - src/main/java/com/retailmanagement/modules/dashboard/service/impl/DashboardServiceImpl.java
+  - src/main/java/com/retailmanagement/modules/erp/finance/service/ErpFinanceService.java
+
+29. Health Endpoint Pattern
+- The project includes an API health controller for service liveness checks.
+- Example:
+  - src/main/java/com/retailmanagement/common/controller/HealthController.java
+
+30. Real Production Refactoring Practices
+- We refactored legacy packages, replaced entity-leaking APIs, isolated posting services, and evolved schema safely.
+- Examples:
+  - src/main/java/com/retailmanagement/RetailManagementApplication.java
+  - src/main/java/com/retailmanagement/common/config/SwaggerConfig.java
+  - src/main/resources/db/changelog/031_align_product_hsn_and_line_snapshots.sql
+  - src/main/resources/db/changelog/032_drop_product_sku_and_backfill_store_product.sql
+
+Conclusion
+----------
+This backend demonstrates a real set of Java and Spring Boot concepts: layered architecture, dependency injection, JPA entities, repositories, JPQL, transactions, scheduled jobs, JWT security, method authorization, global exception handling, configuration classes, recurring processing, approval workflows, reporting services, and migration-driven SQL delivery.

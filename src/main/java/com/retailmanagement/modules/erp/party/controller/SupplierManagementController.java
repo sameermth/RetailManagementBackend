@@ -120,4 +120,28 @@ public class SupplierManagementController {
                 "Store supplier terms updated"
         );
     }
+
+    @GetMapping("/product-preferences/{storeProductId}")
+    @Operation(summary = "Get preferred supplier path for a store product")
+    @PreAuthorize("hasAuthority('purchase.view')")
+    public ErpApiResponse<SupplierDtos.StoreProductSupplierPreferenceResponse> getStoreProductSupplierPreference(
+            @RequestParam Long organizationId,
+            @PathVariable Long storeProductId
+    ) {
+        return ErpApiResponse.ok(supplierManagementService.getStoreProductSupplierPreference(organizationId, storeProductId));
+    }
+
+    @PutMapping("/product-preferences/{storeProductId}")
+    @Operation(summary = "Upsert preferred supplier path for a store product")
+    @PreAuthorize("hasAuthority('purchase.create')")
+    public ErpApiResponse<SupplierDtos.StoreProductSupplierPreferenceResponse> upsertStoreProductSupplierPreference(
+            @RequestParam Long organizationId,
+            @PathVariable Long storeProductId,
+            @Valid @RequestBody SupplierDtos.UpsertStoreProductSupplierPreferenceRequest request
+    ) {
+        return ErpApiResponse.ok(
+                supplierManagementService.upsertStoreProductSupplierPreference(organizationId, storeProductId, request),
+                "Store product supplier preference updated"
+        );
+    }
 }
