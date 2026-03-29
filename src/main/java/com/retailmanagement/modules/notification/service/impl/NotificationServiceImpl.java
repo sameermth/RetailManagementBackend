@@ -2,8 +2,14 @@ package com.retailmanagement.modules.notification.service.impl;
 
 import com.retailmanagement.common.exceptions.BusinessException;
 import com.retailmanagement.common.exceptions.ResourceNotFoundException;
-import com.retailmanagement.modules.customer.model.Customer;
-import com.retailmanagement.modules.customer.repository.CustomerRepository;
+import com.retailmanagement.modules.erp.party.entity.Customer;
+import com.retailmanagement.modules.erp.party.entity.Supplier;
+import com.retailmanagement.modules.erp.party.repository.CustomerRepository;
+import com.retailmanagement.modules.erp.party.repository.SupplierRepository;
+import com.retailmanagement.modules.erp.purchase.entity.PurchaseOrder;
+import com.retailmanagement.modules.erp.purchase.repository.PurchaseOrderRepository;
+import com.retailmanagement.modules.erp.sales.entity.SalesInvoice;
+import com.retailmanagement.modules.erp.sales.repository.SalesInvoiceRepository;
 import com.retailmanagement.modules.notification.dto.request.EmailRequest;
 import com.retailmanagement.modules.notification.dto.request.NotificationRequest;
 import com.retailmanagement.modules.notification.dto.request.SmsRequest;
@@ -19,15 +25,12 @@ import com.retailmanagement.modules.notification.model.NotificationTemplate;
 import com.retailmanagement.modules.notification.repository.NotificationRepository;
 import com.retailmanagement.modules.notification.repository.NotificationTemplateRepository;
 import com.retailmanagement.modules.notification.service.NotificationService;
-import com.retailmanagement.modules.sales.model.Sale;
-import com.retailmanagement.modules.sales.repository.SaleRepository;
-import com.retailmanagement.modules.purchase.model.Purchase;
-import com.retailmanagement.modules.purchase.repository.PurchaseRepository;
 import com.retailmanagement.modules.auth.model.User;
 import com.retailmanagement.modules.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -35,7 +38,9 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.web.client.RestTemplate;
 
 import jakarta.mail.internet.MimeMessage;
@@ -58,11 +63,13 @@ public class NotificationServiceImpl implements NotificationService {
     private final NotificationTemplateRepository templateRepository;
     private final UserRepository userRepository;
     private final CustomerRepository customerRepository;
-    private final SaleRepository saleRepository;
-    private final PurchaseRepository purchaseRepository;
+    private final SupplierRepository supplierRepository;
+    private final SalesInvoiceRepository salesInvoiceRepository;
+    private final PurchaseOrderRepository purchaseOrderRepository;
     private final NotificationMapper notificationMapper;
     private final JavaMailSender mailSender;
     private final RestTemplate restTemplate;
+    private final JdbcTemplate jdbcTemplate;
 
     @Value("${sms.api.url}")
     private String smsApiUrl;
@@ -278,7 +285,7 @@ public class NotificationServiceImpl implements NotificationService {
 
         String content = String.format(
                 "Dear %s,\n\nThis is a reminder that you have a payment due. Please clear it at your earliest convenience.",
-                customer.getName()
+                customer.getFullName()
         );
         request.setContent(content);
 
@@ -291,15 +298,18 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public NotificationResponse sendSaleConfirmation(Long saleId) {
-        Sale sale = saleRepository.findById(saleId)
-                .orElseThrow(() -> new ResourceNotFoundException("Sale not found with id: " + saleId));
+        SalesInvoice sale = salesInvoiceRepository.findById(saleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sales invoice not found with id: " + saleId));
 
-        if (sale.getCustomer() == null || sale.getCustomer().getEmail() == null) {
+        Customer customer = customerRepository.findById(sale.getCustomerId())
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found with id: " + sale.getCustomerId()));
+
+        if (customer.getEmail() == null || customer.getEmail().isBlank()) {
             throw new BusinessException("Customer email not available");
         }
 
         NotificationRequest request = new NotificationRequest();
-        request.setCustomerId(sale.getCustomer().getId());
+        request.setCustomerId(customer.getId());
         request.setReferenceType("SALE");
         request.setReferenceId(saleId);
         request.setChannel(NotificationChannel.EMAIL);
@@ -310,39 +320,43 @@ public class NotificationServiceImpl implements NotificationService {
                 "Thank you for your purchase!\n\nInvoice Number: %s\nTotal Amount: ₹%.2f\nDate: %s",
                 sale.getInvoiceNumber(),
                 sale.getTotalAmount(),
-                sale.getSaleDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+                sale.getInvoiceDate().format(DateTimeFormatter.ISO_LOCAL_DATE)
         );
         request.setContent(content);
-        request.setRecipient(sale.getCustomer().getEmail());
+        request.setRecipient(customer.getEmail());
 
         return sendNotification(request);
     }
 
     @Override
     public NotificationResponse sendPurchaseOrderNotification(Long purchaseId) {
-        Purchase purchase = purchaseRepository.findById(purchaseId)
-                .orElseThrow(() -> new ResourceNotFoundException("Purchase not found with id: " + purchaseId));
+        PurchaseOrder purchase = purchaseOrderRepository.findById(purchaseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase order not found with id: " + purchaseId));
+
+        Supplier supplier = supplierRepository.findById(purchase.getSupplierId())
+                .orElseThrow(() -> new ResourceNotFoundException("Supplier not found with id: " + purchase.getSupplierId()));
+
+        if (supplier.getEmail() == null || supplier.getEmail().isBlank()) {
+            throw new BusinessException("Supplier email not available");
+        }
 
         NotificationRequest request = new NotificationRequest();
-        request.setSupplierId(purchase.getSupplier().getId());
+        request.setSupplierId(supplier.getId());
         request.setReferenceType("PURCHASE");
         request.setReferenceId(purchaseId);
         request.setChannel(NotificationChannel.EMAIL);
         request.setType(NotificationType.PURCHASE_ORDER_CREATED);
-        request.setTitle("Purchase Order Created - " + purchase.getPurchaseOrderNumber());
+        request.setTitle("Purchase Order Created - " + purchase.getPoNumber());
 
         String content = String.format(
                 "Purchase Order %s has been created.\n\nSupplier: %s\nTotal Amount: ₹%.2f\nExpected Delivery: %s",
-                purchase.getPurchaseOrderNumber(),
-                purchase.getSupplier().getName(),
+                purchase.getPoNumber(),
+                supplier.getName(),
                 purchase.getTotalAmount(),
-                purchase.getExpectedDeliveryDate()
+                purchase.getPoDate()
         );
         request.setContent(content);
-
-        if (purchase.getSupplier().getEmail() != null) {
-            request.setRecipient(purchase.getSupplier().getEmail());
-        }
+        request.setRecipient(supplier.getEmail());
 
         return sendNotification(request);
     }
@@ -428,11 +442,22 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @Scheduled(fixedDelay = 60000) // Run every minute
     public void retryFailedNotifications() {
         log.info("Retrying failed notifications at {}", LocalDateTime.now());
 
-        List<Notification> failedNotifications = notificationRepository.findFailedNotificationsToRetry();
+        if (!notificationStorageAvailable()) {
+            log.warn("Skipping notification retry job because notification storage is not available yet");
+            return;
+        }
+
+        List<Notification> failedNotifications;
+        try {
+            failedNotifications = notificationRepository.findFailedNotificationsToRetry();
+        } catch (InvalidDataAccessResourceUsageException ex) {
+            return;
+        }
 
         for (Notification notification : failedNotifications) {
             try {
@@ -446,11 +471,22 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @Scheduled(fixedDelay = 60000) // Run every minute
     public void processPendingNotifications() {
         log.info("Processing pending notifications at {}", LocalDateTime.now());
 
-        List<Notification> pendingNotifications = notificationRepository.findPendingNotifications(LocalDateTime.now());
+        if (!notificationStorageAvailable()) {
+            log.warn("Skipping pending notification job because notification storage is not available yet");
+            return;
+        }
+
+        List<Notification> pendingNotifications;
+        try {
+            pendingNotifications = notificationRepository.findPendingNotifications(LocalDateTime.now());
+        } catch (InvalidDataAccessResourceUsageException ex) {
+            return;
+        }
 
         for (Notification notification : pendingNotifications) {
             try {
@@ -491,6 +527,18 @@ public class NotificationServiceImpl implements NotificationService {
                 .read(70L)
                 .successRate(95.0)
                 .build();
+    }
+
+    private boolean notificationStorageAvailable() {
+        try {
+            String relation = jdbcTemplate.queryForObject(
+                    "SELECT to_regclass(current_schema() || '.notifications')",
+                    String.class
+            );
+            return relation != null;
+        } catch (Exception ex) {
+            return false;
+        }
     }
 
     @Override
@@ -545,4 +593,3 @@ public class NotificationServiceImpl implements NotificationService {
         return notificationId;
     }
 }
-

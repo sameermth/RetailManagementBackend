@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -148,7 +149,7 @@ public class ExcelExporter {
             salesByDayHeader.getCell(1).setCellStyle(headerStyle);
             salesByDayHeader.getCell(2).setCellStyle(headerStyle);
 
-            List<Object[]> salesByDay = (List<Object[]>) data.get("salesByDay");
+            List<Object[]> salesByDay = getObjectArrayRows(data, "salesByDay");
             for (Object[] row : salesByDay) {
                 Row dataRow = sheet.createRow(rowNum++);
                 dataRow.createCell(0).setCellValue(row[0].toString());
@@ -258,7 +259,7 @@ public class ExcelExporter {
             categoryHeader.getCell(0).setCellStyle(headerStyle);
             categoryHeader.getCell(1).setCellStyle(headerStyle);
 
-            List<Object[]> expensesByCategory = (List<Object[]>) data.get("expensesByCategory");
+            List<Object[]> expensesByCategory = getObjectArrayRows(data, "expensesByCategory");
             for (Object[] row : expensesByCategory) {
                 Row dataRow = sheet.createRow(rowNum++);
                 dataRow.createCell(0).setCellValue(row[0].toString());
@@ -283,5 +284,20 @@ public class ExcelExporter {
                 row.createCell(1).setCellValue("");
             }
         }
+    }
+
+    private List<Object[]> getObjectArrayRows(Map<String, Object> data, String key) {
+        Object value = data.get(key);
+        if (!(value instanceof List<?> rawRows)) {
+            return List.of();
+        }
+
+        List<Object[]> rows = new ArrayList<>();
+        for (Object row : rawRows) {
+            if (row instanceof Object[] array) {
+                rows.add(array);
+            }
+        }
+        return rows;
     }
 }

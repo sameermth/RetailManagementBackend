@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "permissions")
+@Table(name = "permission")
 public class Permission {
 
     @Id
@@ -19,7 +19,11 @@ public class Permission {
     private Long id;
 
     @Column(unique = true, nullable = false)
+    private String code;
+
+    @Column(nullable = false)
     private String name;
 
-    private String description;
+    @Column(name = "module_code", nullable = false)
+    private String moduleCode;
 }

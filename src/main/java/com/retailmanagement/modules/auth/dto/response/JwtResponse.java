@@ -13,9 +13,15 @@ import java.util.Set;
 @AllArgsConstructor
 public class JwtResponse {
     private String token;
+    @Builder.Default
     private String type = "Bearer";
     private Long id;
+    private Long organizationId;
     private String username;
     private String email;
     private Set<String> roles;
+    private Long subscriptionVersion;
+    private String subscriptionPlanCode;
+    private String subscriptionStatus;
+    private Set<String> subscriptionFeatures;
 }

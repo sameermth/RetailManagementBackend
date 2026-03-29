@@ -1,5 +1,6 @@
 package com.retailmanagement.modules.dashboard.dto;
 
+import com.retailmanagement.modules.erp.tax.dto.TaxDtos;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -28,4 +29,5 @@ public class DashboardSummaryDTO {
 
     private Integer pendingOrders;
     private Integer completedOrdersToday;
+    private TaxDtos.GstThresholdStatusResponse gstStatus;
 }

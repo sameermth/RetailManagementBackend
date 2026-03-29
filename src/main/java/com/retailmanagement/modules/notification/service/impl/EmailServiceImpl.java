@@ -158,7 +158,7 @@ public class EmailServiceImpl implements EmailService {
         request.setSubject(subject != null ? subject : template.getSubject());
         request.setContent(parsedContent);
         request.setTemplateCode(templateCode);
-        request.setTemplateData((Map<String, Object>) data);
+        request.setTemplateData(templateParser.toObjectMap(data));
 
         return sendHtmlEmail(request);
     }

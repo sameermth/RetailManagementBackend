@@ -64,8 +64,10 @@ public class Report {
             joinColumns = @JoinColumn(name = "report_id"))
     @MapKeyColumn(name = "param_key")
     @Column(name = "param_value", length = 500)
+    @Builder.Default
     private Map<String, String> parameters = new HashMap<>();
 
+    @Builder.Default
     private Boolean isScheduled = false;
 
     private String scheduleCron;
@@ -74,6 +76,7 @@ public class Report {
 
     private String recipients; // Comma separated emails
 
+    @Builder.Default
     private Integer downloadCount = 0;
 
     private String status; // GENERATING, COMPLETED, FAILED

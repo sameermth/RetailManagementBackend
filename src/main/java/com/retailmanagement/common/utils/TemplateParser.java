@@ -1,8 +1,11 @@
 package com.retailmanagement.common.utils;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -11,17 +14,14 @@ import java.util.regex.Pattern;
 public class TemplateParser {
 
     private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{(.+?)\\}\\}");
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public String parse(String template, Object data) {
         if (!StringUtils.hasText(template)) {
             return template;
         }
 
-        if (data instanceof Map) {
-            return parseWithMap(template, (Map<String, Object>) data);
-        } else {
-            return parseWithObject(template, data);
-        }
+        return parseWithMap(template, toObjectMap(data));
     }
 
     private String parseWithMap(String template, Map<String, Object> data) {
@@ -43,13 +43,22 @@ public class TemplateParser {
         // Use reflection or JSON to access object properties
         // For simplicity, convert to Map using Jackson
         try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper =
-                    new com.fasterxml.jackson.databind.ObjectMapper();
-            Map<String, Object> map = mapper.convertValue(data, Map.class);
-            return parseWithMap(template, map);
+            return parseWithMap(template, toObjectMap(data));
         } catch (Exception e) {
             return template;
         }
+    }
+
+    public Map<String, Object> toObjectMap(Object data) {
+        if (data == null) {
+            return Map.of();
+        }
+        if (data instanceof Map<?, ?> rawMap) {
+            Map<String, Object> normalized = new LinkedHashMap<>();
+            rawMap.forEach((key, value) -> normalized.put(String.valueOf(key), value));
+            return normalized;
+        }
+        return objectMapper.convertValue(data, new TypeReference<Map<String, Object>>() {});
     }
 
     public String parseWithCustomFormatter(String template, Map<String, Object> data,

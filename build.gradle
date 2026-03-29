@@ -5,6 +5,10 @@ plugins {
     id 'org.liquibase.gradle' version '2.2.0' apply false
 }
 
+springBoot {
+    mainClass = 'com.retailmanagement.RetailManagementApplication'
+}
+
 group = 'com.retailmanagement'
 version = '0.0.1-SNAPSHOT'
 
@@ -117,7 +121,7 @@ if (project.hasProperty('liquibase')) {
 
     liquibase {
         activity(name: 'main') {
-            changelogFile = 'src/main/resources/db/changelog/db.changelog.yaml'
+            changelogFile = 'src/main/resources/db/changelog/db.changelog-master.yml'
             url = 'jdbc:postgresql://localhost:5432/retail_management_db?currentSchema=retail_management_schema'
             username = 'postgres'
             password = 'password'

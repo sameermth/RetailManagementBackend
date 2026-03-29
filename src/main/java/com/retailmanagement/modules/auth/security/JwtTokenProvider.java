@@ -31,6 +31,7 @@ public class JwtTokenProvider {
 
     public String generateToken(Authentication authentication) {
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        UserPrincipal principal = userDetails instanceof UserPrincipal userPrincipal ? userPrincipal : null;
 
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpiration);
@@ -42,6 +43,13 @@ public class JwtTokenProvider {
 
         Map<String, Object> claims = new HashMap<>();
         claims.put("roles", roles);
+        if (principal != null) {
+            claims.put("organizationId", principal.getOrganizationId());
+            claims.put("subscriptionVersion", principal.getSubscriptionVersion());
+            claims.put("subscriptionPlanCode", principal.getSubscriptionPlanCode());
+            claims.put("subscriptionStatus", principal.getSubscriptionStatus());
+            claims.put("subscriptionFeatures", principal.getSubscriptionFeatures());
+        }
 
         return Jwts.builder()
                 .setClaims(claims)
@@ -53,12 +61,30 @@ public class JwtTokenProvider {
     }
 
     public String getUsernameFromToken(String token) {
-        Claims claims = Jwts.parserBuilder()
+        return getClaims(token).getSubject();
+    }
+
+    public Claims getClaims(String token) {
+        return Jwts.parserBuilder()
                 .setSigningKey(key())
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
-        return claims.getSubject();
+    }
+
+    public boolean isSubscriptionContextValid(String token, UserPrincipal principal) {
+        Claims claims = getClaims(token);
+        Number orgId = claims.get("organizationId", Number.class);
+        Number subscriptionVersion = claims.get("subscriptionVersion", Number.class);
+        if (principal == null) {
+            return false;
+        }
+        return orgId != null
+                && subscriptionVersion != null
+                && principal.getOrganizationId() != null
+                && principal.getSubscriptionVersion() != null
+                && principal.getOrganizationId().equals(orgId.longValue())
+                && principal.getSubscriptionVersion().equals(subscriptionVersion.longValue());
     }
 
     public boolean validateToken(String token) {

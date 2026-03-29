@@ -70,6 +70,7 @@ public class Notification {
 
     private LocalDateTime scheduledFor;
 
+    @Builder.Default
     private Integer retryCount = 0;
 
     private String errorMessage;

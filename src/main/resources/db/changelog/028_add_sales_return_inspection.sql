@@ -1,0 +1,8 @@
+ALTER TABLE sales_return
+  ADD COLUMN IF NOT EXISTS inspected_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS inspected_by BIGINT,
+  ADD COLUMN IF NOT EXISTS inspection_notes TEXT;
+
+ALTER TABLE sales_return_line
+  ADD COLUMN IF NOT EXISTS inspection_status VARCHAR(40) NOT NULL DEFAULT 'PENDING',
+  ADD COLUMN IF NOT EXISTS inspection_notes TEXT;

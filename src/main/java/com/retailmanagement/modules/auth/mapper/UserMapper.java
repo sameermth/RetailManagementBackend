@@ -11,6 +11,9 @@ import java.util.List;
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface UserMapper {
 
+    @Mapping(target = "username", expression = "java(user.getUsername())")
+    @Mapping(target = "firstName", expression = "java(user.getFirstName())")
+    @Mapping(target = "lastName", expression = "java(user.getLastName())")
     @Mapping(target = "roles", expression = "java(user.getRoles().stream().map(role -> role.getName()).collect(java.util.stream.Collectors.toSet()))")
     UserResponse toResponse(User user);
 

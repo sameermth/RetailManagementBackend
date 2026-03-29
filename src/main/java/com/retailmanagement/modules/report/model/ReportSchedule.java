@@ -61,14 +61,18 @@ public class ReportSchedule {
             joinColumns = @JoinColumn(name = "schedule_id"))
     @MapKeyColumn(name = "param_key")
     @Column(name = "param_value", length = 500)
+    @Builder.Default
     private Map<String, String> parameters = new HashMap<>();
 
     private String recipients; // Comma separated emails
 
+    @Builder.Default
     private Boolean isActive = true;
 
+    @Builder.Default
     private Integer successCount = 0;
 
+    @Builder.Default
     private Integer failureCount = 0;
 
     private String lastError;

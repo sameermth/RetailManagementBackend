@@ -56,6 +56,7 @@ public class NotificationTemplate {
 
     private String placeholders; // Comma separated list of placeholders
 
+    @Builder.Default
     private Boolean isActive = true;
 
     private String createdBy;

@@ -1,6 +1,7 @@
 package com.retailmanagement.modules.auth.security;
 
 import com.retailmanagement.modules.auth.model.User;
+import com.retailmanagement.modules.erp.subscription.service.SubscriptionAccessService;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -13,6 +14,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Data
@@ -23,29 +25,57 @@ public class UserPrincipal implements UserDetails {
     private Long id;
     private String username;
     private String email;
+    private Long organizationId;
+    private Long defaultBranchId;
+    private Set<Long> accessibleBranchIds;
+    private Long subscriptionVersion;
+    private String subscriptionPlanCode;
+    private String subscriptionStatus;
+    private java.util.Set<String> subscriptionFeatures;
     @JsonIgnore
     private String password;
     private Collection<? extends GrantedAuthority> authorities;
     private Boolean active;
+    private Boolean accountNonLocked;
 
-    public static UserPrincipal create(User user) {
-        List<GrantedAuthority> authorities = user.getRoles().stream()
-                .flatMap(role -> role.getPermissions().stream())
-                .map(permission -> new SimpleGrantedAuthority(permission.getName()))
-                .collect(Collectors.toList());
-
-        user.getRoles().forEach(role -> {
-            authorities.add(new SimpleGrantedAuthority(role.getName()));
-        });
-
+    public static UserPrincipal create(
+            User user,
+            Collection<? extends GrantedAuthority> authorities,
+            SubscriptionAccessService.SubscriptionSnapshot subscriptionSnapshot
+    ) {
+        boolean accountActive = user.getAccount() == null || Boolean.TRUE.equals(user.getAccount().getActive());
+        boolean accountNonLocked = user.getAccount() == null || !Boolean.TRUE.equals(user.getAccount().getLocked());
         return UserPrincipal.builder()
                 .id(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())
+                .organizationId(user.getOrganizationId())
+                .defaultBranchId(user.getDefaultBranchId())
+                .accessibleBranchIds((user.getBranchAccesses() == null ? List.<com.retailmanagement.modules.auth.model.UserBranchAccess>of() : user.getBranchAccesses()).stream()
+                        .map(access -> access.getBranchId())
+                        .collect(Collectors.toUnmodifiableSet()))
+                .subscriptionVersion(subscriptionSnapshot == null ? 1L : subscriptionSnapshot.subscriptionVersion())
+                .subscriptionPlanCode(subscriptionSnapshot == null ? null : subscriptionSnapshot.planCode())
+                .subscriptionStatus(subscriptionSnapshot == null ? "NONE" : subscriptionSnapshot.status())
+                .subscriptionFeatures(subscriptionSnapshot == null ? java.util.Set.of() : subscriptionSnapshot.featureCodes())
                 .password(user.getPassword())
                 .authorities(authorities)
-                .active(user.getActive())
+                .active(Boolean.TRUE.equals(user.getActive()) && accountActive)
+                .accountNonLocked(accountNonLocked)
                 .build();
+    }
+
+    public static UserPrincipal create(User user, SubscriptionAccessService.SubscriptionSnapshot subscriptionSnapshot) {
+        List<GrantedAuthority> authorities = user.getRoles().stream()
+                .flatMap(role -> role.getPermissions().stream())
+                .map(permission -> new SimpleGrantedAuthority(permission.getCode()))
+                .collect(Collectors.toList());
+
+        user.getRoles().forEach(role -> {
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getCode()));
+        });
+
+        return create(user, authorities, subscriptionSnapshot);
     }
 
     @Override
@@ -70,7 +100,7 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return Boolean.TRUE.equals(accountNonLocked);
     }
 
     @Override
@@ -94,5 +124,23 @@ public class UserPrincipal implements UserDetails {
     @Override
     public int hashCode() {
         return Objects.hash(id);
+    }
+
+    public boolean hasRole(String roleCode) {
+        if (roleCode == null || authorities == null) {
+            return false;
+        }
+        String expected = "ROLE_" + roleCode.trim().toUpperCase();
+        return authorities.stream().anyMatch(authority -> expected.equals(authority.getAuthority()));
+    }
+
+    public boolean hasBranchAccess(Long branchId) {
+        if (branchId == null) {
+            return false;
+        }
+        if (accessibleBranchIds != null && accessibleBranchIds.contains(branchId)) {
+            return true;
+        }
+        return defaultBranchId != null && defaultBranchId.equals(branchId);
     }
 }

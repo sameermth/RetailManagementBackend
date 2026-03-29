@@ -1,7 +1,9 @@
 package com.retailmanagement.modules.auth.security;
 
 import com.retailmanagement.modules.auth.model.User;
+import com.retailmanagement.modules.auth.repository.UserBranchAccessRepository;
 import com.retailmanagement.modules.auth.repository.UserRepository;
+import com.retailmanagement.modules.erp.subscription.service.SubscriptionAccessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -20,31 +22,26 @@ import java.util.stream.Collectors;
 public class CustomUserDetailsService implements UserDetailsService {
 
     private final UserRepository userRepository;
+    private final UserBranchAccessRepository userBranchAccessRepository;
+    private final SubscriptionAccessService subscriptionAccessService;
 
     @Override
     @Transactional
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + username));
+        user.setBranchAccesses(userBranchAccessRepository.findByUserId(user.getId()));
 
         // Add permissions
         List<GrantedAuthority> authorities = user.getRoles().stream()
                 .flatMap(role -> role.getPermissions().stream())
-                .map(permission -> new SimpleGrantedAuthority(permission.getName())).collect(Collectors.toList());
+                .map(permission -> new SimpleGrantedAuthority(permission.getCode()))
+                .collect(Collectors.toList());
 
-        // Add roles with ROLE_ prefix
         user.getRoles().forEach(role -> {
-            authorities.add(new SimpleGrantedAuthority(role.getName()));
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getCode()));
         });
 
-        return org.springframework.security.core.userdetails.User.builder()
-                .username(user.getUsername())
-                .password(user.getPassword())
-                .authorities(authorities)
-                .accountExpired(!user.getActive())
-                .accountLocked(!user.getActive())
-                .credentialsExpired(!user.getActive())
-                .disabled(!user.getActive())
-                .build();
+        return UserPrincipal.create(user, authorities, subscriptionAccessService.currentSnapshot(user.getOrganizationId()));
     }
 }

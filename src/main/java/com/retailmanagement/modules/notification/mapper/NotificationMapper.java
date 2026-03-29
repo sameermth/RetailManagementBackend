@@ -3,9 +3,9 @@ package com.retailmanagement.modules.notification.mapper;
 import com.retailmanagement.modules.notification.dto.response.NotificationResponse;
 import com.retailmanagement.modules.notification.model.Notification;
 import com.retailmanagement.modules.auth.repository.UserRepository;
-import com.retailmanagement.modules.customer.repository.CustomerRepository;
-import com.retailmanagement.modules.supplier.repository.SupplierRepository;
-import com.retailmanagement.modules.distributor.repository.DistributorRepository;
+import com.retailmanagement.modules.erp.party.repository.CustomerRepository;
+import com.retailmanagement.modules.erp.party.repository.SupplierRepository;
+import com.retailmanagement.modules.erp.party.repository.DistributorRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -59,7 +59,7 @@ public class NotificationMapper {
 
         if (notification.getCustomerId() != null) {
             customerRepository.findById(notification.getCustomerId())
-                    .ifPresent(customer -> response.setCustomerName(customer.getName()));
+                    .ifPresent(customer -> response.setCustomerName(customer.getFullName()));
         }
 
         if (notification.getSupplierId() != null) {

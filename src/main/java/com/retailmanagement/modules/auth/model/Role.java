@@ -14,7 +14,7 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "roles")
+@Table(name = "role")
 public class Role {
 
     @Id
@@ -22,15 +22,21 @@ public class Role {
     private Long id;
 
     @Column(unique = true, nullable = false)
+    private String code;
+
+    @Column(nullable = false)
     private String name;
 
-    private String description;
+    @Column(name = "is_system", nullable = false)
+    @Builder.Default
+    private Boolean system = false;
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
-            name = "role_permissions",
+            name = "role_permission",
             joinColumns = @JoinColumn(name = "role_id"),
             inverseJoinColumns = @JoinColumn(name = "permission_id")
     )
+    @Builder.Default
     private Set<Permission> permissions = new HashSet<>();
 }

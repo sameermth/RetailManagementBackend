@@ -1,9 +1,9 @@
 package com.retailmanagement.common.validation;
 
 import com.retailmanagement.modules.auth.repository.UserRepository;
-import com.retailmanagement.modules.customer.repository.CustomerRepository;
-import com.retailmanagement.modules.supplier.repository.SupplierRepository;
-import com.retailmanagement.modules.distributor.repository.DistributorRepository;
+import com.retailmanagement.modules.erp.party.repository.CustomerRepository;
+import com.retailmanagement.modules.erp.party.repository.SupplierRepository;
+import com.retailmanagement.modules.erp.party.repository.DistributorRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;

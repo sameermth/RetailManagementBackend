@@ -14,4 +14,8 @@ public interface DashboardService {
     List<RecentActivityDTO> getRecentActivities(int limit);
     DueSummaryDTO getDueSummary();
     List<DueSummaryDTO.UpcomingDueDTO> getUpcomingDues(int days);
+    DashboardAnalyticsDTOs.ProfitabilitySummaryDTO getProfitabilitySummary(LocalDate startDate, LocalDate endDate, int limit);
+    DashboardAnalyticsDTOs.AgingDashboardDTO getAgingDashboard(LocalDate asOfDate);
+    DashboardAnalyticsDTOs.StockSummaryDTO getStockSummary(int limit);
+    DashboardAnalyticsDTOs.TaxSummaryDTO getTaxSummary(LocalDate startDate, LocalDate endDate);
 }
