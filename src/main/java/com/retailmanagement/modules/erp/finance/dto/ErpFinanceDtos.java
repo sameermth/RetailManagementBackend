@@ -20,6 +20,15 @@ public final class ErpFinanceDtos {
             Boolean isActive
     ) {}
 
+    public record UpdateAccountRequest(
+            Long organizationId,
+            @NotBlank String code,
+            @NotBlank String name,
+            @NotBlank String accountType,
+            Long parentAccountId,
+            Boolean isActive
+    ) {}
+
     public record CreateVoucherRequest(
             Long organizationId,
             Long branchId,

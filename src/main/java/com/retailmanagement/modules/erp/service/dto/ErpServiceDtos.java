@@ -98,6 +98,53 @@ public final class ErpServiceDtos {
             String claimNotes
     ) {}
 
+    public record CreateWarrantyExtensionRequest(
+            Long organizationId,
+            Long branchId,
+            @NotBlank String extensionType,
+            @NotNull @Positive Integer monthsAdded,
+            LocalDate startDate,
+            LocalDate endDate,
+            String reason,
+            String referenceNumber,
+            BigDecimal amount,
+            String remarks
+    ) {}
+
+    public record CreateServiceAgreementItemRequest(
+            @NotNull Long productId,
+            Long productOwnershipId,
+            Long salesInvoiceLineId,
+            Long serialNumberId,
+            String coverageScope,
+            String includedServiceNotes
+    ) {}
+
+    public record CreateServiceAgreementRequest(
+            Long organizationId,
+            Long branchId,
+            @NotNull Long customerId,
+            @NotNull Long salesInvoiceId,
+            @NotBlank String agreementType,
+            String status,
+            @NotNull LocalDate serviceStartDate,
+            @NotNull LocalDate serviceEndDate,
+            Boolean laborIncluded,
+            Boolean partsIncluded,
+            Integer preventiveVisitsIncluded,
+            Integer visitLimit,
+            Integer slaHours,
+            BigDecimal agreementAmount,
+            String notes,
+            @NotEmpty List<@Valid CreateServiceAgreementItemRequest> items
+    ) {}
+
+    public record CancelWarrantyExtensionRequest(
+            Long organizationId,
+            Long branchId,
+            String remarks
+    ) {}
+
     public record CreateServiceReplacementRequest(
             Long organizationId,
             Long branchId,
@@ -150,6 +197,8 @@ public final class ErpServiceDtos {
             String symptomNotes,
             String diagnosisNotes,
             String resolutionStatus,
+            OwnershipWarrantySummaryResponse warrantySummary,
+            ServiceAgreementSummaryResponse serviceAgreementSummary,
             LocalDateTime createdAt,
             LocalDateTime updatedAt
     ) {}
@@ -196,9 +245,95 @@ public final class ErpServiceDtos {
             LocalDate approvedOn,
             LocalDate warrantyStartDate,
             LocalDate warrantyEndDate,
+            OwnershipWarrantySummaryResponse warrantySummary,
+            ServiceAgreementSummaryResponse serviceAgreementSummary,
             String claimNotes,
             LocalDateTime createdAt,
             LocalDateTime updatedAt
+    ) {}
+
+    public record WarrantyExtensionResponse(
+            Long id,
+            Long organizationId,
+            Long productOwnershipId,
+            Long serialNumberId,
+            Long salesInvoiceId,
+            Long salesInvoiceLineId,
+            String extensionType,
+            Integer monthsAdded,
+            LocalDate startDate,
+            LocalDate endDate,
+            String status,
+            String reason,
+            String referenceNumber,
+            BigDecimal amount,
+            String remarks,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt
+    ) {}
+
+    public record OwnershipWarrantySummaryResponse(
+            Long productOwnershipId,
+            Long serialNumberId,
+            Long salesInvoiceId,
+            Long salesInvoiceLineId,
+            LocalDate baseWarrantyStartDate,
+            LocalDate baseWarrantyEndDate,
+            LocalDate effectiveWarrantyEndDate,
+            Boolean hasExtensions,
+            List<WarrantyExtensionResponse> extensions
+    ) {}
+
+    public record ServiceAgreementItemResponse(
+            Long id,
+            Long serviceAgreementId,
+            Long productId,
+            Long productOwnershipId,
+            Long salesInvoiceLineId,
+            Long serialNumberId,
+            String coverageScope,
+            String includedServiceNotes,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt
+    ) {}
+
+    public record ServiceAgreementResponse(
+            Long id,
+            Long organizationId,
+            Long branchId,
+            Long customerId,
+            Long salesInvoiceId,
+            String agreementNumber,
+            String agreementType,
+            String status,
+            LocalDate serviceStartDate,
+            LocalDate serviceEndDate,
+            Boolean laborIncluded,
+            Boolean partsIncluded,
+            Integer preventiveVisitsIncluded,
+            Integer visitLimit,
+            Integer slaHours,
+            BigDecimal agreementAmount,
+            String notes,
+            List<ServiceAgreementItemResponse> items,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt
+    ) {}
+
+    public record ServiceAgreementSummaryResponse(
+            Long serviceAgreementId,
+            String agreementNumber,
+            String agreementType,
+            String status,
+            LocalDate serviceStartDate,
+            LocalDate serviceEndDate,
+            Boolean coverageActive,
+            Boolean laborIncluded,
+            Boolean partsIncluded,
+            Integer preventiveVisitsIncluded,
+            Integer visitLimit,
+            Integer slaHours,
+            String coverageScope
     ) {}
 
     public record ServiceReplacementResponse(

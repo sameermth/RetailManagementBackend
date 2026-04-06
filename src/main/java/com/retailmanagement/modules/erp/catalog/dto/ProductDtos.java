@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public final class ProductDtos {
     private ProductDtos() {}
@@ -14,7 +15,7 @@ public final class ProductDtos {
             @NotNull Long categoryId,
             @NotNull Long brandId,
             @NotNull Long baseUomId,
-            @NotNull Long taxGroupId,
+            Long taxGroupId,
             @NotBlank String sku,
             @NotBlank String name,
             String description,
@@ -24,9 +25,12 @@ public final class ProductDtos {
             Boolean batchTrackingEnabled,
             Boolean expiryTrackingEnabled,
             Boolean fractionalQuantityAllowed,
+            List<ProductAttributeDtos.UpsertProductAttributeValueRequest> attributes,
             BigDecimal minStockBaseQty,
             BigDecimal reorderLevelBaseQty,
             BigDecimal defaultSalePrice,
+            Integer defaultWarrantyMonths,
+            String warrantyTerms,
             Boolean isServiceItem,
             Boolean isActive
     ) {}
@@ -36,13 +40,16 @@ public final class ProductDtos {
             @NotNull Long productId,
             @NotNull Long categoryId,
             @NotNull Long brandId,
-            @NotNull Long taxGroupId,
+            Long taxGroupId,
             String sku,
             String name,
             String description,
+            List<ProductAttributeDtos.UpsertProductAttributeValueRequest> attributes,
             BigDecimal minStockBaseQty,
             BigDecimal reorderLevelBaseQty,
             BigDecimal defaultSalePrice,
+            Integer defaultWarrantyMonths,
+            String warrantyTerms,
             Boolean isActive
     ) {}
 
@@ -51,9 +58,16 @@ public final class ProductDtos {
             Long organizationId,
             Long productId,
             Long categoryId,
+            String categoryName,
             Long brandId,
+            String brandName,
             Long baseUomId,
+            String baseUomCode,
+            String baseUomName,
             Long taxGroupId,
+            String taxGroupCode,
+            String taxGroupName,
+            List<ProductAttributeDtos.ProductAttributeValueResponse> attributes,
             String sku,
             String name,
             String description,
@@ -65,6 +79,8 @@ public final class ProductDtos {
             BigDecimal minStockBaseQty,
             BigDecimal reorderLevelBaseQty,
             BigDecimal defaultSalePrice,
+            Integer defaultWarrantyMonths,
+            String warrantyTerms,
             Boolean isServiceItem,
             Boolean isActive,
             LocalDateTime createdAt,
@@ -132,5 +148,19 @@ public final class ProductDtos {
             Boolean fractionalQuantityAllowed,
             Boolean isServiceItem,
             Boolean isActive
+    ) {}
+
+    public record TaxGroupSuggestionResponse(
+            String hsnCode,
+            Long taxGroupId,
+            String taxGroupCode,
+            String taxGroupName,
+            BigDecimal cgstRate,
+            BigDecimal sgstRate,
+            BigDecimal igstRate,
+            BigDecimal cessRate,
+            java.time.LocalDate effectiveFrom,
+            Boolean matched,
+            String message
     ) {}
 }

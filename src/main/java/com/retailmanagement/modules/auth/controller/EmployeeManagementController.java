@@ -3,6 +3,7 @@ package com.retailmanagement.modules.auth.controller;
 import com.retailmanagement.modules.auth.dto.request.EmployeeManagementRequests;
 import com.retailmanagement.modules.auth.dto.response.EmployeeManagementResponses;
 import com.retailmanagement.modules.auth.service.EmployeeManagementService;
+import com.retailmanagement.modules.auth.service.EmployeeReferenceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -19,6 +20,14 @@ import org.springframework.web.bind.annotation.*;
 public class EmployeeManagementController {
 
     private final EmployeeManagementService employeeManagementService;
+    private final EmployeeReferenceService employeeReferenceService;
+
+    @GetMapping("/roles")
+    @PreAuthorize("hasAuthority('user.view')")
+    @Operation(summary = "List available employee roles")
+    public ResponseEntity<List<EmployeeManagementResponses.RoleReferenceResponse>> listRoles(@RequestParam(required = false) String query) {
+        return ResponseEntity.ok(employeeReferenceService.listRoles(query));
+    }
 
     @GetMapping
     @PreAuthorize("hasAuthority('user.view')")

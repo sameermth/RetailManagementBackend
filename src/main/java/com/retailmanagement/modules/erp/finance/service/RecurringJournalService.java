@@ -22,10 +22,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -124,6 +127,7 @@ public class RecurringJournalService {
     }
 
     @Scheduled(fixedDelayString = "${erp.recurring.journal.scan-ms:3600000}")
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void runDueTemplates() {
         LocalDate today = LocalDate.now();
         for (RecurringJournal journal : recurringJournalRepository
@@ -135,8 +139,9 @@ public class RecurringJournalService {
             }
             try {
                 generateVoucher(journal, journal.getNextRunDate());
-            } catch (RuntimeException ignored) {
-                // Keep template active for manual rerun.
+            } catch (RuntimeException ex) {
+                log.warn("Recurring journal template {} failed during scheduled run: {}",
+                        journal.getId(), ex.getMessage());
             }
         }
     }

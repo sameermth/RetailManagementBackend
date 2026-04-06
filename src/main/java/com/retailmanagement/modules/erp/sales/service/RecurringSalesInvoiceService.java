@@ -23,10 +23,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -89,7 +92,7 @@ public class RecurringSalesInvoiceService {
 
         List<RecurringSalesInvoiceLine> lines = new ArrayList<>();
         for (RecurringSalesDtos.CreateRecurringSalesInvoiceLineRequest requestLine : request.lines()) {
-            storeProductRepository.findById(requestLine.productId())
+            var storeProduct = storeProductRepository.findById(requestLine.productId())
                     .orElseThrow(() -> new ResourceNotFoundException("Store product not found: " + requestLine.productId()));
             uomRepository.findById(requestLine.uomId())
                     .orElseThrow(() -> new ResourceNotFoundException("UOM not found: " + requestLine.uomId()));
@@ -101,7 +104,7 @@ public class RecurringSalesInvoiceService {
             line.setBaseQuantity(requestLine.baseQuantity());
             line.setUnitPrice(requestLine.unitPrice());
             line.setDiscountAmount(requestLine.discountAmount() == null ? java.math.BigDecimal.ZERO : requestLine.discountAmount());
-            line.setWarrantyMonths(requestLine.warrantyMonths());
+            line.setWarrantyMonths(requestLine.warrantyMonths() != null ? requestLine.warrantyMonths() : storeProduct.getDefaultWarrantyMonths());
             line.setRemarks(requestLine.remarks());
             lines.add(recurringSalesInvoiceLineRepository.save(line));
         }
@@ -117,6 +120,7 @@ public class RecurringSalesInvoiceService {
     }
 
     @Scheduled(fixedDelayString = "${erp.recurring.sales.scan-ms:3600000}")
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void runDueTemplates() {
         LocalDate today = LocalDate.now();
         for (RecurringSalesInvoice template : recurringSalesInvoiceRepository
@@ -131,8 +135,9 @@ public class RecurringSalesInvoiceService {
             }
             try {
                 generateInvoice(template, template.getNextRunDate(), false);
-            } catch (RuntimeException ignored) {
-                // Keep the template active; manual review can rerun it later.
+            } catch (RuntimeException ex) {
+                log.warn("Recurring sales invoice template {} failed during scheduled run: {}",
+                        template.getId(), ex.getMessage());
             }
         }
     }

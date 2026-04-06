@@ -1,0 +1,41 @@
+databaseChangeLog:
+  - changeSet:
+      id: bootstrap-001-schema
+      author: openai
+      changes:
+        - sqlFile:
+            path: bootstrap/001_bootstrap_schema.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for bootstrap schema';"
+
+  - changeSet:
+      id: bootstrap-002-master-data
+      author: openai
+      context: seed,dev,test
+      changes:
+        - sqlFile:
+            path: bootstrap/002_bootstrap_master_data.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for bootstrap master data';"
+
+  - changeSet:
+      id: bootstrap-003-demo-data
+      author: openai
+      context: sample,dev,test
+      changes:
+        - sqlFile:
+            path: bootstrap/003_bootstrap_demo_data.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for bootstrap demo data';"

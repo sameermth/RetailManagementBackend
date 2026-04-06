@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Retail ERP Module Flow Map</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --panel: #ffffff;
+      --panel-alt: #f1f4f9;
+      --text: #142033;
+      --muted: #5f6f86;
+      --line: #d8e0ec;
+      --primary: #1f6feb;
+      --primary-soft: #eaf2ff;
+      --success: #0f9d58;
+      --warning: #b26a00;
+      --shadow: 0 10px 30px rgba(18, 38, 63, 0.08);
+      --radius: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #f8fafc 0%, #eef3fb 100%);
+      color: var(--text);
+    }
+
+    .page {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 32px 24px 48px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 52%, #2a5fa8 100%);
+      color: #fff;
+      border-radius: 24px;
+      padding: 28px 28px 24px;
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 32px;
+      line-height: 1.1;
+    }
+
+    .hero p {
+      margin: 0;
+      color: rgba(255, 255, 255, 0.82);
+      max-width: 900px;
+      line-height: 1.6;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .sidebar,
+    .content {
+      background: var(--panel);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+    }
+
+    .sidebar {
+      padding: 20px;
+      position: sticky;
+      top: 20px;
+    }
+
+    .sidebar h2,
+    .content h2 {
+      margin: 0 0 14px;
+      font-size: 18px;
+    }
+
+    .module-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .module-btn {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      padding: 14px 14px;
+      border-radius: 14px;
+      text-align: left;
+      cursor: pointer;
+      transition: 0.2s ease;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .module-btn small {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .module-btn:hover,
+    .module-btn.active {
+      border-color: var(--primary);
+      background: var(--primary-soft);
+      transform: translateY(-1px);
+    }
+
+    .content {
+      padding: 24px;
+    }
+
+    .module-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .module-header h2 {
+      margin: 0 0 6px;
+      font-size: 28px;
+    }
+
+    .module-header p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .badge {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 18px 0 18px;
+    }
+
+    .tab-btn {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .tab-btn.active {
+      background: var(--text);
+      color: #fff;
+      border-color: var(--text);
+    }
+
+    .panel {
+      display: none;
+    }
+
+    .panel.active {
+      display: block;
+    }
+
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+    }
+
+    .overview-card {
+      background: var(--panel-alt);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .overview-card h3 {
+      margin: 0 0 8px;
+      font-size: 14px;
+    }
+
+    .overview-card p,
+    .overview-card li {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .overview-card ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .flow-scroll {
+      overflow-x: auto;
+      padding-bottom: 8px;
+    }
+
+    .flow-track {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 100%;
+      padding: 10px 2px 18px;
+    }
+
+    .step {
+      min-width: 200px;
+      max-width: 240px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: 0 4px 14px rgba(18, 38, 63, 0.05);
+      cursor: pointer;
+    }
+
+    .step.type-create {
+      border-color: #c8e6d3;
+      background: #f3fbf6;
+    }
+
+    .step.type-convert {
+      border-color: #cfe0ff;
+      background: #f4f8ff;
+    }
+
+    .step.type-post {
+      border-color: #ffe4b5;
+      background: #fff8ec;
+    }
+
+    .step.type-approve {
+      border-color: #ead7ff;
+      background: #faf5ff;
+    }
+
+    .step.type-track {
+      border-color: #d8e3ea;
+      background: #f7fafc;
+    }
+
+    .step.type-report {
+      border-color: #ffd6d6;
+      background: #fff7f7;
+    }
+
+    .step .index {
+      display: inline-block;
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      text-align: center;
+      line-height: 26px;
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+
+    .step h4 {
+      margin: 0 0 8px;
+      font-size: 15px;
+    }
+
+    .step p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .step .meta {
+      margin-top: 10px;
+      color: var(--primary);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .arrow {
+      color: var(--primary);
+      font-size: 26px;
+      font-weight: 700;
+      flex: 0 0 auto;
+    }
+
+    .notes {
+      margin-top: 8px;
+      padding: 16px;
+      background: #fbfcff;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+    }
+
+    .notes h3 {
+      margin: 0 0 8px;
+      font-size: 15px;
+    }
+
+    .notes ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 13px;
+    }
+
+    .detail-box {
+      margin-top: 16px;
+      padding: 16px;
+      background: #fbfcff;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+    }
+
+    .detail-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .detail-box h3 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .detail-box p {
+      margin: 0 0 12px;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 13px;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+    }
+
+    .detail-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .detail-card h4 {
+      margin: 0 0 10px;
+      font-size: 14px;
+    }
+
+    .detail-card ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .detail-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .collapse-btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .detail-content.collapsed {
+      display: none;
+    }
+
+    @media (max-width: 820px) {
+      .detail-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .step {
+        min-width: 180px;
+      }
+    }
+
+    .pill-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .pill {
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+      margin-bottom: 16px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid var(--line);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .legend-swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+
+    @media (max-width: 1100px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: static;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <h1>Retail ERP Process Map</h1>
+      <p>
+        Click any module on the left to view its high-level overview, core operational flow, and approvals or exception path.
+        This page is fully self-contained, so you can open it directly without any build step or internet dependency.
+      </p>
+    </section>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <h2>Modules</h2>
+        <div id="moduleList" class="module-list"></div>
+      </aside>
+
+      <main class="content">
+        <div class="module-header">
+          <div>
+            <h2 id="moduleTitle"></h2>
+            <p id="moduleSummary"></p>
+          </div>
+          <div id="moduleBadge" class="badge"></div>
+        </div>
+
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="overview">Overview</button>
+          <button class="tab-btn" data-tab="flow">Transaction Flow</button>
+          <button class="tab-btn" data-tab="approvals">Approvals / Exceptions</button>
+        </div>
+
+        <section id="overview" class="panel active"></section>
+        <section id="flow" class="panel"></section>
+        <section id="approvals" class="panel"></section>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const modules = [
+      {
+        key: "auth",
+        name: "Auth & Org",
+        badge: "Foundation",
+        summary: "Owner profile, subscription, organization setup, branches, warehouses, and employee allocation.",
+        buttonsNote: "Owner-driven setup and organization management",
+        overview: {
+          cards: [
+            { title: "Primary Goal", body: "Create the owner-led business structure before any ERP transaction starts." },
+            { title: "Main Records", bullets: ["Owner profile", "Organizations", "Branches", "Warehouses", "Employees", "Branch allocations"] },
+            { title: "Typical Users", body: "Owner, admin, HR-style operations, multi-org accountants." }
+          ]
+        },
+        flow: [
+          { type: "track", title: "Owner Login", text: "The owner signs in and lands in the active organization context.", screens: ["Login", "Organization Switcher"], outcome: "The user enters the right store context before doing any work." },
+          { type: "track", title: "Profile & Subscription", text: "The owner edits profile details and views plan entitlement.", screens: ["Owner Profile", "Subscription Card"], outcome: "Business identity and subscription visibility stay current." },
+          { type: "create", title: "Create Organization", text: "The owner creates or edits one or more organizations within subscription limits.", screens: ["Organization List", "Organization Form"], outcome: "A new business unit becomes available for setup and operations." },
+          { type: "create", title: "Create Branches", text: "Each organization gets its physical operating branches.", screens: ["Branch List", "Branch Form"], outcome: "Transactions can now be tied to a real operational branch." },
+          { type: "create", title: "Create Warehouses", text: "Warehouses are created under branches for stock movement and inventory balances.", screens: ["Warehouse List", "Warehouse Form"], outcome: "Inventory can now be tracked at the correct storage location." },
+          { type: "create", title: "Create Employees", text: "Users are created, assigned roles, and mapped to one or more branches.", screens: ["Employee List", "Employee Form", "Branch Allocation"], outcome: "Operational access is controlled by role and branch visibility." }
+        ],
+        approvals: {
+          pills: ["Subscription limit on org creation", "Role-based access", "Branch-scoped employee access"],
+          notes: [
+            "Organization creation is constrained by owner subscription tier.",
+            "Branch access is independent from simply being in the organization.",
+            "Multi-org switching is explicit, not implicit."
+          ]
+        }
+      },
+      {
+        key: "catalog",
+        name: "Catalog & Pricing",
+        badge: "Master Data",
+        summary: "Shared product master, HSN reference, store-product linkage, pricing tiers, and tax-facing item setup.",
+        overview: {
+          cards: [
+            { title: "Primary Goal", body: "Keep product identity global while keeping SKU and pricing organization-specific." },
+            { title: "Main Records", bullets: ["Product master", "HSN master", "Store product", "Store product price", "Category", "Brand", "UOM"] },
+            { title: "Important Rule", body: "HSN belongs to product master; SKU belongs to store-product." }
+          ]
+        },
+        flow: [
+          { type: "track", title: "Search / Create Product Master", text: "A shared product identity is created or reused.", screens: ["Shared Catalog", "Product Search"], outcome: "The same product can be reused across organizations without duplication." },
+          { type: "track", title: "Assign HSN", text: "The product master is linked to a validated HSN code from the HSN reference.", screens: ["HSN Search", "HSN Picker"], outcome: "GST classification becomes consistent across transactions and documents." },
+          { type: "create", title: "Link to Store Product", text: "The product is linked into an organization’s catalog with its own SKU.", screens: ["Store Product Form"], outcome: "Each organization gets its own SKU and sellable catalog entry." },
+          { type: "track", title: "Assign Tax Group", text: "Operational tax behavior is configured at store-product level.", screens: ["Store Product Tax Settings"], outcome: "Billing and reporting can apply the right tax behavior during transactions." },
+          { type: "create", title: "Set Price Tiers", text: "Retail, dealer, segment, or tier-based pricing is created.", screens: ["Pricing Grid"], outcome: "Different customer types can be billed at the right selling price." },
+          { type: "track", title: "Set Reorder Rules", text: "Min stock and reorder level are set for replenishment logic.", screens: ["Inventory Settings"], outcome: "Low-stock alerts and purchase suggestions become possible." }
+        ],
+        approvals: {
+          pills: ["Catalog validation", "Known HSN only", "Store-level SKU uniqueness"],
+          notes: [
+            "Unknown HSN codes are rejected at product creation time.",
+            "A shared product can be linked into multiple organizations with different SKUs.",
+            "Pricing can vary by customer segment or price type."
+          ]
+        }
+      },
+      {
+        key: "purchase",
+        name: "Supplier & Purchase",
+        badge: "Procurement",
+        summary: "Supplier setup, supplier-product mapping, purchase order, purchase receipt, and supplier payment allocation.",
+        overview: {
+          cards: [
+            { title: "Primary Goal", body: "Procure items from supplier relationships while keeping receipt, inventory, and payable flow aligned." },
+            { title: "Main Records", bullets: ["Supplier", "Store supplier terms", "Supplier product", "Purchase order", "Purchase receipt", "Supplier payment"] },
+            { title: "Important Rule", body: "Supplier is a relationship record; terms and product mapping are separate layers." }
+          ]
+        },
+        flow: [
+          { type: "create", title: "Create Supplier", text: "Supplier master and contact data are stored for the organization.", screens: ["Supplier List", "Supplier Form"], outcome: "The supplier becomes available for purchase and payment workflows." },
+          { type: "track", title: "Set Terms", text: "Payment terms, preferred status, and relationship terms are defined.", screens: ["Supplier Terms"], outcome: "Commercial handling becomes organization-specific instead of generic." },
+          { type: "track", title: "Map Supplier Products", text: "Supplier offerings are linked to product master entries.", screens: ["Supplier Catalog"], outcome: "Buying decisions can be made from real supplier-product relationships." },
+          { type: "create", title: "Create Purchase Order", text: "The buyer selects supplier, items, quantities, and purchase terms.", screens: ["PO Form", "PO List"], outcome: "The organization now has an approval-ready procurement document." },
+          { type: "post", title: "Post Purchase Receipt", text: "Goods are received into a warehouse and purchase tax/cost is posted.", screens: ["Purchase Receipt Form", "Purchase Receipt Detail"], outcome: "Stock comes in and the payable side of the transaction becomes real." },
+          { type: "post", title: "Create Supplier Payment", text: "Payments are recorded and then allocated against one or more receipts.", screens: ["Supplier Payment Form"], outcome: "Supplier dues are reduced and payment history is preserved." }
+        ],
+        approvals: {
+          pills: ["PO approval", "Purchase receipt approval", "Supplier payment allocation"],
+          notes: [
+            "Purchase orders can move into pending approval instead of auto-posting.",
+            "Receipts update inventory and payable context once posted.",
+            "Purchase receipt detail now returns linked supplier payments for UI display."
+          ]
+        }
+      },
+      {
+        key: "inventory",
+        name: "Inventory",
+        badge: "Stock Control",
+        summary: "Warehouse balances, reservations, transfers, adjustments, serials, batches, and replenishment logic.",
+        overview: {
+          cards: [
+            { title: "Primary Goal", body: "Track available, reserved, transferred, and adjusted stock accurately by warehouse." },
+            { title: "Main Records", bullets: ["Inventory balance", "Reservations", "Stock transfer", "Stock adjustment", "Serial number", "Inventory batch"] },
+            { title: "Important Rule", body: "Serial and batch-tracked products must be handled explicitly in the flow." }
+          ]
+        },
+        flow: [
+          { type: "post", title: "Inventory In / Out", text: "Purchase receipts, sales invoices, returns, and service actions move stock.", screens: ["Inventory Balance", "Stock Movements"], outcome: "Available stock changes immediately after posted transactions." },
+          { type: "track", title: "Reserve Stock", text: "Pending sales can reserve stock before final posting.", screens: ["Reservation List"], outcome: "Available-to-sell quantity stays accurate even before final invoicing." },
+          { type: "approve", title: "Adjust Stock", text: "Manual adjustments correct stock with controlled approval.", screens: ["Stock Adjustment"], outcome: "Corrections stay auditable and approval-backed." },
+          { type: "approve", title: "Transfer Stock", text: "Warehouse-to-warehouse movement posts transfer out and transfer in.", screens: ["Stock Transfer"], outcome: "Stock is relocated without losing movement history." },
+          { type: "track", title: "Track Serials / Batches", text: "Tracked items remain tied to specific serials or batches through the lifecycle.", screens: ["Serial Lookup", "Batch Lookup"], outcome: "Traceability stays intact for warranty, returns, and compliance." },
+          { type: "report", title: "Trigger Reorder", text: "Low-stock workflow logic can suggest or create replenishment actions.", screens: ["Workflow Alerts"], outcome: "Operational teams can act before stock-outs happen." }
+        ],
+        approvals: {
+          pills: ["Stock adjustment approval", "Stock transfer approval", "Reservation expiry handling"],
+          notes: [
+            "Reservation lifecycle includes create, consume, release, and expiry.",
+            "Tracked-item movement is stricter than standard quantity movement.",
+            "Warehouse management is now fully API-backed."
+          ]
+        }
+      },
+      {
+        key: "sales",
+        name: "Customer & Sales",
+        badge: "Revenue",
+        summary: "Customer setup, quote/estimate, sales order, tax invoice, stock-out, and receivable creation.",
+        overview: {
+          cards: [
+            { title: "Primary Goal", body: "Move from proposal to final sale while preserving stock, GST, and receivable truth." },
+            { title: "Main Records", bullets: ["Customer", "Store customer terms", "Quote", "Sales order", "Sales invoice"] },
+            { title: "Important Rule", body: "Tax invoice is the actual commercial and accounting event." }
+          ]
+        },
+        flow: [
+          { type: "create", title: "Create Customer", text: "Customer master and relationship terms are captured for the organization.", screens: ["Customer List", "Customer Form"], outcome: "The customer is now ready for quotation, billing, and receipt collection." },
+          { type: "create", title: "Create Quote / Estimate", text: "A commercial proposal is issued without stock or accounting impact.", screens: ["Quote Form", "Quote List"], outcome: "The customer receives a non-posting commercial offer." },
+          { type: "convert", title: "Convert to Sales Order", text: "The proposal becomes a committed order if required.", screens: ["Order Conversion"], outcome: "The commercial proposal becomes an execution-oriented order." },
+          { type: "post", title: "Convert to Tax Invoice", text: "The final invoice posts the sale, tax, and stock-out.", screens: ["Invoice Conversion", "Invoice Detail"], outcome: "Revenue, GST, and inventory all become live." },
+          { type: "post", title: "Receive Payment", text: "Payments are recorded later through customer receipts and allocations.", screens: ["Customer Receipt Form"], outcome: "Customer dues start reducing with proper payment evidence." },
+          { type: "track", title: "Track Outstanding", text: "Invoice status moves through unpaid, partial, and paid based on allocations.", screens: ["Invoice Detail", "Outstanding Summary"], outcome: "The UI can always show how much is still due." }
+        ],
+        approvals: {
+          pills: ["Invoice approval", "Price override reason", "Tracked conversion"],
+          notes: [
+            "Quote/order to invoice conversion supports tracked items.",
+            "Price overrides require both permission and a reason.",
+            "Invoice detail now returns all related customer receipt allocations."
+          ]
+        }
+      },
+      {
+        key: "payments",
+        name: "Receipts & Payments",
+        badge: "Settlement",
+        summary: "Customer receipts and supplier payments close the loop on invoices and purchase receipts.",
+        overview: {
+          cards: [
+            { title: "Primary Goal", body: "Record money movement separately from invoicing and allocate it against documents." },
+            { title: "Main Records", bullets: ["Customer receipt", "Customer receipt allocation", "Supplier payment", "Supplier payment allocation"] },
+            { title: "Important Rule", body: "Partial allocations are first-class, so one payment can settle multiple docs and one doc can have multiple payments." }
+          ]
+        },
+        flow: [
+          { type: "create", title: "Create Customer Receipt", text: "Money collected from a customer is recorded with date, method, and reference.", screens: ["Customer Receipt Form", "Customer Receipt PDF"], outcome: "The payment gets its own business document and audit trail." },
+          { type: "track", title: "Allocate to Invoice", text: "A receipt is allocated against one or more sales invoices.", screens: ["Receipt Allocation"], outcome: "A single payment can settle one or many invoices." },
+          { type: "track", title: "Reduce Outstanding", text: "Allocated amount updates invoice status and remaining due.", screens: ["Invoice Detail"], outcome: "Outstanding becomes accurate for follow-up and reporting." },
+          { type: "create", title: "Create Supplier Payment", text: "Money paid to a supplier is recorded similarly.", screens: ["Supplier Payment Form", "Supplier Payment PDF"], outcome: "Supplier payment history becomes printable and traceable." },
+          { type: "track", title: "Allocate to Receipt", text: "Supplier payment is allocated against purchase receipts.", screens: ["Supplier Payment Allocation"], outcome: "One outgoing payment can settle one or many purchase receipts." },
+          { type: "track", title: "Reduce Payable", text: "Allocated supplier payments reduce the open payable exposure.", screens: ["Purchase Receipt Detail"], outcome: "Purchase dues stay visible and up to date." }
+        ],
+        approvals: {
+          pills: ["Payment permission", "Allocation trail", "Payment PDFs"],
+          notes: [
+            "Payment documents now have their own PDF endpoints.",
+            "Invoice details return receipt allocations, and purchase receipt details return supplier payment allocations.",
+            "This makes the detail screen enough for settlement history."
+          ]
+        }
+      },
+      {
+        key: "returns",
+        name: "Returns",
+        badge: "Reverse Flow",
+        summary: "Sales returns, purchase returns, inspection, disposition, and GST reversal behavior.",
+        overview: {
+          cards: [
+            { title: "Primary Goal", body: "Handle stock reversal, financial reversal, and GST reversal safely." },
+            { title: "Main Records", bullets: ["Sales return", "Purchase return", "Return inspection", "Tracked return detail"] },
+            { title: "Important Rule", body: "Returns are not just stock events; they are accounting and GST correction events too." }
+          ]
+        },
+        flow: [
+          { type: "create", title: "Create Return", text: "The return references an original invoice or purchase receipt.", screens: ["Return Form"], outcome: "The system knows which original commercial document is being corrected." },
+          { type: "approve", title: "Inspect Return", text: "Returned goods are inspected before posting final effects.", screens: ["Sales Return Inspection"], outcome: "Only approved returns affect stock and finance." },
+          { type: "track", title: "Choose Disposition", text: "The return is restocked, quarantined, damaged, or otherwise handled.", screens: ["Disposition Section"], outcome: "Returned items go to the correct operational bucket." },
+          { type: "post", title: "Post Reversal", text: "Stock, GST, and accounting reversals are posted from original context.", screens: ["Return Posting Result"], outcome: "The return becomes a true commercial correction, not just a note." },
+          { type: "track", title: "Track Serials / Batches", text: "Exact serials or batches are preserved through the return detail.", screens: ["Tracked Return Detail"], outcome: "Traceability remains available for audits and warranty follow-up." }
+        ],
+        approvals: {
+          pills: ["Sales return approval", "Purchase return approval", "Serial return semantics"],
+          notes: [
+            "Restocked serials move back to `IN_STOCK`.",
+            "Non-restock approved serial returns keep `RETURNED` semantics.",
+            "Return posting uses original tax snapshot logic."
+          ]
+        }
+      },
+      {
+        key: "service",
+        name: "Warranty & Service",
+        badge: "After-Sales",
+        summary: "Service tickets, warranty claims, replacements, ownership links, and upstream routing.",
+        overview: {
+          cards: [
+            { title: "Primary Goal", body: "Handle after-sales service, warranty decisions, and replacement stock flow." },
+            { title: "Main Records", bullets: ["Service ticket", "Warranty claim", "Service replacement", "Product ownership"] },
+            { title: "Important Rule", body: "Sold-item ownership and serial context are the anchor for warranty and service." }
+          ]
+        },
+        flow: [
+          { type: "track", title: "Sold Item Ownership", text: "A sold serialized item creates customer ownership context.", screens: ["Ownership Lookup"], outcome: "Service can begin from a known sold-item and warranty context." },
+          { type: "create", title: "Open Service Ticket", text: "Issue, diagnosis, and assignment are captured operationally.", screens: ["Service Ticket Form"], outcome: "Operational work begins with clear issue and assignment tracking." },
+          { type: "create", title: "Raise Warranty Claim", text: "Warranty eligibility and upstream route can be recorded.", screens: ["Warranty Claim Form"], outcome: "The claim becomes a managed after-sales case, not ad hoc work." },
+          { type: "approve", title: "Approve / Reject", text: "Claim status determines whether replacement or other action happens.", screens: ["Warranty Claim Detail"], outcome: "Only approved claims can move into replacement or settlement actions." },
+          { type: "post", title: "Issue Replacement", text: "Replacement stock is consumed from the configured source bucket.", screens: ["Replacement Issue Form"], outcome: "Stock and finance move in a controlled after-sales process." },
+          { type: "track", title: "Update Ownership", text: "Original ownership and new ownership are transitioned properly.", screens: ["Replacement Detail"], outcome: "The replaced item trail stays intact for future service and audit." }
+        ],
+        approvals: {
+          pills: ["Warranty claim approval", "Replacement approval", "Upstream routing"],
+          notes: [
+            "Replacements can be warranty, goodwill, or sales-return linked.",
+            "Upstream supplier/distributor/company routing is preserved on claims.",
+            "Replacement also has finance policy hooks."
+          ]
+        }
+      },
+      {
+        key: "finance",
+        name: "Finance & Accounting",
+        badge: "Books",
+        summary: "Voucher posting, ledger impact, outstanding, bank reconciliation, recurring journals, and summaries.",
+        overview: {
+          cards: [
+            { title: "Primary Goal", body: "Translate operational transactions into ledgers, balances, and reconciliations." },
+            { title: "Main Records", bullets: ["Voucher", "Ledger entry", "Outstanding summary", "Recurring journal", "Bank statement entry"] },
+            { title: "Important Rule", body: "Operational documents and accounting documents stay linked, but not conflated." }
+          ]
+        },
+        flow: [
+          { type: "track", title: "Operational Event", text: "Sale, purchase, payment, expense, or adjustment occurs.", screens: ["Transaction Modules"], outcome: "Commercial operations feed finance automatically instead of separately." },
+          { type: "post", title: "Post Voucher", text: "The event creates the correct accounting voucher.", screens: ["Voucher Trail"], outcome: "Every major business event leaves a financial trail." },
+          { type: "track", title: "Write Ledger", text: "Ledger entries reflect the commercial and tax movement.", screens: ["Account Ledger"], outcome: "Accounts remain drillable back to the source transaction." },
+          { type: "report", title: "Track Outstanding", text: "Receivable and payable aging is calculated from allocations.", screens: ["Outstanding Summary", "Aging"], outcome: "Collections and payables can be managed from accurate due figures." },
+          { type: "create", title: "Import Bank Statement", text: "Statement lines are imported for reconciliation.", screens: ["Bank Statement Import"], outcome: "Bank-side evidence is brought into the system for matching." },
+          { type: "track", title: "Reconcile", text: "Ledger bank movements are matched to statement lines.", screens: ["Bank Reconciliation"], outcome: "Bank balances become explainable and reviewable." }
+        ],
+        approvals: {
+          pills: ["Expense approval", "Finance review", "Recurring journals"],
+          notes: [
+            "Finance review includes return and replacement adjustments.",
+            "Bank reconciliation supports statement import and manual matching.",
+            "Recurring journals and recurring invoices are already supported."
+          ]
+        }
+      },
+      {
+        key: "reports",
+        name: "Reports & Dashboard",
+        badge: "Analytics",
+        summary: "Dashboard metrics, profitability, aging, inventory summary, tax summary, and exportable documents.",
+        overview: {
+          cards: [
+            { title: "Primary Goal", body: "Give leadership and operators a clear summary of current business health." },
+            { title: "Main Records", bullets: ["Dashboard widgets", "Profitability report", "Aging report", "Inventory summary", "Tax summary"] },
+            { title: "Important Rule", body: "Reporting should reflect posted truth, not draft assumptions." }
+          ]
+        },
+        flow: [
+          { type: "report", title: "Load Dashboard", text: "Top-level business metrics and summaries are shown.", screens: ["Dashboard Home"], outcome: "Leadership sees live operational and financial health in one place." },
+          { type: "report", title: "Open Analytics", text: "Users can drill into profitability, aging, inventory, and tax reports.", screens: ["Analytics Tabs"], outcome: "Teams move from top-level metrics into actionable detail." },
+          { type: "track", title: "View GST Breakup", text: "Documents and reports can show taxable amount and tax component rows.", screens: ["Document Detail", "PDF Preview"], outcome: "Tax-facing documents become easier to verify and explain." },
+          { type: "report", title: "Export", text: "Reports and transactional PDFs can be downloaded for sharing or record use.", screens: ["Export Actions"], outcome: "Business documents can be shared, printed, and stored externally." }
+        ],
+        approvals: {
+          pills: ["Role-based visibility", "Subscription-gated reports", "Historical snapshots"],
+          notes: [
+            "UI can lock advanced reports by permission or subscription.",
+            "Transactional PDFs now show GST breakup rows.",
+            "A future artifact cache can store generated documents for faster reuse."
+          ]
+        }
+      },
+      {
+        key: "approval",
+        name: "Approvals & Workflow",
+        badge: "Controls",
+        summary: "Rule-based approvals, pending queues, low-stock alerts, overdue triggers, and business control logic.",
+        overview: {
+          cards: [
+            { title: "Primary Goal", body: "Keep sensitive transactions controlled without blocking normal operations unnecessarily." },
+            { title: "Main Records", bullets: ["Approval rule", "Approval request", "Approval history", "Workflow trigger", "Notification"] },
+            { title: "Important Rule", body: "Approval and workflow are related, but they are not the same thing." }
+          ]
+        },
+        flow: [
+          { type: "create", title: "Create Transaction", text: "A PO, invoice, stock action, return, or replacement is initiated.", screens: ["Operational Forms"], outcome: "The business action starts in its own module without immediate posting if controls apply." },
+          { type: "approve", title: "Evaluate Rules", text: "System checks whether approval is needed for amount, branch, role, or action type.", screens: ["Approval Evaluator"], outcome: "The platform decides whether it can move forward automatically." },
+          { type: "approve", title: "Pending Approval", text: "If matched, the document stays in pending approval state.", screens: ["Approval Queue"], outcome: "Sensitive transactions wait in a controlled queue instead of posting directly." },
+          { type: "approve", title: "Approve / Reject", text: "Approver decides whether posting is allowed.", screens: ["Approval Detail"], outcome: "Control stays with the responsible approver instead of the requester." },
+          { type: "post", title: "Post Final Effect", text: "Approved transactions execute inventory, accounting, or commercial impact.", screens: ["Posted Document Detail"], outcome: "Operational and financial effects happen only after valid approval." },
+          { type: "report", title: "Run Workflow Scan", text: "Low stock, overdue dues, warranty expiry, and GST threshold triggers generate alerts.", screens: ["Workflow Trigger Review"], outcome: "Teams are warned before issues become business problems." }
+        ],
+        approvals: {
+          pills: ["Rule-driven approval", "Pending queue", "Workflow alerts"],
+          notes: [
+            "Major operational flows are already approval-backed.",
+            "Workflow triggers are deduplicated and role-routed.",
+            "Auto-reorder can be driven from low-stock trigger logic."
+          ]
+        }
+      }
+    ];
+
+    const moduleList = document.getElementById("moduleList");
+    const moduleTitle = document.getElementById("moduleTitle");
+    const moduleSummary = document.getElementById("moduleSummary");
+    const moduleBadge = document.getElementById("moduleBadge");
+    const overviewPanel = document.getElementById("overview");
+    const flowPanel = document.getElementById("flow");
+    const approvalsPanel = document.getElementById("approvals");
+    const tabButtons = Array.from(document.querySelectorAll(".tab-btn"));
+
+    let activeModuleKey = modules[0].key;
+
+    function renderModuleButtons() {
+      moduleList.innerHTML = "";
+      modules.forEach((module) => {
+        const btn = document.createElement("button");
+        btn.className = "module-btn" + (module.key === activeModuleKey ? " active" : "");
+        btn.innerHTML = `${module.name}<small>${module.buttonsNote || module.summary}</small>`;
+        btn.onclick = () => {
+          activeModuleKey = module.key;
+          renderModuleButtons();
+          renderModule();
+        };
+        moduleList.appendChild(btn);
+      });
+    }
+
+    function renderOverview(module) {
+      overviewPanel.innerHTML = `
+        <div class="overview-grid">
+          ${module.overview.cards.map(card => `
+            <div class="overview-card">
+              <h3>${card.title}</h3>
+              ${card.body ? `<p>${card.body}</p>` : ""}
+              ${card.bullets ? `<ul>${card.bullets.map(item => `<li>${item}</li>`).join("")}</ul>` : ""}
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function renderFlow(module) {
+      flowPanel.innerHTML = `
+        <div class="legend">
+          <div class="legend-item"><span class="legend-swatch" style="background:#dff3e6;"></span>Create</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:#e2ecff;"></span>Convert</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:#fff0d8;"></span>Post</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:#f0e3ff;"></span>Approve</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:#edf3f7;"></span>Track</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:#ffe5e5;"></span>Report</div>
+        </div>
+        <div class="flow-scroll">
+          <div class="flow-track">
+            ${module.flow.map((step, index) => `
+              ${index > 0 ? `<div class="arrow">→</div>` : ""}
+              <div class="step type-${step.type || "track"}" data-step-index="${index}">
+                <div class="index">${index + 1}</div>
+                <h4>${step.title}</h4>
+                <p>${step.text}</p>
+                <div class="meta">Click for screens & APIs</div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+        <div id="stepDetail" class="detail-box">
+          ${renderStepDetail(module.flow[0])}
+        </div>
+      `;
+
+      Array.from(flowPanel.querySelectorAll(".step")).forEach((stepNode) => {
+        stepNode.addEventListener("click", () => {
+          const step = module.flow[Number(stepNode.dataset.stepIndex)];
+          flowPanel.querySelector("#stepDetail").innerHTML = renderStepDetail(step);
+          bindDetailToggle();
+        });
+      });
+
+      bindDetailToggle();
+    }
+
+    function renderStepDetail(step) {
+      return `
+        <div class="detail-header">
+          <h3>${step.title}</h3>
+          <button type="button" class="collapse-btn" id="detailToggle">Collapse</button>
+        </div>
+        <div class="detail-content" id="detailContent">
+          <p>${step.text}</p>
+          <div class="detail-grid">
+            <div class="detail-card">
+              <h4>Suggested Screens</h4>
+              <ul>
+                ${(step.screens || ["No screen mapping yet"]).map(item => `<li>${item}</li>`).join("")}
+              </ul>
+            </div>
+            <div class="detail-card">
+              <h4>Business Outcome</h4>
+              <p>${step.outcome || "This step moves the workflow forward in the current module."}</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function bindDetailToggle() {
+      const toggle = document.getElementById("detailToggle");
+      const content = document.getElementById("detailContent");
+      if (!toggle || !content) {
+        return;
+      }
+      toggle.onclick = () => {
+        const collapsed = content.classList.toggle("collapsed");
+        toggle.textContent = collapsed ? "Expand" : "Collapse";
+      };
+    }
+
+    function renderApprovals(module) {
+      approvalsPanel.innerHTML = `
+        <div class="pill-list">
+          ${module.approvals.pills.map(pill => `<div class="pill">${pill}</div>`).join("")}
+        </div>
+        <div class="notes">
+          <h3>What To Remember</h3>
+          <ul>
+            ${module.approvals.notes.map(note => `<li>${note}</li>`).join("")}
+          </ul>
+        </div>
+      `;
+    }
+
+    function renderModule() {
+      const module = modules.find(item => item.key === activeModuleKey);
+      moduleTitle.textContent = module.name;
+      moduleSummary.textContent = module.summary;
+      moduleBadge.textContent = module.badge;
+      renderOverview(module);
+      renderFlow(module);
+      renderApprovals(module);
+    }
+
+    tabButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        tabButtons.forEach((tab) => tab.classList.remove("active"));
+        document.querySelectorAll(".panel").forEach((panel) => panel.classList.remove("active"));
+        button.classList.add("active");
+        document.getElementById(button.dataset.tab).classList.add("active");
+      });
+    });
+
+    renderModuleButtons();
+    renderModule();
+  </script>
+</body>
+</html>

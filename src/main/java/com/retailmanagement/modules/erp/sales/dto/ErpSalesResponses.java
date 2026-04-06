@@ -11,6 +11,8 @@ public final class ErpSalesResponses {
             Long id,
             Long productId,
             Long uomId,
+            Long productOwnershipId,
+            List<Long> productOwnershipIds,
             String hsnCode,
             BigDecimal quantity,
             BigDecimal baseQuantity,
@@ -147,7 +149,19 @@ public final class ErpSalesResponses {
             BigDecimal allocatedAmount,
             BigDecimal outstandingAmount,
             String status,
-            List<SalesInvoiceLineResponse> lines
+            List<SalesInvoiceLineResponse> lines,
+            List<SalesInvoiceAllocationResponse> allocations
+    ) {}
+
+    public record SalesInvoiceAllocationResponse(
+            Long customerReceiptId,
+            String receiptNumber,
+            LocalDate receiptDate,
+            String paymentMethod,
+            String referenceNumber,
+            BigDecimal receiptAmount,
+            BigDecimal allocatedAmount,
+            String status
     ) {}
 
     public record SalesInvoiceSummaryResponse(

@@ -7,6 +7,7 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface BankStatementEntryRepository extends JpaRepository<BankStatementEntry, Long> {
+    boolean existsByOrganizationIdAndAccountId(Long organizationId, Long accountId);
     List<BankStatementEntry> findByOrganizationIdAndAccountIdOrderByEntryDateDescIdDesc(Long organizationId, Long accountId);
     List<BankStatementEntry> findByOrganizationIdAndAccountIdAndEntryDateBetweenOrderByEntryDateAscIdAsc(Long organizationId, Long accountId, LocalDate fromDate, LocalDate toDate);
     Optional<BankStatementEntry> findByIdAndOrganizationId(Long id, Long organizationId);

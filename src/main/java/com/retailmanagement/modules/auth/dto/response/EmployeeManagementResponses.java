@@ -29,4 +29,12 @@ public final class EmployeeManagementResponses {
             LocalDateTime createdAt,
             LocalDateTime updatedAt
     ) {}
+
+    public record RoleReferenceResponse(
+            Long id,
+            String code,
+            String name,
+            Boolean system,
+            Boolean active
+    ) {}
 }

@@ -28,4 +28,13 @@ public interface AccountSubscriptionRepository extends JpaRepository<AccountSubs
     default Optional<AccountSubscription> findCurrentSubscription(Long accountId, LocalDate asOfDate) {
         return findActiveSubscriptions(accountId, asOfDate).stream().findFirst();
     }
+
+    @Query("""
+            SELECT s
+            FROM AccountSubscription s
+            JOIN FETCH s.plan p
+            WHERE s.accountId = :accountId
+            ORDER BY s.startsOn DESC, s.id DESC
+            """)
+    List<AccountSubscription> findHistoryByAccountId(@Param("accountId") Long accountId);
 }

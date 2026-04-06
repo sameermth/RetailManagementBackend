@@ -3,6 +3,8 @@ package com.retailmanagement.modules.erp.service.controller;
 import com.retailmanagement.modules.erp.common.ErpSecurityUtils;
 import com.retailmanagement.modules.erp.common.api.ErpApiResponse;
 import com.retailmanagement.modules.erp.service.dto.ErpServiceDtos;
+import com.retailmanagement.modules.erp.service.entity.ServiceAgreement;
+import com.retailmanagement.modules.erp.service.entity.ServiceAgreementItem;
 import com.retailmanagement.modules.erp.service.entity.ServiceTicketItem;
 import com.retailmanagement.modules.erp.service.entity.ServiceReplacement;
 import com.retailmanagement.modules.erp.service.entity.ServiceTicket;
@@ -90,6 +92,37 @@ public class ErpServiceWarrantyController {
         return ErpApiResponse.ok(service.listClaims(orgId).stream().map(this::toClaimResponse).toList());
     }
 
+    @GetMapping("/agreements")
+    @Operation(summary = "List service agreements")
+    @PreAuthorize("hasAuthority('service.view')")
+    public ErpApiResponse<List<ErpServiceDtos.ServiceAgreementResponse>> listAgreements(@RequestParam(required = false) Long organizationId) {
+        Long orgId = organizationId != null ? organizationId : ErpSecurityUtils.currentOrganizationId().orElse(1L);
+        return ErpApiResponse.ok(service.listAgreements(orgId).stream()
+                .map(agreement -> toAgreementResponse(agreement, List.of()))
+                .toList());
+    }
+
+    @GetMapping("/agreements/{id}")
+    @Operation(summary = "Get service agreement by id")
+    @PreAuthorize("hasAuthority('service.view')")
+    public ErpApiResponse<ErpServiceDtos.ServiceAgreementResponse> getAgreement(@PathVariable Long id,
+                                                                                @RequestParam(required = false) Long organizationId) {
+        Long orgId = organizationId != null ? organizationId : ErpSecurityUtils.currentOrganizationId().orElse(1L);
+        ErpServiceWarrantyService.ServiceAgreementDetails details = service.getAgreement(orgId, id);
+        return ErpApiResponse.ok(toAgreementResponse(details.agreement(), details.items()));
+    }
+
+    @PostMapping("/agreements")
+    @Operation(summary = "Create service agreement")
+    @PreAuthorize("hasAuthority('service.manage')")
+    public ErpApiResponse<ErpServiceDtos.ServiceAgreementResponse> createAgreement(@RequestBody @Valid ErpServiceDtos.CreateServiceAgreementRequest request) {
+        Long orgId = request.organizationId() != null ? request.organizationId() : ErpSecurityUtils.currentOrganizationId().orElse(1L);
+        Long branchId = request.branchId() != null ? request.branchId() : ErpSecurityUtils.currentBranchId().orElse(1L);
+        ServiceAgreement agreement = service.createAgreement(orgId, branchId, request);
+        ErpServiceWarrantyService.ServiceAgreementDetails details = service.getAgreement(orgId, agreement.getId());
+        return ErpApiResponse.ok(toAgreementResponse(details.agreement(), details.items()), "Service agreement created");
+    }
+
     @GetMapping("/warranty-claims/{id}")
     @Operation(summary = "Get warranty claim by id")
     @PreAuthorize("hasAuthority('service.view')")
@@ -116,6 +149,48 @@ public class ErpServiceWarrantyController {
         Long orgId = request.organizationId() != null ? request.organizationId() : ErpSecurityUtils.currentOrganizationId().orElse(1L);
         Long branchId = request.branchId() != null ? request.branchId() : ErpSecurityUtils.currentBranchId().orElse(1L);
         return ErpApiResponse.ok(toClaimResponse(service.updateClaimStatus(orgId, branchId, id, request)), "Warranty claim status updated");
+    }
+
+    @GetMapping("/ownership/{id}/warranty")
+    @Operation(summary = "Get warranty summary for a sold ownership item")
+    @PreAuthorize("hasAuthority('service.view')")
+    public ErpApiResponse<ErpServiceDtos.OwnershipWarrantySummaryResponse> getOwnershipWarranty(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long organizationId) {
+        Long orgId = organizationId != null ? organizationId : ErpSecurityUtils.currentOrganizationId().orElse(1L);
+        return ErpApiResponse.ok(service.getOwnershipWarrantySummary(orgId, id));
+    }
+
+    @GetMapping("/ownership/{id}/warranty-extensions")
+    @Operation(summary = "List warranty extensions for a sold ownership item")
+    @PreAuthorize("hasAuthority('service.view')")
+    public ErpApiResponse<List<ErpServiceDtos.WarrantyExtensionResponse>> listWarrantyExtensions(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long organizationId) {
+        Long orgId = organizationId != null ? organizationId : ErpSecurityUtils.currentOrganizationId().orElse(1L);
+        return ErpApiResponse.ok(service.listWarrantyExtensions(orgId, id));
+    }
+
+    @PostMapping("/ownership/{id}/warranty-extensions")
+    @Operation(summary = "Create a warranty extension for a sold ownership item")
+    @PreAuthorize("hasAuthority('service.manage')")
+    public ErpApiResponse<ErpServiceDtos.WarrantyExtensionResponse> createWarrantyExtension(
+            @PathVariable Long id,
+            @RequestBody @Valid ErpServiceDtos.CreateWarrantyExtensionRequest request) {
+        Long orgId = request.organizationId() != null ? request.organizationId() : ErpSecurityUtils.currentOrganizationId().orElse(1L);
+        Long branchId = request.branchId() != null ? request.branchId() : ErpSecurityUtils.currentBranchId().orElse(1L);
+        return ErpApiResponse.ok(service.createWarrantyExtension(orgId, branchId, id, request), "Warranty extension created");
+    }
+
+    @PostMapping("/warranty-extensions/{id}/cancel")
+    @Operation(summary = "Cancel a warranty extension")
+    @PreAuthorize("hasAuthority('service.manage')")
+    public ErpApiResponse<ErpServiceDtos.WarrantyExtensionResponse> cancelWarrantyExtension(
+            @PathVariable Long id,
+            @RequestBody @Valid ErpServiceDtos.CancelWarrantyExtensionRequest request) {
+        Long orgId = request.organizationId() != null ? request.organizationId() : ErpSecurityUtils.currentOrganizationId().orElse(1L);
+        Long branchId = request.branchId() != null ? request.branchId() : ErpSecurityUtils.currentBranchId().orElse(1L);
+        return ErpApiResponse.ok(service.cancelWarrantyExtension(orgId, branchId, id, request), "Warranty extension cancelled");
     }
 
     @GetMapping("/replacements")
@@ -151,10 +226,13 @@ public class ErpServiceWarrantyController {
                 ticket.getReportedOn(), ticket.getAssignedToUserId(), ticket.getCreatedAt(), ticket.getUpdatedAt());
     }
 
-    private ErpServiceDtos.ServiceTicketItemResponse toItemResponse(ServiceTicketItem item) {
+    private ErpServiceDtos.ServiceTicketItemResponse toItemResponse(Long organizationId, ServiceTicketItem item) {
         return new ErpServiceDtos.ServiceTicketItemResponse(item.getId(), item.getServiceTicketId(), item.getProductId(),
                 item.getSerialNumberId(), item.getProductOwnershipId(), item.getSymptomNotes(), item.getDiagnosisNotes(),
-                item.getResolutionStatus(), item.getCreatedAt(), item.getUpdatedAt());
+                item.getResolutionStatus(),
+                resolveWarrantySummary(organizationId, item.getProductOwnershipId()),
+                resolveServiceAgreementSummary(organizationId, item.getProductOwnershipId(), null, null),
+                item.getCreatedAt(), item.getUpdatedAt());
     }
 
     private ErpServiceDtos.ServiceVisitResponse toVisitResponse(ServiceVisit visit) {
@@ -172,13 +250,15 @@ public class ErpServiceWarrantyController {
                 claim.getUpstreamReferenceNumber(), claim.getUpstreamStatus(), claim.getRoutedOn(),
                 claim.getClaimNumber(), claim.getClaimType(), claim.getStatus(),
                 claim.getClaimDate(), claim.getApprovedOn(), claim.getWarrantyStartDate(), claim.getWarrantyEndDate(),
+                resolveWarrantySummary(claim.getOrganizationId(), claim.getProductOwnershipId()),
+                resolveServiceAgreementSummary(claim.getOrganizationId(), claim.getProductOwnershipId(), claim.getSalesInvoiceId(), null),
                 claim.getClaimNotes(), claim.getCreatedAt(), claim.getUpdatedAt());
     }
 
     private ErpServiceDtos.ServiceTicketDetailsResponse toDetailsResponse(ErpServiceWarrantyService.ServiceTicketDetails details) {
         return new ErpServiceDtos.ServiceTicketDetailsResponse(
                 toTicketResponse(details.ticket()),
-                details.items().stream().map(this::toItemResponse).toList(),
+                details.items().stream().map(item -> toItemResponse(details.ticket().getOrganizationId(), item)).toList(),
                 details.visits().stream().map(this::toVisitResponse).toList()
         );
     }
@@ -212,5 +292,26 @@ public class ErpServiceWarrantyController {
                 replacement.getCreatedAt(),
                 replacement.getUpdatedAt()
         );
+    }
+
+    private ErpServiceDtos.ServiceAgreementResponse toAgreementResponse(ServiceAgreement agreement, List<ServiceAgreementItem> items) {
+        return service.toServiceAgreementResponse(agreement, items);
+    }
+
+    private ErpServiceDtos.OwnershipWarrantySummaryResponse resolveWarrantySummary(Long organizationId, Long ownershipId) {
+        if (organizationId == null || ownershipId == null) {
+            return null;
+        }
+        return service.getOwnershipWarrantySummary(organizationId, ownershipId);
+    }
+
+    private ErpServiceDtos.ServiceAgreementSummaryResponse resolveServiceAgreementSummary(Long organizationId,
+                                                                                          Long ownershipId,
+                                                                                          Long salesInvoiceId,
+                                                                                          Long salesInvoiceLineId) {
+        if (organizationId == null) {
+            return null;
+        }
+        return service.resolveServiceAgreementSummary(organizationId, ownershipId, salesInvoiceId, salesInvoiceLineId);
     }
 }

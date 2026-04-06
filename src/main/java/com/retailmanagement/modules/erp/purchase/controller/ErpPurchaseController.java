@@ -2,6 +2,8 @@ package com.retailmanagement.modules.erp.purchase.controller;
 
 import com.retailmanagement.modules.erp.common.ErpSecurityUtils;
 import com.retailmanagement.modules.erp.common.api.ErpApiResponse;
+import com.retailmanagement.modules.erp.document.dto.ErpDocumentDtos;
+import com.retailmanagement.modules.erp.document.service.ErpDocumentService;
 import com.retailmanagement.modules.erp.purchase.dto.ErpPurchaseDtos;
 import com.retailmanagement.modules.erp.purchase.dto.ErpPurchaseResponses;
 import com.retailmanagement.modules.erp.purchase.entity.PurchaseOrder;
@@ -13,6 +15,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,6 +29,7 @@ import org.springframework.web.bind.annotation.*;
 public class ErpPurchaseController {
 
     private final ErpPurchaseService erpPurchaseService;
+    private final ErpDocumentService erpDocumentService;
 
     @GetMapping("/orders")
     @Operation(summary = "List purchase orders")
@@ -37,6 +44,22 @@ public class ErpPurchaseController {
     @PreAuthorize("hasAuthority('purchase.view')")
     public ErpApiResponse<ErpPurchaseResponses.PurchaseOrderResponse> getPurchaseOrder(@PathVariable Long id) {
         return ErpApiResponse.ok(erpPurchaseService.getPurchaseOrder(id));
+    }
+
+    @GetMapping("/orders/{id}/pdf")
+    @Operation(summary = "Download purchase order PDF")
+    @PreAuthorize("hasAuthority('purchase.view')")
+    public ResponseEntity<ByteArrayResource> downloadPurchaseOrderPdf(@PathVariable Long id) {
+        ErpPurchaseResponses.PurchaseOrderResponse order = erpPurchaseService.getPurchaseOrder(id);
+        return pdfResponse(erpDocumentService.generatePurchaseOrderPdf(id), order.poNumber() + ".pdf");
+    }
+
+    @PostMapping("/orders/{id}/send")
+    @Operation(summary = "Email purchase order PDF")
+    @PreAuthorize("hasAuthority('purchase.view')")
+    public ErpApiResponse<Void> sendPurchaseOrderPdf(@PathVariable Long id, @RequestBody(required = false) ErpDocumentDtos.SendDocumentRequest request) {
+        erpDocumentService.sendPurchaseOrder(id, request);
+        return ErpApiResponse.ok(null, "Purchase order emailed");
     }
 
     @PostMapping("/orders")
@@ -63,6 +86,22 @@ public class ErpPurchaseController {
         return ErpApiResponse.ok(erpPurchaseService.getPurchaseReceipt(id));
     }
 
+    @GetMapping("/receipts/{id}/pdf")
+    @Operation(summary = "Download purchase receipt PDF")
+    @PreAuthorize("hasAuthority('purchase.view')")
+    public ResponseEntity<ByteArrayResource> downloadPurchaseReceiptPdf(@PathVariable Long id) {
+        ErpPurchaseResponses.PurchaseReceiptResponse receipt = erpPurchaseService.getPurchaseReceipt(id);
+        return pdfResponse(erpDocumentService.generatePurchaseReceiptPdf(id), receipt.receiptNumber() + ".pdf");
+    }
+
+    @PostMapping("/receipts/{id}/send")
+    @Operation(summary = "Email purchase receipt PDF")
+    @PreAuthorize("hasAuthority('purchase.view')")
+    public ErpApiResponse<Void> sendPurchaseReceiptPdf(@PathVariable Long id, @RequestBody(required = false) ErpDocumentDtos.SendDocumentRequest request) {
+        erpDocumentService.sendPurchaseReceipt(id, request);
+        return ErpApiResponse.ok(null, "Purchase receipt emailed");
+    }
+
     @PostMapping("/receipts")
     @Operation(summary = "Create purchase receipt")
     @PreAuthorize("hasAnyAuthority('purchase.post','inventory.receive')")
@@ -78,6 +117,22 @@ public class ErpPurchaseController {
     public ErpApiResponse<List<ErpPurchaseResponses.SupplierPaymentResponse>> listSupplierPayments(@RequestParam(required = false) Long organizationId) {
         Long orgId = organizationId != null ? organizationId : ErpSecurityUtils.currentOrganizationId().orElse(1L);
         return ErpApiResponse.ok(erpPurchaseService.listSupplierPayments(orgId).stream().map(this::toSupplierPaymentResponse).toList());
+    }
+
+    @GetMapping("/supplier-payments/{id}/pdf")
+    @Operation(summary = "Download supplier payment PDF")
+    @PreAuthorize("hasAnyAuthority('purchase.view','payment.pay')")
+    public ResponseEntity<ByteArrayResource> downloadSupplierPaymentPdf(@PathVariable Long id) {
+        SupplierPayment payment = erpPurchaseService.getSupplierPayment(id);
+        return pdfResponse(erpDocumentService.generateSupplierPaymentPdf(id), payment.getPaymentNumber() + ".pdf");
+    }
+
+    @PostMapping("/supplier-payments/{id}/send")
+    @Operation(summary = "Email supplier payment PDF")
+    @PreAuthorize("hasAnyAuthority('purchase.view','payment.pay')")
+    public ErpApiResponse<Void> sendSupplierPaymentPdf(@PathVariable Long id, @RequestBody(required = false) ErpDocumentDtos.SendDocumentRequest request) {
+        erpDocumentService.sendSupplierPayment(id, request);
+        return ErpApiResponse.ok(null, "Supplier payment emailed");
     }
 
     @PostMapping("/supplier-payments")
@@ -114,5 +169,13 @@ public class ErpPurchaseController {
         return new ErpPurchaseResponses.SupplierPaymentResponse(payment.getId(), payment.getOrganizationId(), payment.getBranchId(),
                 payment.getSupplierId(), payment.getPaymentNumber(), payment.getPaymentDate(), payment.getPaymentMethod(),
                 payment.getReferenceNumber(), payment.getAmount(), payment.getStatus(), payment.getRemarks());
+    }
+
+    private ResponseEntity<ByteArrayResource> pdfResponse(byte[] pdf, String fileName) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .contentLength(pdf.length)
+                .body(new ByteArrayResource(pdf));
     }
 }

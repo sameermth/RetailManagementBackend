@@ -57,6 +57,7 @@ public class ErpSalesService {
     private final SalesOrderLineRepository salesOrderLineRepository;
     private final CustomerReceiptRepository customerReceiptRepository;
     private final CustomerReceiptAllocationRepository customerReceiptAllocationRepository;
+    private final ProductOwnershipRepository productOwnershipRepository;
     private final StoreProductRepository productRepository;
     private final ProductRepository productMasterRepository;
     private final CustomerRepository customerRepository;
@@ -202,6 +203,7 @@ public class ErpSalesService {
                     organizationId,
                     branchId,
                     invoice.getInvoiceDate(),
+                    productMaster.getHsnCode(),
                     product.getTaxGroupId(),
                     customer.getGstin(),
                     request.placeOfSupplyStateCode(),
@@ -242,7 +244,7 @@ public class ErpSalesService {
             line.setCessRate(taxContext.cessRate());
             line.setCessAmount(taxContext.cessAmount());
             line.setLineAmount(lineTotal);
-            line.setWarrantyMonths(reqLine.warrantyMonths());
+            line.setWarrantyMonths(reqLine.warrantyMonths() != null ? reqLine.warrantyMonths() : product.getDefaultWarrantyMonths());
             line.setTotalCostAtSale(lineEstimatedCost);
             line.setUnitCostAtSale(reqLine.baseQuantity().compareTo(BigDecimal.ZERO) == 0
                     ? BigDecimal.ZERO
@@ -558,11 +560,109 @@ public class ErpSalesService {
         return response;
     }
 
+    public ErpSalesResponses.SalesQuoteResponse cancelQuote(Long quoteId, ErpSalesDtos.CancelSalesDocumentRequest request) {
+        SalesQuote quote = salesQuoteRepository.findById(quoteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sales quote not found: " + quoteId));
+        Long organizationId = quote.getOrganizationId();
+        Long branchId = request.branchId() != null ? request.branchId() : quote.getBranchId();
+        accessGuard.assertBranchAccess(organizationId, quote.getBranchId());
+        subscriptionAccessService.assertFeature(organizationId, "sales");
+        if (ErpDocumentStatuses.CANCELLED.equals(quote.getStatus())) {
+            return toQuoteResponse(quote, salesQuoteLineRepository.findBySalesQuoteIdOrderByIdAsc(quoteId));
+        }
+        if (quote.getConvertedSalesInvoiceId() != null) {
+            throw new BusinessException("Cannot cancel a quote that has already been converted to an invoice");
+        }
+        if (quote.getConvertedSalesOrderId() != null) {
+            final Long convertedSalesOrderId = quote.getConvertedSalesOrderId();
+            SalesOrder convertedOrder = salesOrderRepository.findById(convertedSalesOrderId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Sales order not found: " + convertedSalesOrderId));
+            if (!ErpDocumentStatuses.CANCELLED.equals(convertedOrder.getStatus())) {
+                throw new BusinessException("Cannot cancel a quote that has already been converted to an active sales order");
+            }
+        }
+        String reason = request.reason().trim();
+        quote.setStatus(ErpDocumentStatuses.CANCELLED);
+        quote.setRemarks(appendCancellationReason(quote.getRemarks(), reason));
+        quote = salesQuoteRepository.save(quote);
+        auditEventWriter.write(
+                organizationId,
+                branchId,
+                "SALES_QUOTE_CANCELLED",
+                "sales_quote",
+                quote.getId(),
+                quote.getQuoteNumber(),
+                "CANCEL",
+                quote.getWarehouseId(),
+                quote.getCustomerId(),
+                null,
+                "Sales quote cancelled",
+                ErpJsonPayloads.of("reason", reason)
+        );
+        return toQuoteResponse(quote, salesQuoteLineRepository.findBySalesQuoteIdOrderByIdAsc(quoteId));
+    }
+
+    public ErpSalesResponses.SalesOrderResponse cancelOrder(Long orderId, ErpSalesDtos.CancelSalesDocumentRequest request) {
+        SalesOrder order = salesOrderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sales order not found: " + orderId));
+        Long organizationId = order.getOrganizationId();
+        Long branchId = request.branchId() != null ? request.branchId() : order.getBranchId();
+        accessGuard.assertBranchAccess(organizationId, order.getBranchId());
+        subscriptionAccessService.assertFeature(organizationId, "sales");
+        if (ErpDocumentStatuses.CANCELLED.equals(order.getStatus())) {
+            return toOrderResponse(order, salesOrderLineRepository.findBySalesOrderIdOrderByIdAsc(orderId));
+        }
+        if (order.getConvertedSalesInvoiceId() != null) {
+            throw new BusinessException("Cannot cancel a sales order that has already been converted to an invoice");
+        }
+        String reason = request.reason().trim();
+        order.setStatus(ErpDocumentStatuses.CANCELLED);
+        order.setRemarks(appendCancellationReason(order.getRemarks(), reason));
+        order = salesOrderRepository.save(order);
+
+        if (order.getSourceQuoteId() != null) {
+            final Long cancelledOrderId = order.getId();
+            salesQuoteRepository.findById(order.getSourceQuoteId()).ifPresent(sourceQuote -> {
+                if (!ErpDocumentStatuses.CANCELLED.equals(sourceQuote.getStatus())
+                        && sourceQuote.getConvertedSalesInvoiceId() == null
+                        && cancelledOrderId.equals(sourceQuote.getConvertedSalesOrderId())) {
+                    sourceQuote.setStatus(ErpDocumentStatuses.SUBMITTED);
+                    salesQuoteRepository.save(sourceQuote);
+                }
+            });
+        }
+
+        auditEventWriter.write(
+                organizationId,
+                branchId,
+                "SALES_ORDER_CANCELLED",
+                "sales_order",
+                order.getId(),
+                order.getOrderNumber(),
+                "CANCEL",
+                order.getWarehouseId(),
+                order.getCustomerId(),
+                null,
+                "Sales order cancelled",
+                ErpJsonPayloads.of("reason", reason)
+        );
+        return toOrderResponse(order, salesOrderLineRepository.findBySalesOrderIdOrderByIdAsc(orderId));
+    }
+
     @Transactional(readOnly = true)
     public List<CustomerReceipt> listReceipts(Long organizationId) {
         accessGuard.assertOrganizationAccess(organizationId);
         subscriptionAccessService.assertFeature(organizationId, "payments");
         return customerReceiptRepository.findTop100ByOrganizationIdOrderByReceiptDateDescIdDesc(organizationId);
+    }
+
+    @Transactional(readOnly = true)
+    public CustomerReceipt getReceipt(Long receiptId) {
+        CustomerReceipt receipt = customerReceiptRepository.findById(receiptId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer receipt not found: " + receiptId));
+        accessGuard.assertOrganizationAccess(receipt.getOrganizationId());
+        subscriptionAccessService.assertFeature(receipt.getOrganizationId(), "payments");
+        return receipt;
     }
 
     public CustomerReceipt createReceipt(Long organizationId, Long branchId, ErpSalesDtos.CreateCustomerReceiptRequest request) {
@@ -721,6 +821,15 @@ public class ErpSalesService {
         return receipt;
     }
     private ErpSalesResponses.SalesInvoiceResponse toInvoiceResponse(SalesInvoice invoice, List<SalesInvoiceLine> lines) {
+        Map<Long, List<Long>> ownershipIdsByLine = new HashMap<>();
+        for (SalesInvoiceLine line : lines) {
+            ownershipIdsByLine.put(
+                    line.getId(),
+                    productOwnershipRepository.findBySalesInvoiceLineId(line.getId()).stream()
+                            .map(ProductOwnership::getId)
+                            .toList()
+            );
+        }
         return new ErpSalesResponses.SalesInvoiceResponse(
                 invoice.getId(),
                 invoice.getOrganizationId(),
@@ -745,6 +854,10 @@ public class ErpSalesService {
                                 line.getId(),
                                 line.getProductId(),
                                 line.getUomId(),
+                                ownershipIdsByLine.getOrDefault(line.getId(), List.of()).size() == 1
+                                        ? ownershipIdsByLine.get(line.getId()).getFirst()
+                                        : null,
+                                ownershipIdsByLine.getOrDefault(line.getId(), List.of()),
                                 line.getHsnSnapshot(),
                                 line.getQuantity(),
                                 line.getBaseQuantity(),
@@ -762,7 +875,8 @@ public class ErpSalesService {
                                 line.getCessAmount(),
                                 line.getLineAmount()
                         ))
-                        .toList()
+                        .toList(),
+                invoiceAllocations(invoice.getId())
         );
     }
 
@@ -928,6 +1042,7 @@ public class ErpSalesService {
                     organizationId,
                     branchId,
                     documentDate,
+                    productMaster.getHsnCode(),
                     product.getTaxGroupId(),
                     customer.getGstin(),
                     placeOfSupplyStateCode,
@@ -1079,6 +1194,43 @@ public class ErpSalesService {
 
     private BigDecimal outstandingAmount(Long salesInvoiceId, BigDecimal totalAmount) {
         return totalAmount.subtract(allocatedAmount(salesInvoiceId)).max(BigDecimal.ZERO);
+    }
+
+    private List<ErpSalesResponses.SalesInvoiceAllocationResponse> invoiceAllocations(Long salesInvoiceId) {
+        return customerReceiptAllocationRepository.findBySalesInvoiceIdOrderByIdAsc(salesInvoiceId).stream()
+                .map(allocation -> {
+                    CustomerReceipt receipt = customerReceiptRepository.findById(allocation.getCustomerReceiptId()).orElse(null);
+                    if (receipt == null) {
+                        return new ErpSalesResponses.SalesInvoiceAllocationResponse(
+                                allocation.getCustomerReceiptId(),
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                allocation.getAllocatedAmount(),
+                                null
+                        );
+                    }
+                    return new ErpSalesResponses.SalesInvoiceAllocationResponse(
+                            receipt.getId(),
+                            receipt.getReceiptNumber(),
+                            receipt.getReceiptDate(),
+                            receipt.getPaymentMethod(),
+                            receipt.getReferenceNumber(),
+                            receipt.getAmount(),
+                            allocation.getAllocatedAmount(),
+                            receipt.getStatus()
+                    );
+                })
+                .toList();
+    }
+
+    private String appendCancellationReason(String currentRemarks, String reason) {
+        if (currentRemarks == null || currentRemarks.isBlank()) {
+            return "Cancelled: " + reason;
+        }
+        return currentRemarks.trim() + " | Cancelled: " + reason;
     }
 
     private record Totals(

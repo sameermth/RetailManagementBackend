@@ -9,7 +9,7 @@ public final class CustomerDtos {
     private CustomerDtos() {}
 
     public record UpsertCustomerRequest(
-            @NotBlank String customerCode,
+            String customerCode,
             @NotBlank String fullName,
             String customerType,
             String legalName,

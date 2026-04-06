@@ -6,4 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SubscriptionPlanFeatureRepository extends JpaRepository<SubscriptionPlanFeature, Long> {
     List<SubscriptionPlanFeature> findByPlanIdAndIsEnabledTrue(Long planId);
+    List<SubscriptionPlanFeature> findByPlanIdOrderByIdAsc(Long planId);
 }

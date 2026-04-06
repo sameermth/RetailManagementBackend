@@ -62,6 +62,12 @@ public final class ErpSalesDtos {
             List<@Valid ConvertTrackedSalesLineRequest> trackedLines
     ) {}
 
+    public record CancelSalesDocumentRequest(
+            Long organizationId,
+            Long branchId,
+            @NotBlank String reason
+    ) {}
+
     public record ConvertTrackedSalesLineRequest(
             @NotNull Long productId,
             List<Long> serialNumberIds,

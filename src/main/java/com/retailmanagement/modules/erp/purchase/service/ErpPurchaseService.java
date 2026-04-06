@@ -133,6 +133,7 @@ public class ErpPurchaseService {
                     organizationId,
                     branchId,
                     order.getPoDate(),
+                    productMaster.getHsnCode(),
                     product.getTaxGroupId(),
                     supplier.getGstin(),
                     request.placeOfSupplyStateCode(),
@@ -296,6 +297,7 @@ public class ErpPurchaseService {
                     organizationId,
                     branchId,
                     receipt.getReceiptDate(),
+                    productMaster.getHsnCode(),
                     product.getTaxGroupId(),
                     supplier.getGstin(),
                     request.placeOfSupplyStateCode(),
@@ -455,6 +457,15 @@ public class ErpPurchaseService {
         accessGuard.assertOrganizationAccess(organizationId);
         subscriptionAccessService.assertFeature(organizationId, "payments");
         return supplierPaymentRepository.findTop100ByOrganizationIdOrderByPaymentDateDescIdDesc(organizationId);
+    }
+
+    @Transactional(readOnly = true)
+    public SupplierPayment getSupplierPayment(Long paymentId) {
+        SupplierPayment payment = supplierPaymentRepository.findById(paymentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Supplier payment not found: " + paymentId));
+        accessGuard.assertOrganizationAccess(payment.getOrganizationId());
+        subscriptionAccessService.assertFeature(payment.getOrganizationId(), "payments");
+        return payment;
     }
 
     public SupplierPayment createSupplierPayment(Long organizationId, Long branchId, ErpPurchaseDtos.CreateSupplierPaymentRequest request) {
@@ -630,7 +641,8 @@ public class ErpPurchaseService {
                 allocatedAmount(receipt.getId()),
                 outstandingAmount(receipt.getId(), receipt.getTotalAmount()),
                 receipt.getStatus(),
-                lines.stream().map(this::toPurchaseLineResponseFromReceipt).toList()
+                lines.stream().map(this::toPurchaseLineResponseFromReceipt).toList(),
+                receiptAllocations(receipt.getId())
         );
     }
 
@@ -698,6 +710,36 @@ public class ErpPurchaseService {
 
     private BigDecimal outstandingAmount(Long purchaseReceiptId, BigDecimal totalAmount) {
         return totalAmount.subtract(allocatedAmount(purchaseReceiptId)).max(BigDecimal.ZERO);
+    }
+
+    private List<ErpPurchaseResponses.PurchaseReceiptAllocationResponse> receiptAllocations(Long purchaseReceiptId) {
+        return supplierPaymentAllocationRepository.findByPurchaseReceiptId(purchaseReceiptId).stream()
+                .map(allocation -> {
+                    SupplierPayment payment = supplierPaymentRepository.findById(allocation.getSupplierPaymentId()).orElse(null);
+                    if (payment == null) {
+                        return new ErpPurchaseResponses.PurchaseReceiptAllocationResponse(
+                                allocation.getSupplierPaymentId(),
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                allocation.getAllocatedAmount(),
+                                null
+                        );
+                    }
+                    return new ErpPurchaseResponses.PurchaseReceiptAllocationResponse(
+                            payment.getId(),
+                            payment.getPaymentNumber(),
+                            payment.getPaymentDate(),
+                            payment.getPaymentMethod(),
+                            payment.getReferenceNumber(),
+                            payment.getAmount(),
+                            allocation.getAllocatedAmount(),
+                            payment.getStatus()
+                    );
+                })
+                .toList();
     }
 
     private void ensureSupplierBelongsToOrganization(Long organizationId, Long supplierId) {

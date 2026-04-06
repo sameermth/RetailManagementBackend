@@ -5,12 +5,15 @@ import com.retailmanagement.common.exceptions.ResourceNotFoundException;
 import com.retailmanagement.modules.erp.audit.service.AuditEventWriter;
 import com.retailmanagement.modules.erp.common.ErpSecurityUtils;
 import com.retailmanagement.modules.erp.expense.repository.ExpenseRepository;
+import com.retailmanagement.modules.erp.expense.repository.ExpenseCategoryRepository;
 import com.retailmanagement.modules.erp.finance.dto.ErpFinanceDtos;
 import com.retailmanagement.modules.erp.finance.entity.Account;
 import com.retailmanagement.modules.erp.finance.entity.LedgerEntry;
 import com.retailmanagement.modules.erp.finance.entity.Voucher;
 import com.retailmanagement.modules.erp.finance.repository.AccountRepository;
+import com.retailmanagement.modules.erp.finance.repository.BankStatementEntryRepository;
 import com.retailmanagement.modules.erp.finance.repository.LedgerEntryRepository;
+import com.retailmanagement.modules.erp.finance.repository.RecurringJournalLineRepository;
 import com.retailmanagement.modules.erp.finance.repository.VoucherRepository;
 import com.retailmanagement.modules.erp.party.repository.CustomerRepository;
 import com.retailmanagement.modules.erp.party.repository.SupplierRepository;
@@ -48,9 +51,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class ErpFinanceService {
 
     private final AccountRepository accountRepository;
+    private final BankStatementEntryRepository bankStatementEntryRepository;
     private final VoucherRepository voucherRepository;
     private final LedgerEntryRepository ledgerEntryRepository;
+    private final RecurringJournalLineRepository recurringJournalLineRepository;
     private final ExpenseRepository expenseRepository;
+    private final ExpenseCategoryRepository expenseCategoryRepository;
     private final CustomerRepository customerRepository;
     private final SupplierRepository supplierRepository;
     private final SalesInvoiceRepository salesInvoiceRepository;
@@ -65,11 +71,21 @@ public class ErpFinanceService {
     private final AuditEventWriter auditEventWriter;
 
     @Transactional(readOnly = true)
-    public List<Account> listAccounts(Long organizationId, String accountType) {
+    public List<Account> listAccounts(Long organizationId, String accountType, boolean includeInactive) {
         if (accountType == null || accountType.isBlank()) {
-            return accountRepository.findByOrganizationIdAndIsActiveTrueOrderByCodeAsc(organizationId);
+            return includeInactive
+                    ? accountRepository.findByOrganizationIdOrderByCodeAsc(organizationId)
+                    : accountRepository.findByOrganizationIdAndIsActiveTrueOrderByCodeAsc(organizationId);
         }
-        return accountRepository.findByOrganizationIdAndAccountTypeAndIsActiveTrueOrderByCodeAsc(organizationId, accountType);
+        return includeInactive
+                ? accountRepository.findByOrganizationIdAndAccountTypeOrderByCodeAsc(organizationId, accountType)
+                : accountRepository.findByOrganizationIdAndAccountTypeAndIsActiveTrueOrderByCodeAsc(organizationId, accountType);
+    }
+
+    @Transactional(readOnly = true)
+    public Account getAccount(Long organizationId, Long id) {
+        return accountRepository.findByIdAndOrganizationId(id, organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Account not found: " + id));
     }
 
     public Account createAccount(ErpFinanceDtos.CreateAccountRequest request) {
@@ -115,6 +131,101 @@ public class ErpFinanceService {
         );
 
         return saved;
+    }
+
+    public Account updateAccount(Long id, ErpFinanceDtos.UpdateAccountRequest request) {
+        Long organizationId = request.organizationId() != null ? request.organizationId() : ErpSecurityUtils.currentOrganizationId().orElse(1L);
+        Account account = accountRepository.findByIdAndOrganizationId(id, organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Account not found: " + id));
+
+        if (Boolean.TRUE.equals(account.getIsSystem())) {
+            throw new BusinessException("System accounts cannot be modified");
+        }
+
+        String code = request.code().trim().toUpperCase();
+        String name = request.name().trim();
+        String accountType = request.accountType().trim().toUpperCase();
+        validateAccountType(accountType);
+
+        if (accountRepository.existsByOrganizationIdAndCodeAndIdNot(organizationId, code, id)) {
+            throw new BusinessException("Account code already exists for organization: " + code);
+        }
+
+        if (request.parentAccountId() != null) {
+            if (request.parentAccountId().equals(id)) {
+                throw new BusinessException("Account cannot be its own parent");
+            }
+            Account parent = accountRepository.findByIdAndOrganizationId(request.parentAccountId(), organizationId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Parent account not found: " + request.parentAccountId()));
+            if (Boolean.TRUE.equals(parent.getIsSystem()) && !parent.getAccountType().equals(accountType)) {
+                throw new BusinessException("Parent account type does not match the selected account type");
+            }
+        }
+
+        account.setCode(code);
+        account.setName(name);
+        account.setAccountType(accountType);
+        account.setParentAccountId(request.parentAccountId());
+        if (request.isActive() != null) {
+            account.setIsActive(request.isActive());
+        }
+
+        Account saved = accountRepository.save(account);
+        auditEventWriter.write(
+                organizationId,
+                null,
+                "FINANCE_ACCOUNT",
+                "account",
+                saved.getId(),
+                saved.getCode(),
+                "UPDATE",
+                null,
+                null,
+                null,
+                "Finance account updated",
+                "{\"code\":\"" + escape(saved.getCode()) + "\",\"name\":\"" + escape(saved.getName()) + "\",\"active\":" + saved.getIsActive() + "}"
+        );
+        return saved;
+    }
+
+    public void deleteAccount(Long organizationId, Long id) {
+        Account account = accountRepository.findByIdAndOrganizationId(id, organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Account not found: " + id));
+
+        if (Boolean.TRUE.equals(account.getIsSystem())) {
+            throw new BusinessException("System accounts cannot be deleted");
+        }
+        if (accountRepository.existsByOrganizationIdAndParentAccountId(organizationId, id)) {
+            throw new BusinessException("Account cannot be deleted while child accounts still reference it");
+        }
+        if (ledgerEntryRepository.existsByOrganizationIdAndAccountId(organizationId, id)) {
+            throw new BusinessException("Account cannot be deleted because ledger entries already reference it");
+        }
+        if (bankStatementEntryRepository.existsByOrganizationIdAndAccountId(organizationId, id)) {
+            throw new BusinessException("Account cannot be deleted because bank reconciliation entries already reference it");
+        }
+        if (expenseCategoryRepository.existsByOrganizationIdAndExpenseAccountId(organizationId, id)) {
+            throw new BusinessException("Account cannot be deleted because expense categories reference it");
+        }
+        if (recurringJournalLineRepository.existsByAccountId(id)) {
+            throw new BusinessException("Account cannot be deleted because recurring journals reference it");
+        }
+
+        accountRepository.delete(account);
+        auditEventWriter.write(
+                organizationId,
+                null,
+                "FINANCE_ACCOUNT",
+                "account",
+                account.getId(),
+                account.getCode(),
+                "DELETE",
+                null,
+                null,
+                null,
+                "Finance account deleted",
+                "{\"code\":\"" + escape(account.getCode()) + "\",\"name\":\"" + escape(account.getName()) + "\"}"
+        );
     }
 
     @Transactional(readOnly = true)
@@ -522,6 +633,12 @@ public class ErpFinanceService {
         return value == null ? "" : value
                 .replace("\\", "\\\\")
                 .replace("\"", "\\\"");
+    }
+
+    private void validateAccountType(String accountType) {
+        if (!List.of("ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE").contains(accountType)) {
+            throw new BusinessException("Unsupported account type: " + accountType);
+        }
     }
 
     private BigDecimal allocatedForSalesInvoice(Long organizationId, Long salesInvoiceId, LocalDate asOfDate) {

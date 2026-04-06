@@ -18,7 +18,9 @@ import com.retailmanagement.modules.auth.repository.UserRepository;
 import com.retailmanagement.modules.auth.repository.AccountRepository;
 import com.retailmanagement.modules.auth.service.EmployeeManagementService;
 import com.retailmanagement.modules.erp.common.security.ErpAccessGuard;
+import com.retailmanagement.modules.erp.foundation.entity.Organization;
 import com.retailmanagement.modules.erp.foundation.entity.Branch;
+import com.retailmanagement.modules.erp.foundation.repository.OrganizationRepository;
 import com.retailmanagement.modules.erp.foundation.repository.BranchRepository;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -38,6 +40,7 @@ public class EmployeeManagementServiceImpl implements EmployeeManagementService 
     private final AccountRepository accountRepository;
     private final RoleRepository roleRepository;
     private final BranchRepository branchRepository;
+    private final OrganizationRepository organizationRepository;
     private final UserBranchAccessRepository userBranchAccessRepository;
     private final OrganizationPersonProfileRepository organizationPersonProfileRepository;
     private final ErpAccessGuard accessGuard;
@@ -102,7 +105,7 @@ public class EmployeeManagementServiceImpl implements EmployeeManagementService 
         user.setAccount(account);
         user.setOrganizationPersonProfile(organizationPersonProfile);
         user.setRole(role);
-        user.setEmployeeCode(request.employeeCode() == null || request.employeeCode().isBlank() ? request.username().trim() : request.employeeCode().trim());
+        user.setEmployeeCode(resolveEmployeeCode(request.organizationId(), null, request.employeeCode()));
         user.setDefaultBranchId(request.defaultBranchId());
         user.setActive(Boolean.TRUE.equals(request.active()) || request.active() == null);
         User saved = userRepository.save(user);
@@ -132,7 +135,7 @@ public class EmployeeManagementServiceImpl implements EmployeeManagementService 
             user.setRole(resolveRole(request.roleCode()));
         }
         if (request.employeeCode() != null) {
-            user.setEmployeeCode(request.employeeCode().trim());
+            user.setEmployeeCode(resolveEmployeeCode(organizationId, userId, request.employeeCode()));
         }
         if (request.defaultBranchId() != null || request.branchIds() != null) {
             List<Long> branchIds = request.branchIds() == null
@@ -203,6 +206,43 @@ public class EmployeeManagementServiceImpl implements EmployeeManagementService 
             access.setIsDefault(defaultBranchId != null && defaultBranchId.equals(branchId));
             userBranchAccessRepository.save(access);
         }
+    }
+
+    private String resolveEmployeeCode(Long organizationId, Long userId, String requestedCode) {
+        String normalized = trimToNull(requestedCode);
+        if (normalized != null) {
+            String code = normalized.toUpperCase();
+            boolean exists = userId == null
+                    ? Boolean.TRUE.equals(userRepository.existsByOrganizationIdAndEmployeeCode(organizationId, code))
+                    : Boolean.TRUE.equals(userRepository.existsByOrganizationIdAndEmployeeCodeAndIdNot(organizationId, code, userId));
+            if (exists) {
+                throw new BusinessException("Employee code already exists: " + code);
+            }
+            return code;
+        }
+        if (userId != null) {
+            User existing = requireUser(organizationId, userId);
+            if (trimToNull(existing.getEmployeeCode()) != null) {
+                return existing.getEmployeeCode().trim().toUpperCase();
+            }
+        }
+        Organization organization = organizationRepository.findById(organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Organization not found: " + organizationId));
+        String orgCode = organization.getCode().trim().toUpperCase();
+        for (int sequence = 1; sequence < 100000; sequence++) {
+            String generated = "EMP-" + orgCode + "-" + String.format("%04d", sequence);
+            if (!Boolean.TRUE.equals(userRepository.existsByOrganizationIdAndEmployeeCode(organizationId, generated))) {
+                return generated;
+            }
+        }
+        throw new BusinessException("Unable to generate employee code for organization " + organizationId);
+    }
+
+    private String trimToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     private EmployeeManagementResponses.EmployeeResponse toResponse(User user) {

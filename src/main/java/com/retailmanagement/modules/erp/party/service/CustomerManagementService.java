@@ -2,6 +2,8 @@ package com.retailmanagement.modules.erp.party.service;
 
 import com.retailmanagement.common.exceptions.ResourceNotFoundException;
 import com.retailmanagement.modules.erp.common.security.ErpAccessGuard;
+import com.retailmanagement.modules.erp.foundation.entity.Organization;
+import com.retailmanagement.modules.erp.foundation.repository.OrganizationRepository;
 import com.retailmanagement.modules.erp.party.dto.CustomerDtos;
 import com.retailmanagement.modules.erp.party.entity.Customer;
 import com.retailmanagement.modules.erp.party.entity.StoreCustomerTerms;
@@ -22,6 +24,7 @@ public class CustomerManagementService {
     private final CustomerRepository customerRepository;
     private final StoreCustomerTermsRepository storeCustomerTermsRepository;
     private final ErpAccessGuard accessGuard;
+    private final OrganizationRepository organizationRepository;
 
     @Transactional(readOnly = true)
     public List<CustomerDtos.CustomerResponse> listCustomers(Long organizationId) {
@@ -118,7 +121,7 @@ public class CustomerManagementService {
     }
 
     private void applyCustomerRequest(Customer customer, CustomerDtos.UpsertCustomerRequest request) {
-        customer.setCustomerCode(request.customerCode().trim());
+        customer.setCustomerCode(resolveCustomerCode(customer, request.customerCode()));
         customer.setFullName(request.fullName().trim());
         customer.setCustomerType(normalizeCustomerType(request.customerType(), request.gstin()));
         customer.setLegalName(trimToNull(request.legalName()) == null ? request.fullName().trim() : request.legalName().trim());
@@ -138,6 +141,37 @@ public class CustomerManagementService {
         customer.setIsPlatformLinked(Boolean.TRUE.equals(request.isPlatformLinked()) || request.linkedOrganizationId() != null);
         customer.setNotes(trimToNull(request.notes()));
         customer.setStatus(trimToNull(request.status()) == null ? "ACTIVE" : request.status().trim().toUpperCase());
+    }
+
+    private String resolveCustomerCode(Customer customer, String requestedCode) {
+        String normalized = trimToNull(requestedCode);
+        if (normalized != null) {
+            String code = normalized.toUpperCase();
+            boolean exists = customer.getId() == null
+                    ? customerRepository.existsByOrganizationIdAndCustomerCode(customer.getOrganizationId(), code)
+                    : customerRepository.existsByOrganizationIdAndCustomerCodeAndIdNot(customer.getOrganizationId(), code, customer.getId());
+            if (exists) {
+                throw new com.retailmanagement.common.exceptions.BusinessException("Customer code already exists: " + code);
+            }
+            return code;
+        }
+        if (trimToNull(customer.getCustomerCode()) != null) {
+            return customer.getCustomerCode().trim().toUpperCase();
+        }
+        return generateCustomerCode(customer.getOrganizationId());
+    }
+
+    private String generateCustomerCode(Long organizationId) {
+        Organization organization = organizationRepository.findById(organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Organization not found: " + organizationId));
+        String orgCode = organization.getCode().trim().toUpperCase();
+        for (int sequence = 1; sequence < 100000; sequence++) {
+            String generated = "CUST-" + orgCode + "-" + String.format("%04d", sequence);
+            if (!customerRepository.existsByOrganizationIdAndCustomerCode(organizationId, generated)) {
+                return generated;
+            }
+        }
+        throw new com.retailmanagement.common.exceptions.BusinessException("Unable to generate customer code for organization " + organizationId);
     }
 
     private CustomerDtos.CustomerResponse toCustomerResponse(Customer customer) {

@@ -11,7 +11,7 @@ public final class SupplierDtos {
     private SupplierDtos() {}
 
     public record UpsertSupplierRequest(
-            @NotBlank String supplierCode,
+            String supplierCode,
             @NotBlank String name,
             String legalName,
             String tradeName,
@@ -130,6 +130,45 @@ public final class SupplierDtos {
             String remarks,
             LocalDateTime createdAt,
             LocalDateTime updatedAt
+    ) {}
+
+    public record StoreProductSupplierLinkResponse(
+            Long supplierId,
+            String supplierCode,
+            String supplierName,
+            Long supplierProductId,
+            String supplierProductCode,
+            String supplierProductName,
+            Integer priority,
+            Boolean supplierPreferred,
+            Boolean storeProductPreferred,
+            Boolean isActive
+    ) {}
+
+    public record StoreProductSuppliersResponse(
+            Long storeProductId,
+            Long productId,
+            Long preferredSupplierId,
+            Long preferredSupplierProductId,
+            List<StoreProductSupplierLinkResponse> supplierLinks
+    ) {}
+
+    public record UpsertStoreProductSupplierLinkRequest(
+            @NotNull Long supplierId,
+            Long supplierProductId,
+            String supplierProductCode,
+            String supplierProductName,
+            Integer priority,
+            Boolean isPreferred,
+            Boolean isActive
+    ) {}
+
+    public record UpsertStoreProductSuppliersRequest(
+            @NotNull @jakarta.validation.Valid List<UpsertStoreProductSupplierLinkRequest> supplierLinks,
+            Long preferredSupplierId,
+            Long preferredSupplierProductId,
+            Boolean preferredIsActive,
+            String preferredRemarks
     ) {}
 
     public record PurchasableStoreProductResponse(

@@ -2,6 +2,8 @@ package com.retailmanagement.modules.erp.sales.controller;
 
 import com.retailmanagement.modules.erp.common.ErpSecurityUtils;
 import com.retailmanagement.modules.erp.common.api.ErpApiResponse;
+import com.retailmanagement.modules.erp.document.dto.ErpDocumentDtos;
+import com.retailmanagement.modules.erp.document.service.ErpDocumentService;
 import com.retailmanagement.modules.erp.sales.dto.ErpSalesDtos;
 import com.retailmanagement.modules.erp.sales.dto.ErpSalesResponses;
 import com.retailmanagement.modules.erp.sales.entity.CustomerReceipt;
@@ -12,6 +14,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 public class ErpSalesController {
 
     private final ErpSalesService erpSalesService;
+    private final ErpDocumentService erpDocumentService;
 
     @GetMapping("/quotes")
     @Operation(summary = "List sales estimates and quotations")
@@ -38,6 +45,22 @@ public class ErpSalesController {
         return ErpApiResponse.ok(erpSalesService.getQuote(id));
     }
 
+    @GetMapping("/quotes/{id}/pdf")
+    @Operation(summary = "Download sales estimate or quotation PDF")
+    @PreAuthorize("hasAuthority('sales.view')")
+    public ResponseEntity<ByteArrayResource> downloadQuotePdf(@PathVariable Long id) {
+        ErpSalesResponses.SalesQuoteResponse quote = erpSalesService.getQuote(id);
+        return pdfResponse(erpDocumentService.generateSalesQuotePdf(id), quote.quoteNumber() + ".pdf");
+    }
+
+    @PostMapping("/quotes/{id}/send")
+    @Operation(summary = "Email sales estimate or quotation PDF")
+    @PreAuthorize("hasAuthority('sales.view')")
+    public ErpApiResponse<Void> sendQuotePdf(@PathVariable Long id, @RequestBody(required = false) ErpDocumentDtos.SendDocumentRequest request) {
+        erpDocumentService.sendSalesQuote(id, request);
+        return ErpApiResponse.ok(null, "Sales quote emailed");
+    }
+
     @PostMapping("/quotes")
     @Operation(summary = "Create sales estimate or quotation")
     @PreAuthorize("hasAuthority('sales.create')")
@@ -45,6 +68,14 @@ public class ErpSalesController {
         Long orgId = request.organizationId() != null ? request.organizationId() : ErpSecurityUtils.currentOrganizationId().orElse(1L);
         Long branchId = request.branchId() != null ? request.branchId() : ErpSecurityUtils.currentBranchId().orElse(1L);
         return ErpApiResponse.ok(erpSalesService.createQuote(orgId, branchId, request), "Sales quote created");
+    }
+
+    @PostMapping("/quotes/{id}/cancel")
+    @Operation(summary = "Cancel sales estimate or quotation")
+    @PreAuthorize("hasAuthority('sales.create')")
+    public ErpApiResponse<ErpSalesResponses.SalesQuoteResponse> cancelQuote(@PathVariable Long id,
+                                                                            @RequestBody @Valid ErpSalesDtos.CancelSalesDocumentRequest request) {
+        return ErpApiResponse.ok(erpSalesService.cancelQuote(id, request), "Sales quote cancelled");
     }
 
     @PostMapping("/quotes/{id}/convert-to-order")
@@ -82,6 +113,22 @@ public class ErpSalesController {
         return ErpApiResponse.ok(erpSalesService.getOrder(id));
     }
 
+    @GetMapping("/orders/{id}/pdf")
+    @Operation(summary = "Download sales order PDF")
+    @PreAuthorize("hasAuthority('sales.view')")
+    public ResponseEntity<ByteArrayResource> downloadOrderPdf(@PathVariable Long id) {
+        ErpSalesResponses.SalesOrderResponse order = erpSalesService.getOrder(id);
+        return pdfResponse(erpDocumentService.generateSalesOrderPdf(id), order.orderNumber() + ".pdf");
+    }
+
+    @PostMapping("/orders/{id}/send")
+    @Operation(summary = "Email sales order PDF")
+    @PreAuthorize("hasAuthority('sales.view')")
+    public ErpApiResponse<Void> sendOrderPdf(@PathVariable Long id, @RequestBody(required = false) ErpDocumentDtos.SendDocumentRequest request) {
+        erpDocumentService.sendSalesOrder(id, request);
+        return ErpApiResponse.ok(null, "Sales order emailed");
+    }
+
     @PostMapping("/orders")
     @Operation(summary = "Create sales order")
     @PreAuthorize("hasAuthority('sales.create')")
@@ -89,6 +136,14 @@ public class ErpSalesController {
         Long orgId = request.organizationId() != null ? request.organizationId() : ErpSecurityUtils.currentOrganizationId().orElse(1L);
         Long branchId = request.branchId() != null ? request.branchId() : ErpSecurityUtils.currentBranchId().orElse(1L);
         return ErpApiResponse.ok(erpSalesService.createOrder(orgId, branchId, request), "Sales order created");
+    }
+
+    @PostMapping("/orders/{id}/cancel")
+    @Operation(summary = "Cancel sales order")
+    @PreAuthorize("hasAuthority('sales.create')")
+    public ErpApiResponse<ErpSalesResponses.SalesOrderResponse> cancelOrder(@PathVariable Long id,
+                                                                            @RequestBody @Valid ErpSalesDtos.CancelSalesDocumentRequest request) {
+        return ErpApiResponse.ok(erpSalesService.cancelOrder(id, request), "Sales order cancelled");
     }
 
     @PostMapping("/orders/{id}/convert-to-invoice")
@@ -116,6 +171,22 @@ public class ErpSalesController {
         return ErpApiResponse.ok(erpSalesService.getInvoice(id));
     }
 
+    @GetMapping("/invoices/{id}/pdf")
+    @Operation(summary = "Download sales invoice PDF")
+    @PreAuthorize("hasAuthority('sales.view')")
+    public ResponseEntity<ByteArrayResource> downloadInvoicePdf(@PathVariable Long id) {
+        ErpSalesResponses.SalesInvoiceResponse invoice = erpSalesService.getInvoice(id);
+        return pdfResponse(erpDocumentService.generateSalesInvoicePdf(id), invoice.invoiceNumber() + ".pdf");
+    }
+
+    @PostMapping("/invoices/{id}/send")
+    @Operation(summary = "Email sales invoice PDF")
+    @PreAuthorize("hasAuthority('sales.view')")
+    public ErpApiResponse<Void> sendInvoicePdf(@PathVariable Long id, @RequestBody(required = false) ErpDocumentDtos.SendDocumentRequest request) {
+        erpDocumentService.sendSalesInvoice(id, request);
+        return ErpApiResponse.ok(null, "Sales invoice emailed");
+    }
+
     @PostMapping("/invoices")
     @Operation(summary = "Create sales invoice")
     @PreAuthorize("hasAnyAuthority('sales.create','sales.post')")
@@ -131,6 +202,22 @@ public class ErpSalesController {
     public ErpApiResponse<List<ErpSalesResponses.CustomerReceiptResponse>> listReceipts(@RequestParam(required = false) Long organizationId) {
         Long orgId = organizationId != null ? organizationId : ErpSecurityUtils.currentOrganizationId().orElse(1L);
         return ErpApiResponse.ok(erpSalesService.listReceipts(orgId).stream().map(this::toCustomerReceiptResponse).toList());
+    }
+
+    @GetMapping("/receipts/{id}/pdf")
+    @Operation(summary = "Download customer receipt PDF")
+    @PreAuthorize("hasAnyAuthority('sales.view','payment.receive')")
+    public ResponseEntity<ByteArrayResource> downloadReceiptPdf(@PathVariable Long id) {
+        CustomerReceipt receipt = erpSalesService.getReceipt(id);
+        return pdfResponse(erpDocumentService.generateCustomerReceiptPdf(id), receipt.getReceiptNumber() + ".pdf");
+    }
+
+    @PostMapping("/receipts/{id}/send")
+    @Operation(summary = "Email customer receipt PDF")
+    @PreAuthorize("hasAnyAuthority('sales.view','payment.receive')")
+    public ErpApiResponse<Void> sendReceiptPdf(@PathVariable Long id, @RequestBody(required = false) ErpDocumentDtos.SendDocumentRequest request) {
+        erpDocumentService.sendCustomerReceipt(id, request);
+        return ErpApiResponse.ok(null, "Customer receipt emailed");
     }
 
     @PostMapping("/receipts")
@@ -195,5 +282,13 @@ public class ErpSalesController {
         return new ErpSalesResponses.CustomerReceiptResponse(receipt.getId(), receipt.getOrganizationId(), receipt.getBranchId(),
                 receipt.getCustomerId(), receipt.getReceiptNumber(), receipt.getReceiptDate(), receipt.getPaymentMethod(),
                 receipt.getReferenceNumber(), receipt.getAmount(), receipt.getStatus(), receipt.getRemarks());
+    }
+
+    private ResponseEntity<ByteArrayResource> pdfResponse(byte[] pdf, String fileName) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .contentLength(pdf.length)
+                .body(new ByteArrayResource(pdf));
     }
 }

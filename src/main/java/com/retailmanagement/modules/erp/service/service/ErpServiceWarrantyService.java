@@ -32,13 +32,19 @@ import com.retailmanagement.modules.erp.service.dto.ErpServiceDtos;
 import com.retailmanagement.modules.erp.service.entity.ServiceTicket;
 import com.retailmanagement.modules.erp.service.entity.ServiceTicketItem;
 import com.retailmanagement.modules.erp.service.entity.ServiceReplacement;
+import com.retailmanagement.modules.erp.service.entity.ServiceAgreement;
+import com.retailmanagement.modules.erp.service.entity.ServiceAgreementItem;
 import com.retailmanagement.modules.erp.service.entity.ServiceVisit;
 import com.retailmanagement.modules.erp.service.entity.WarrantyClaim;
+import com.retailmanagement.modules.erp.service.entity.WarrantyExtension;
+import com.retailmanagement.modules.erp.service.repository.ServiceAgreementItemRepository;
+import com.retailmanagement.modules.erp.service.repository.ServiceAgreementRepository;
 import com.retailmanagement.modules.erp.service.repository.ServiceReplacementRepository;
 import com.retailmanagement.modules.erp.service.repository.ServiceTicketItemRepository;
 import com.retailmanagement.modules.erp.service.repository.ServiceTicketRepository;
 import com.retailmanagement.modules.erp.service.repository.ServiceVisitRepository;
 import com.retailmanagement.modules.erp.service.repository.WarrantyClaimRepository;
+import com.retailmanagement.modules.erp.service.repository.WarrantyExtensionRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -56,8 +62,11 @@ public class ErpServiceWarrantyService {
     private final ServiceTicketRepository serviceTicketRepository;
     private final ServiceTicketItemRepository serviceTicketItemRepository;
     private final ServiceVisitRepository serviceVisitRepository;
+    private final ServiceAgreementRepository serviceAgreementRepository;
+    private final ServiceAgreementItemRepository serviceAgreementItemRepository;
     private final ServiceReplacementRepository serviceReplacementRepository;
     private final WarrantyClaimRepository warrantyClaimRepository;
+    private final WarrantyExtensionRepository warrantyExtensionRepository;
     private final CustomerRepository customerRepository;
     private final StoreProductRepository productRepository;
     private final UomRepository uomRepository;
@@ -507,9 +516,296 @@ public class ErpServiceWarrantyService {
     }
 
     @Transactional(readOnly = true)
+    public List<ServiceAgreement> listAgreements(Long organizationId) {
+        return serviceAgreementRepository.findTop100ByOrganizationIdOrderByServiceStartDateDescIdDesc(organizationId);
+    }
+
+    @Transactional(readOnly = true)
+    public ServiceAgreementDetails getAgreement(Long organizationId, Long id) {
+        ServiceAgreement agreement = serviceAgreementRepository.findByOrganizationIdAndId(organizationId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Service agreement not found: " + id));
+        List<ServiceAgreementItem> items = serviceAgreementItemRepository.findByServiceAgreementIdOrderByIdAsc(id);
+        return new ServiceAgreementDetails(agreement, items);
+    }
+
+    public ServiceAgreement createAgreement(Long organizationId, Long branchId, ErpServiceDtos.CreateServiceAgreementRequest request) {
+        Customer customer = customerRepository.findByIdAndOrganizationId(request.customerId(), organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found: " + request.customerId()));
+        SalesInvoice invoice = salesInvoiceRepository.findByOrganizationIdAndId(organizationId, request.salesInvoiceId())
+                .orElseThrow(() -> new ResourceNotFoundException("Sales invoice not found: " + request.salesInvoiceId()));
+        if (!customer.getId().equals(invoice.getCustomerId())) {
+            throw new BusinessException("Sales invoice does not belong to the selected customer");
+        }
+        if (request.serviceEndDate().isBefore(request.serviceStartDate())) {
+            throw new BusinessException("Service agreement end date cannot be before start date");
+        }
+
+        ServiceAgreement agreement = new ServiceAgreement();
+        agreement.setOrganizationId(organizationId);
+        agreement.setBranchId(branchId);
+        agreement.setCustomerId(customer.getId());
+        agreement.setSalesInvoiceId(invoice.getId());
+        agreement.setAgreementNumber("SAG-" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE) + "-" + System.currentTimeMillis());
+        agreement.setAgreementType(normalizeAgreementType(request.agreementType()));
+        agreement.setStatus(normalizeAgreementStatus(request.status()));
+        agreement.setServiceStartDate(request.serviceStartDate());
+        agreement.setServiceEndDate(request.serviceEndDate());
+        agreement.setLaborIncluded(Boolean.TRUE.equals(request.laborIncluded()));
+        agreement.setPartsIncluded(Boolean.TRUE.equals(request.partsIncluded()));
+        agreement.setPreventiveVisitsIncluded(request.preventiveVisitsIncluded());
+        agreement.setVisitLimit(request.visitLimit());
+        agreement.setSlaHours(request.slaHours());
+        agreement.setAgreementAmount(request.agreementAmount());
+        agreement.setNotes(trimToNull(request.notes()));
+        agreement = serviceAgreementRepository.save(agreement);
+
+        for (ErpServiceDtos.CreateServiceAgreementItemRequest itemRequest : request.items()) {
+            StoreProduct product = productRepository.findById(itemRequest.productId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + itemRequest.productId()));
+            if (!organizationId.equals(product.getOrganizationId())) {
+                throw new BusinessException("Product does not belong to organization " + organizationId);
+            }
+
+            ProductOwnership ownership = null;
+            if (itemRequest.productOwnershipId() != null) {
+                ownership = productOwnershipRepository.findByIdAndOrganizationId(itemRequest.productOwnershipId(), organizationId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Product ownership not found: " + itemRequest.productOwnershipId()));
+                if (!customer.getId().equals(ownership.getCustomerId())) {
+                    throw new BusinessException("Product ownership does not belong to the selected customer");
+                }
+                if (!product.getId().equals(ownership.getProductId())) {
+                    throw new BusinessException("Product ownership does not belong to the selected product");
+                }
+                if (!invoice.getId().equals(ownership.getSalesInvoiceId())) {
+                    throw new BusinessException("Product ownership does not belong to the selected sales invoice");
+                }
+            }
+
+            SalesInvoiceLine invoiceLine = null;
+            Long invoiceLineId = itemRequest.salesInvoiceLineId();
+            if (invoiceLineId == null && ownership != null) {
+                invoiceLineId = ownership.getSalesInvoiceLineId();
+            }
+            if (invoiceLineId != null) {
+                final Long resolvedInvoiceLineId = invoiceLineId;
+                invoiceLine = salesInvoiceLineRepository.findById(invoiceLineId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Sales invoice line not found: " + resolvedInvoiceLineId));
+                if (!invoice.getId().equals(invoiceLine.getSalesInvoiceId())) {
+                    throw new BusinessException("Sales invoice line does not belong to the selected invoice");
+                }
+                if (!product.getId().equals(invoiceLine.getProductId())) {
+                    throw new BusinessException("Sales invoice line does not belong to the selected product");
+                }
+            }
+
+            Long serialNumberId = itemRequest.serialNumberId();
+            if (serialNumberId == null && ownership != null) {
+                serialNumberId = ownership.getSerialNumberId();
+            }
+            if (serialNumberId != null) {
+                final Long resolvedSerialNumberId = serialNumberId;
+                SerialNumber serial = serialNumberRepository.findById(serialNumberId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Serial number not found: " + resolvedSerialNumberId));
+                if (!organizationId.equals(serial.getOrganizationId()) || !product.getId().equals(serial.getProductId())) {
+                    throw new BusinessException("Serial number does not belong to the selected product");
+                }
+            }
+
+            ServiceAgreementItem item = new ServiceAgreementItem();
+            item.setServiceAgreementId(agreement.getId());
+            item.setProductId(product.getId());
+            item.setProductOwnershipId(ownership == null ? itemRequest.productOwnershipId() : ownership.getId());
+            item.setSalesInvoiceLineId(invoiceLine == null ? invoiceLineId : invoiceLine.getId());
+            item.setSerialNumberId(serialNumberId);
+            item.setCoverageScope(normalizeCoverageScope(itemRequest.coverageScope()));
+            item.setIncludedServiceNotes(trimToNull(itemRequest.includedServiceNotes()));
+            serviceAgreementItemRepository.save(item);
+        }
+
+        auditEventWriter.write(
+                organizationId,
+                branchId,
+                "SERVICE_AGREEMENT_CREATED",
+                "service_agreement",
+                agreement.getId(),
+                agreement.getAgreementNumber(),
+                "CREATE",
+                invoice.getWarehouseId(),
+                customer.getId(),
+                null,
+                "Service agreement created",
+                ErpJsonPayloads.of("salesInvoiceId", invoice.getId(), "agreementType", agreement.getAgreementType())
+        );
+
+        return agreement;
+    }
+
+    @Transactional(readOnly = true)
     public ServiceReplacement getReplacement(Long organizationId, Long id) {
         return serviceReplacementRepository.findByOrganizationIdAndId(organizationId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Service replacement not found: " + id));
+    }
+
+    @Transactional(readOnly = true)
+    public ErpServiceDtos.OwnershipWarrantySummaryResponse getOwnershipWarrantySummary(Long organizationId, Long ownershipId) {
+        ProductOwnership ownership = productOwnershipRepository.findByIdAndOrganizationId(ownershipId, organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product ownership not found: " + ownershipId));
+        List<WarrantyExtension> extensions = warrantyExtensionRepository.findByOrganizationIdAndProductOwnershipIdOrderByIdAsc(organizationId, ownershipId);
+        return new ErpServiceDtos.OwnershipWarrantySummaryResponse(
+                ownership.getId(),
+                ownership.getSerialNumberId(),
+                ownership.getSalesInvoiceId(),
+                ownership.getSalesInvoiceLineId(),
+                ownership.getWarrantyStartDate(),
+                ownership.getWarrantyEndDate(),
+                computeEffectiveWarrantyEndDate(ownership, extensions),
+                !extensions.isEmpty(),
+                extensions.stream().map(this::toWarrantyExtensionResponse).toList()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<ErpServiceDtos.WarrantyExtensionResponse> listWarrantyExtensions(Long organizationId, Long ownershipId) {
+        productOwnershipRepository.findByIdAndOrganizationId(ownershipId, organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product ownership not found: " + ownershipId));
+        return warrantyExtensionRepository.findByOrganizationIdAndProductOwnershipIdOrderByIdAsc(organizationId, ownershipId)
+                .stream()
+                .map(this::toWarrantyExtensionResponse)
+                .toList();
+    }
+
+    public ErpServiceDtos.WarrantyExtensionResponse createWarrantyExtension(Long organizationId, Long branchId, Long ownershipId,
+                                                                            ErpServiceDtos.CreateWarrantyExtensionRequest request) {
+        ProductOwnership ownership = productOwnershipRepository.findByIdAndOrganizationId(ownershipId, organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product ownership not found: " + ownershipId));
+        List<WarrantyExtension> existingExtensions = warrantyExtensionRepository.findByOrganizationIdAndProductOwnershipIdOrderByIdAsc(organizationId, ownershipId);
+        LocalDate effectiveEnd = computeEffectiveWarrantyEndDate(ownership, existingExtensions);
+        LocalDate startDate = request.startDate() != null
+                ? request.startDate()
+                : (effectiveEnd != null ? effectiveEnd.plusDays(1) : LocalDate.now());
+        LocalDate endDate = request.endDate() != null
+                ? request.endDate()
+                : (effectiveEnd != null ? effectiveEnd.plusMonths(request.monthsAdded()) : startDate.plusMonths(request.monthsAdded()));
+        if (endDate.isBefore(startDate)) {
+            throw new BusinessException("Warranty extension end date cannot be before start date");
+        }
+
+        WarrantyExtension extension = new WarrantyExtension();
+        extension.setOrganizationId(organizationId);
+        extension.setProductOwnershipId(ownership.getId());
+        extension.setSerialNumberId(ownership.getSerialNumberId());
+        extension.setSalesInvoiceId(ownership.getSalesInvoiceId());
+        extension.setSalesInvoiceLineId(ownership.getSalesInvoiceLineId());
+        extension.setExtensionType(normalizeExtensionType(request.extensionType()));
+        extension.setMonthsAdded(request.monthsAdded());
+        extension.setStartDate(startDate);
+        extension.setEndDate(endDate);
+        extension.setStatus("ACTIVE");
+        extension.setReason(trimToNull(request.reason()));
+        extension.setReferenceNumber(trimToNull(request.referenceNumber()));
+        extension.setAmount(request.amount());
+        extension.setRemarks(trimToNull(request.remarks()));
+        extension = warrantyExtensionRepository.save(extension);
+
+        auditEventWriter.write(
+                organizationId,
+                branchId,
+                "WARRANTY_EXTENSION_CREATED",
+                "warranty_extension",
+                extension.getId(),
+                extension.getReferenceNumber(),
+                "CREATE",
+                null,
+                ownership.getCustomerId(),
+                null,
+                "Warranty extension created",
+                ErpJsonPayloads.of(
+                        "productOwnershipId", ownershipId,
+                        "extensionType", extension.getExtensionType(),
+                        "monthsAdded", extension.getMonthsAdded(),
+                        "endDate", extension.getEndDate()
+                )
+        );
+
+        return toWarrantyExtensionResponse(extension);
+    }
+
+    @Transactional(readOnly = true)
+    public ErpServiceDtos.ServiceAgreementSummaryResponse resolveServiceAgreementSummary(Long organizationId,
+                                                                                        Long productOwnershipId,
+                                                                                        Long salesInvoiceId,
+                                                                                        Long salesInvoiceLineId) {
+        ServiceAgreementItem item = null;
+        if (productOwnershipId != null) {
+            List<ServiceAgreementItem> items = serviceAgreementItemRepository
+                    .findByOrganizationIdAndProductOwnershipIdOrderByAgreementPriority(organizationId, productOwnershipId);
+            if (!items.isEmpty()) {
+                item = items.getFirst();
+            }
+        }
+        if (item == null && salesInvoiceId != null) {
+            List<ServiceAgreementItem> items = serviceAgreementItemRepository
+                    .findByOrganizationIdAndInvoiceScopeOrderByAgreementPriority(organizationId, salesInvoiceId, salesInvoiceLineId);
+            if (!items.isEmpty()) {
+                item = items.getFirst();
+            }
+        }
+        if (item == null) {
+            return null;
+        }
+        ServiceAgreement agreement = serviceAgreementRepository.findByOrganizationIdAndId(organizationId, item.getServiceAgreementId())
+                .orElse(null);
+        if (agreement == null) {
+            return null;
+        }
+        LocalDate today = LocalDate.now();
+        boolean coverageActive = "ACTIVE".equals(agreement.getStatus())
+                && (agreement.getServiceStartDate() == null || !today.isBefore(agreement.getServiceStartDate()))
+                && (agreement.getServiceEndDate() == null || !today.isAfter(agreement.getServiceEndDate()));
+        return new ErpServiceDtos.ServiceAgreementSummaryResponse(
+                agreement.getId(),
+                agreement.getAgreementNumber(),
+                agreement.getAgreementType(),
+                agreement.getStatus(),
+                agreement.getServiceStartDate(),
+                agreement.getServiceEndDate(),
+                coverageActive,
+                agreement.getLaborIncluded(),
+                agreement.getPartsIncluded(),
+                agreement.getPreventiveVisitsIncluded(),
+                agreement.getVisitLimit(),
+                agreement.getSlaHours(),
+                item.getCoverageScope()
+        );
+    }
+
+    public ErpServiceDtos.WarrantyExtensionResponse cancelWarrantyExtension(Long organizationId, Long branchId, Long extensionId,
+                                                                            ErpServiceDtos.CancelWarrantyExtensionRequest request) {
+        WarrantyExtension extension = warrantyExtensionRepository.findByIdAndOrganizationId(extensionId, organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Warranty extension not found: " + extensionId));
+        extension.setStatus("CANCELLED");
+        if (trimToNull(request.remarks()) != null) {
+            String currentRemarks = trimToNull(extension.getRemarks());
+            extension.setRemarks(currentRemarks == null ? request.remarks().trim() : currentRemarks + " | Cancelled: " + request.remarks().trim());
+        }
+        extension = warrantyExtensionRepository.save(extension);
+
+        auditEventWriter.write(
+                organizationId,
+                branchId,
+                "WARRANTY_EXTENSION_CANCELLED",
+                "warranty_extension",
+                extension.getId(),
+                extension.getReferenceNumber(),
+                "CANCEL",
+                null,
+                null,
+                null,
+                "Warranty extension cancelled",
+                ErpJsonPayloads.of("productOwnershipId", extension.getProductOwnershipId())
+        );
+
+        return toWarrantyExtensionResponse(extension);
     }
 
     public ServiceReplacement createReplacement(Long organizationId, Long branchId, ErpServiceDtos.CreateServiceReplacementRequest request) {
@@ -732,6 +1028,8 @@ public class ErpServiceWarrantyService {
 
     public record ServiceTicketDetails(ServiceTicket ticket, List<ServiceTicketItem> items, List<ServiceVisit> visits) {}
 
+    public record ServiceAgreementDetails(ServiceAgreement agreement, List<ServiceAgreementItem> items) {}
+
     private String normalizeSourceType(String sourceType) {
         return switch (sourceType.toUpperCase()) {
             case "INVOICE", "WALK_IN", "AMC", "REPLACEMENT", "SALES_RETURN", "OTHER" -> sourceType.toUpperCase();
@@ -771,6 +1069,40 @@ public class ErpServiceWarrantyService {
         return switch (status.toUpperCase()) {
             case "OPEN", "SUBMITTED", "APPROVED", "REJECTED", "SETTLED", "CLOSED" -> status.toUpperCase();
             default -> throw new BusinessException("Invalid warranty claim status: " + status);
+        };
+    }
+
+    private String normalizeExtensionType(String type) {
+        return switch (type.toUpperCase()) {
+            case "MANUFACTURER_PROMO", "PAID_EXTENDED", "GOODWILL", "MANUAL_CORRECTION" -> type.toUpperCase();
+            default -> throw new BusinessException("Invalid warranty extension type: " + type);
+        };
+    }
+
+    private String normalizeAgreementType(String type) {
+        return switch (type.toUpperCase()) {
+            case "AMC", "INSTALLATION_SUPPORT", "SERVICE_CONTRACT", "PREVENTIVE_MAINTENANCE" -> type.toUpperCase();
+            default -> throw new BusinessException("Invalid service agreement type: " + type);
+        };
+    }
+
+    private String normalizeAgreementStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return "ACTIVE";
+        }
+        return switch (status.toUpperCase()) {
+            case "DRAFT", "ACTIVE", "EXPIRED", "CANCELLED" -> status.toUpperCase();
+            default -> throw new BusinessException("Invalid service agreement status: " + status);
+        };
+    }
+
+    private String normalizeCoverageScope(String coverageScope) {
+        if (coverageScope == null || coverageScope.isBlank()) {
+            return "FULL";
+        }
+        return switch (coverageScope.toUpperCase()) {
+            case "FULL", "LABOR_ONLY", "PARTS_ONLY", "VISIT_ONLY" -> coverageScope.toUpperCase();
+            default -> throw new BusinessException("Invalid service agreement coverage scope: " + coverageScope);
         };
     }
 
@@ -820,6 +1152,85 @@ public class ErpServiceWarrantyService {
 
     private String claimPayload(WarrantyClaim claim) {
         return ErpJsonPayloads.of("claimNumber", claim.getClaimNumber(), "status", claim.getStatus(), "claimType", claim.getClaimType());
+    }
+
+    private LocalDate computeEffectiveWarrantyEndDate(ProductOwnership ownership, List<WarrantyExtension> extensions) {
+        LocalDate effectiveEnd = ownership.getWarrantyEndDate();
+        for (WarrantyExtension extension : extensions) {
+            if (!"ACTIVE".equals(extension.getStatus())) {
+                continue;
+            }
+            if (extension.getEndDate() != null) {
+                effectiveEnd = effectiveEnd == null || extension.getEndDate().isAfter(effectiveEnd)
+                        ? extension.getEndDate()
+                        : effectiveEnd;
+            } else if (effectiveEnd != null && extension.getMonthsAdded() != null) {
+                effectiveEnd = effectiveEnd.plusMonths(extension.getMonthsAdded());
+            }
+        }
+        return effectiveEnd;
+    }
+
+    private ErpServiceDtos.WarrantyExtensionResponse toWarrantyExtensionResponse(WarrantyExtension extension) {
+        return new ErpServiceDtos.WarrantyExtensionResponse(
+                extension.getId(),
+                extension.getOrganizationId(),
+                extension.getProductOwnershipId(),
+                extension.getSerialNumberId(),
+                extension.getSalesInvoiceId(),
+                extension.getSalesInvoiceLineId(),
+                extension.getExtensionType(),
+                extension.getMonthsAdded(),
+                extension.getStartDate(),
+                extension.getEndDate(),
+                extension.getStatus(),
+                extension.getReason(),
+                extension.getReferenceNumber(),
+                extension.getAmount(),
+                extension.getRemarks(),
+                extension.getCreatedAt(),
+                extension.getUpdatedAt()
+        );
+    }
+
+    public ErpServiceDtos.ServiceAgreementResponse toServiceAgreementResponse(ServiceAgreement agreement, List<ServiceAgreementItem> items) {
+        return new ErpServiceDtos.ServiceAgreementResponse(
+                agreement.getId(),
+                agreement.getOrganizationId(),
+                agreement.getBranchId(),
+                agreement.getCustomerId(),
+                agreement.getSalesInvoiceId(),
+                agreement.getAgreementNumber(),
+                agreement.getAgreementType(),
+                agreement.getStatus(),
+                agreement.getServiceStartDate(),
+                agreement.getServiceEndDate(),
+                agreement.getLaborIncluded(),
+                agreement.getPartsIncluded(),
+                agreement.getPreventiveVisitsIncluded(),
+                agreement.getVisitLimit(),
+                agreement.getSlaHours(),
+                agreement.getAgreementAmount(),
+                agreement.getNotes(),
+                items.stream().map(this::toServiceAgreementItemResponse).toList(),
+                agreement.getCreatedAt(),
+                agreement.getUpdatedAt()
+        );
+    }
+
+    private ErpServiceDtos.ServiceAgreementItemResponse toServiceAgreementItemResponse(ServiceAgreementItem item) {
+        return new ErpServiceDtos.ServiceAgreementItemResponse(
+                item.getId(),
+                item.getServiceAgreementId(),
+                item.getProductId(),
+                item.getProductOwnershipId(),
+                item.getSalesInvoiceLineId(),
+                item.getSerialNumberId(),
+                item.getCoverageScope(),
+                item.getIncludedServiceNotes(),
+                item.getCreatedAt(),
+                item.getUpdatedAt()
+        );
     }
 
     private String escape(String value) {

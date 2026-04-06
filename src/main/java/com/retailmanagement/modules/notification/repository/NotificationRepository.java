@@ -58,4 +58,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     void markAllAsReadByUser(@Param("userId") Long userId, @Param("now") LocalDateTime now);
 
     boolean existsByNotificationId(String notificationId);
+
+    List<Notification> findTop200ByOrderByCreatedAtDescIdDesc();
 }

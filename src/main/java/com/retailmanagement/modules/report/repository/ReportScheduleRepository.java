@@ -1,7 +1,6 @@
 package com.retailmanagement.modules.report.repository;
 
 import com.retailmanagement.modules.report.model.ReportSchedule;
-import com.retailmanagement.modules.report.enums.ReportType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,7 +15,8 @@ public interface ReportScheduleRepository extends JpaRepository<ReportSchedule, 
 
     Optional<ReportSchedule> findByScheduleId(String scheduleId);
 
-    List<ReportSchedule> findByReportType(ReportType reportType);
+    @Query("SELECT rs FROM ReportSchedule rs WHERE UPPER(rs.reportTypeCode) = UPPER(:reportTypeCode)")
+    List<ReportSchedule> findByReportTypeCode(@Param("reportTypeCode") String reportTypeCode);
 
     List<ReportSchedule> findByIsActiveTrue();
 

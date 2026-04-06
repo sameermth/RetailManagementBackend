@@ -5,6 +5,8 @@ import com.retailmanagement.common.exceptions.ResourceNotFoundException;
 import com.retailmanagement.modules.erp.catalog.entity.StoreProduct;
 import com.retailmanagement.modules.erp.catalog.repository.StoreProductRepository;
 import com.retailmanagement.modules.erp.common.security.ErpAccessGuard;
+import com.retailmanagement.modules.erp.foundation.entity.Organization;
+import com.retailmanagement.modules.erp.foundation.repository.OrganizationRepository;
 import com.retailmanagement.modules.erp.party.dto.SupplierDtos;
 import com.retailmanagement.modules.erp.party.entity.StoreProductSupplierPreference;
 import com.retailmanagement.modules.erp.party.entity.StoreSupplierTerms;
@@ -35,6 +37,7 @@ public class SupplierManagementService {
     private final StoreProductSupplierPreferenceRepository storeProductSupplierPreferenceRepository;
     private final StoreProductRepository storeProductRepository;
     private final ErpAccessGuard accessGuard;
+    private final OrganizationRepository organizationRepository;
 
     @Transactional(readOnly = true)
     public List<SupplierDtos.SupplierResponse> listSuppliers(Long organizationId) {
@@ -219,8 +222,108 @@ public class SupplierManagementService {
         return toStoreProductSupplierPreferenceResponse(storeProductSupplierPreferenceRepository.save(preference));
     }
 
+    @Transactional(readOnly = true)
+    public SupplierDtos.StoreProductSuppliersResponse getStoreProductSuppliers(Long organizationId, Long storeProductId) {
+        accessGuard.assertOrganizationAccess(organizationId);
+        StoreProduct storeProduct = storeProductRepository.findById(storeProductId)
+                .orElseThrow(() -> new ResourceNotFoundException("Store product not found: " + storeProductId));
+        if (!organizationId.equals(storeProduct.getOrganizationId())) {
+            throw new BusinessException("Store product does not belong to organization " + organizationId + ": " + storeProductId);
+        }
+
+        List<SupplierProduct> supplierProducts = supplierProductRepository
+                .findByOrganizationIdAndProductIdAndIsActiveTrueOrderByIsPreferredDescPriorityAscIdAsc(organizationId, storeProduct.getProductId());
+        Map<Long, Supplier> suppliersById = supplierRepository.findByOrganizationId(organizationId).stream()
+                .collect(Collectors.toMap(Supplier::getId, Function.identity(), (left, right) -> left));
+        StoreProductSupplierPreference preference = storeProductSupplierPreferenceRepository
+                .findByOrganizationIdAndStoreProductIdAndIsActiveTrue(organizationId, storeProductId)
+                .orElse(null);
+
+        List<SupplierDtos.StoreProductSupplierLinkResponse> links = supplierProducts.stream()
+                .map(supplierProduct -> {
+                    Supplier supplier = suppliersById.get(supplierProduct.getSupplierId());
+                    return new SupplierDtos.StoreProductSupplierLinkResponse(
+                            supplierProduct.getSupplierId(),
+                            supplier != null ? supplier.getSupplierCode() : null,
+                            supplier != null ? supplier.getName() : null,
+                            supplierProduct.getId(),
+                            supplierProduct.getSupplierProductCode(),
+                            supplierProduct.getSupplierProductName(),
+                            supplierProduct.getPriority(),
+                            supplierProduct.getIsPreferred(),
+                            preference != null && supplierProduct.getId().equals(preference.getSupplierProductId()),
+                            supplierProduct.getIsActive()
+                    );
+                })
+                .toList();
+
+        return new SupplierDtos.StoreProductSuppliersResponse(
+                storeProductId,
+                storeProduct.getProductId(),
+                preference != null ? preference.getSupplierId() : null,
+                preference != null ? preference.getSupplierProductId() : null,
+                links
+        );
+    }
+
+    public SupplierDtos.StoreProductSuppliersResponse upsertStoreProductSuppliers(
+            Long organizationId,
+            Long storeProductId,
+            SupplierDtos.UpsertStoreProductSuppliersRequest request
+    ) {
+        accessGuard.assertOrganizationAccess(organizationId);
+        StoreProduct storeProduct = storeProductRepository.findById(storeProductId)
+                .orElseThrow(() -> new ResourceNotFoundException("Store product not found: " + storeProductId));
+        if (!organizationId.equals(storeProduct.getOrganizationId())) {
+            throw new BusinessException("Store product does not belong to organization " + organizationId + ": " + storeProductId);
+        }
+        if (request.supplierLinks() == null || request.supplierLinks().isEmpty()) {
+            throw new BusinessException("At least one supplier link is required");
+        }
+
+        List<SupplierProduct> savedSupplierProducts = new java.util.ArrayList<>();
+        for (SupplierDtos.UpsertStoreProductSupplierLinkRequest link : request.supplierLinks()) {
+            Supplier supplier = supplierRepository.findByIdAndOrganizationId(link.supplierId(), organizationId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Supplier not found: " + link.supplierId()));
+            SupplierProduct supplierProduct = resolveSupplierProductForStoreProduct(organizationId, storeProduct, supplier, link);
+            supplierProduct.setOrganizationId(organizationId);
+            supplierProduct.setSupplierId(supplier.getId());
+            supplierProduct.setProductId(storeProduct.getProductId());
+            supplierProduct.setSupplierProductCode(trimToNull(link.supplierProductCode()));
+            supplierProduct.setSupplierProductName(trimToNull(link.supplierProductName()));
+            supplierProduct.setPriority(link.priority() == null ? 1 : link.priority());
+            supplierProduct.setIsPreferred(Boolean.TRUE.equals(link.isPreferred()));
+            supplierProduct.setIsActive(link.isActive() == null || Boolean.TRUE.equals(link.isActive()));
+            savedSupplierProducts.add(supplierProductRepository.save(supplierProduct));
+        }
+
+        SupplierProduct preferred = resolvePreferredSupplierProduct(organizationId, storeProduct, request, savedSupplierProducts);
+        StoreProductSupplierPreference preference = storeProductSupplierPreferenceRepository
+                .findByOrganizationIdAndStoreProductId(organizationId, storeProductId)
+                .orElseGet(StoreProductSupplierPreference::new);
+        if (preferred == null) {
+            if (preference.getId() != null) {
+                preference.setOrganizationId(organizationId);
+                preference.setStoreProductId(storeProductId);
+                preference.setIsActive(false);
+                preference.setRemarks(trimToNull(request.preferredRemarks()));
+                storeProductSupplierPreferenceRepository.save(preference);
+            }
+            return getStoreProductSuppliers(organizationId, storeProductId);
+        }
+
+        preference.setOrganizationId(organizationId);
+        preference.setStoreProductId(storeProductId);
+        preference.setSupplierId(preferred.getSupplierId());
+        preference.setSupplierProductId(preferred.getId());
+        preference.setIsActive(request.preferredIsActive() == null || Boolean.TRUE.equals(request.preferredIsActive()));
+        preference.setRemarks(trimToNull(request.preferredRemarks()));
+        storeProductSupplierPreferenceRepository.save(preference);
+        return getStoreProductSuppliers(organizationId, storeProductId);
+    }
+
     private void applySupplierRequest(Supplier supplier, SupplierDtos.UpsertSupplierRequest request) {
-        supplier.setSupplierCode(request.supplierCode().trim());
+        supplier.setSupplierCode(resolveSupplierCode(supplier, request.supplierCode()));
         supplier.setName(request.name().trim());
         supplier.setLegalName(trimToNull(request.legalName()) == null ? request.name().trim() : request.legalName().trim());
         supplier.setTradeName(trimToNull(request.tradeName()) == null ? supplier.getName() : request.tradeName().trim());
@@ -239,6 +342,37 @@ public class SupplierManagementService {
         supplier.setIsPlatformLinked(Boolean.TRUE.equals(request.isPlatformLinked()) || request.linkedOrganizationId() != null);
         supplier.setNotes(trimToNull(request.notes()));
         supplier.setStatus(trimToNull(request.status()) == null ? "ACTIVE" : request.status().trim().toUpperCase());
+    }
+
+    private String resolveSupplierCode(Supplier supplier, String requestedCode) {
+        String normalized = trimToNull(requestedCode);
+        if (normalized != null) {
+            String code = normalized.toUpperCase();
+            boolean exists = supplier.getId() == null
+                    ? supplierRepository.existsByOrganizationIdAndSupplierCode(supplier.getOrganizationId(), code)
+                    : supplierRepository.existsByOrganizationIdAndSupplierCodeAndIdNot(supplier.getOrganizationId(), code, supplier.getId());
+            if (exists) {
+                throw new BusinessException("Supplier code already exists: " + code);
+            }
+            return code;
+        }
+        if (trimToNull(supplier.getSupplierCode()) != null) {
+            return supplier.getSupplierCode().trim().toUpperCase();
+        }
+        return generateSupplierCode(supplier.getOrganizationId());
+    }
+
+    private String generateSupplierCode(Long organizationId) {
+        Organization organization = organizationRepository.findById(organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Organization not found: " + organizationId));
+        String orgCode = organization.getCode().trim().toUpperCase();
+        for (int sequence = 1; sequence < 100000; sequence++) {
+            String generated = "SUP-" + orgCode + "-" + String.format("%04d", sequence);
+            if (!supplierRepository.existsByOrganizationIdAndSupplierCode(organizationId, generated)) {
+                return generated;
+            }
+        }
+        throw new BusinessException("Unable to generate supplier code for organization " + organizationId);
     }
 
     private SupplierDtos.SupplierResponse toSupplierResponse(Supplier supplier) {
@@ -325,5 +459,59 @@ public class SupplierManagementService {
             return null;
         }
         return value.trim();
+    }
+
+    private SupplierProduct resolveSupplierProductForStoreProduct(
+            Long organizationId,
+            StoreProduct storeProduct,
+            Supplier supplier,
+            SupplierDtos.UpsertStoreProductSupplierLinkRequest request
+    ) {
+        if (request.supplierProductId() == null) {
+            return new SupplierProduct();
+        }
+        SupplierProduct supplierProduct = supplierProductRepository.findByIdAndOrganizationId(request.supplierProductId(), organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Supplier product not found: " + request.supplierProductId()));
+        if (!supplier.getId().equals(supplierProduct.getSupplierId())) {
+            throw new BusinessException("Supplier product does not belong to supplier " + supplier.getId());
+        }
+        if (!storeProduct.getProductId().equals(supplierProduct.getProductId())) {
+            throw new BusinessException("Supplier product does not match store product master for store product " + storeProduct.getId());
+        }
+        return supplierProduct;
+    }
+
+    private SupplierProduct resolvePreferredSupplierProduct(
+            Long organizationId,
+            StoreProduct storeProduct,
+            SupplierDtos.UpsertStoreProductSuppliersRequest request,
+            List<SupplierProduct> savedSupplierProducts
+    ) {
+        if (request.preferredSupplierProductId() != null) {
+            SupplierProduct preferred = supplierProductRepository.findByIdAndOrganizationId(request.preferredSupplierProductId(), organizationId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Supplier product not found: " + request.preferredSupplierProductId()));
+            if (!storeProduct.getProductId().equals(preferred.getProductId())) {
+                throw new BusinessException("Preferred supplier product does not match store product master for store product " + storeProduct.getId());
+            }
+            if (request.preferredSupplierId() != null && !request.preferredSupplierId().equals(preferred.getSupplierId())) {
+                throw new BusinessException("Preferred supplier and supplier product do not match");
+            }
+            return preferred;
+        }
+
+        if (request.preferredSupplierId() != null) {
+            return savedSupplierProducts.stream()
+                    .filter(link -> request.preferredSupplierId().equals(link.getSupplierId()))
+                    .findFirst()
+                    .orElseThrow(() -> new BusinessException("Preferred supplier must be included in supplier links"));
+        }
+
+        List<SupplierProduct> preferredLinks = savedSupplierProducts.stream()
+                .filter(link -> Boolean.TRUE.equals(link.getIsPreferred()))
+                .toList();
+        if (preferredLinks.size() > 1) {
+            throw new BusinessException("Only one preferred supplier link can be marked for a store product");
+        }
+        return preferredLinks.isEmpty() ? null : preferredLinks.getFirst();
     }
 }

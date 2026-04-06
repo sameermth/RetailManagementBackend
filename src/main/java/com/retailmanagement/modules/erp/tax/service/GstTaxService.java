@@ -2,7 +2,9 @@ package com.retailmanagement.modules.erp.tax.service;
 
 import com.retailmanagement.common.exceptions.BusinessException;
 import com.retailmanagement.common.exceptions.ResourceNotFoundException;
+import com.retailmanagement.modules.erp.catalog.entity.HsnTaxRate;
 import com.retailmanagement.modules.erp.catalog.entity.TaxGroup;
+import com.retailmanagement.modules.erp.catalog.service.HsnTaxRateService;
 import com.retailmanagement.modules.erp.catalog.repository.TaxGroupRepository;
 import com.retailmanagement.modules.erp.tax.entity.TaxRegistration;
 import com.retailmanagement.modules.erp.tax.repository.TaxRegistrationRepository;
@@ -22,11 +24,13 @@ public class GstTaxService {
 
     private final TaxGroupRepository taxGroupRepository;
     private final TaxRegistrationRepository taxRegistrationRepository;
+    private final HsnTaxRateService hsnTaxRateService;
 
     public TaxContext resolveSalesTax(
             Long organizationId,
             Long branchId,
             LocalDate documentDate,
+            String hsnCode,
             Long taxGroupId,
             String counterpartyGstin,
             String explicitPlaceOfSupplyStateCode,
@@ -36,6 +40,7 @@ public class GstTaxService {
                 organizationId,
                 branchId,
                 documentDate,
+                hsnCode,
                 taxGroupId,
                 counterpartyGstin,
                 explicitPlaceOfSupplyStateCode,
@@ -47,6 +52,7 @@ public class GstTaxService {
             Long organizationId,
             Long branchId,
             LocalDate documentDate,
+            String hsnCode,
             Long taxGroupId,
             String counterpartyGstin,
             String explicitPlaceOfSupplyStateCode,
@@ -56,6 +62,7 @@ public class GstTaxService {
                 organizationId,
                 branchId,
                 documentDate,
+                hsnCode,
                 taxGroupId,
                 counterpartyGstin,
                 explicitPlaceOfSupplyStateCode,
@@ -67,6 +74,7 @@ public class GstTaxService {
             Long organizationId,
             Long branchId,
             LocalDate documentDate,
+            String hsnCode,
             Long taxGroupId,
             String counterpartyGstin,
             String explicitPlaceOfSupplyStateCode,
@@ -81,8 +89,7 @@ public class GstTaxService {
             return TaxContext.noRegistration(normalizeAmount(taxableAmount));
         }
 
-        TaxGroup taxGroup = taxGroupRepository.findByIdAndOrganizationId(taxGroupId, organizationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Tax group not found: " + taxGroupId));
+        RateProfile rateProfile = resolveRateProfile(organizationId, effectiveDate, hsnCode, taxGroupId);
 
         String placeOfSupplyStateCode = normalizeStateCode(explicitPlaceOfSupplyStateCode);
         if (placeOfSupplyStateCode == null) {
@@ -95,10 +102,10 @@ public class GstTaxService {
         boolean intraState = normalizeStateCode(sellerRegistration.getRegistrationStateCode()).equals(placeOfSupplyStateCode);
         BigDecimal normalizedTaxableAmount = normalizeAmount(taxableAmount);
 
-        BigDecimal cgstRate = intraState ? zeroIfNull(taxGroup.getCgstRate()) : BigDecimal.ZERO;
-        BigDecimal sgstRate = intraState ? zeroIfNull(taxGroup.getSgstRate()) : BigDecimal.ZERO;
-        BigDecimal igstRate = intraState ? BigDecimal.ZERO : zeroIfNull(taxGroup.getIgstRate());
-        BigDecimal cessRate = zeroIfNull(taxGroup.getCessRate());
+        BigDecimal cgstRate = intraState ? zeroIfNull(rateProfile.cgstRate()) : BigDecimal.ZERO;
+        BigDecimal sgstRate = intraState ? zeroIfNull(rateProfile.sgstRate()) : BigDecimal.ZERO;
+        BigDecimal igstRate = intraState ? BigDecimal.ZERO : zeroIfNull(rateProfile.igstRate());
+        BigDecimal cessRate = zeroIfNull(rateProfile.cessRate());
 
         BigDecimal cgstAmount = percentageOf(normalizedTaxableAmount, cgstRate);
         BigDecimal sgstAmount = percentageOf(normalizedTaxableAmount, sgstRate);
@@ -146,6 +153,29 @@ public class GstTaxService {
         return value == null ? BigDecimal.ZERO : value;
     }
 
+    private RateProfile resolveRateProfile(Long organizationId, LocalDate effectiveDate, String hsnCode, Long taxGroupId) {
+        HsnTaxRate hsnTaxRate = hsnTaxRateService.findApplicableRate(hsnCode, effectiveDate).orElse(null);
+        if (hsnTaxRate != null) {
+            return new RateProfile(
+                    hsnTaxRate.getCgstRate(),
+                    hsnTaxRate.getSgstRate(),
+                    hsnTaxRate.getIgstRate(),
+                    hsnTaxRate.getCessRate()
+            );
+        }
+        if (taxGroupId == null) {
+            throw new ResourceNotFoundException("No applicable tax rule found for HSN " + hsnCode);
+        }
+        TaxGroup taxGroup = taxGroupRepository.findByIdAndOrganizationId(taxGroupId, organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tax group not found: " + taxGroupId));
+        return new RateProfile(
+                taxGroup.getCgstRate(),
+                taxGroup.getSgstRate(),
+                taxGroup.getIgstRate(),
+                taxGroup.getCessRate()
+        );
+    }
+
     private static BigDecimal normalizeAmount(BigDecimal value) {
         return zeroIfNull(value).setScale(2, RoundingMode.HALF_UP);
     }
@@ -160,6 +190,13 @@ public class GstTaxService {
         }
         return normalized;
     }
+
+    private record RateProfile(
+            BigDecimal cgstRate,
+            BigDecimal sgstRate,
+            BigDecimal igstRate,
+            BigDecimal cessRate
+    ) {}
 
     public record TaxContext(
             Long sellerTaxRegistrationId,

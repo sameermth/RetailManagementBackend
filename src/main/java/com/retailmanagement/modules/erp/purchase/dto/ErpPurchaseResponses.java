@@ -84,7 +84,19 @@ public final class ErpPurchaseResponses {
             BigDecimal allocatedAmount,
             BigDecimal outstandingAmount,
             String status,
-            List<PurchaseLineResponse> lines
+            List<PurchaseLineResponse> lines,
+            List<PurchaseReceiptAllocationResponse> allocations
+    ) {}
+
+    public record PurchaseReceiptAllocationResponse(
+            Long supplierPaymentId,
+            String paymentNumber,
+            LocalDate paymentDate,
+            String paymentMethod,
+            String referenceNumber,
+            BigDecimal paymentAmount,
+            BigDecimal allocatedAmount,
+            String status
     ) {}
 
     public record PurchaseReceiptSummaryResponse(

@@ -20,8 +20,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -41,18 +42,21 @@ public class ReportScheduleServiceImpl implements ReportScheduleService {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+        String normalizedFrequency = normalizeFrequency(request.getFrequency());
 
         ReportSchedule schedule = ReportSchedule.builder()
+                .organizationId(user.getOrganizationId())
                 .scheduleId(generateScheduleId())
                 .scheduleName(request.getScheduleName())
                 .reportType(request.getReportType())
                 .format(request.getFormat())
                 .createdBy(user)
-                .frequency(request.getFrequency())
+                .frequency(normalizedFrequency)
+                .deliveryChannel(resolveDeliveryChannel(request.getRecipients()))
                 .cronExpression(request.getCronExpression())
                 .startDate(request.getStartDate())
                 .endDate(request.getEndDate())
-                .parameters(request.getParameters() != null ? request.getParameters() : new java.util.HashMap<>())
+                .parameters(request.getParameters() != null ? request.getParameters() : new HashMap<>())
                 .recipients(request.getRecipients())
                 .isActive(true)
                 .successCount(0)
@@ -102,9 +106,24 @@ public class ReportScheduleServiceImpl implements ReportScheduleService {
             case "YEARLY":
                 return now.plusYears(1).withDayOfYear(1).withHour(0).withMinute(0).withSecond(0);
             default:
-                // For custom cron, parse and calculate
-                return now.plusHours(1); // Placeholder
+                throw new BusinessException("Unsupported report schedule frequency: " + schedule.getFrequency());
         }
+    }
+
+    private String normalizeFrequency(String frequency) {
+        if (frequency == null || frequency.isBlank()) {
+            throw new BusinessException("Report schedule frequency is required");
+        }
+        String normalized = frequency.trim().toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "DAILY", "WEEKLY", "MONTHLY", "QUARTERLY", "YEARLY" -> normalized;
+            case "CUSTOM" -> throw new BusinessException("Custom report schedules are not supported in the current ERP schema");
+            default -> throw new BusinessException("Unsupported report schedule frequency: " + frequency);
+        };
+    }
+
+    private String resolveDeliveryChannel(String recipients) {
+        return recipients != null && !recipients.isBlank() ? "EMAIL" : "APP";
     }
 
     @Override
@@ -113,16 +132,18 @@ public class ReportScheduleServiceImpl implements ReportScheduleService {
 
         ReportSchedule schedule = scheduleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Report schedule not found with id: " + id));
+        String normalizedFrequency = normalizeFrequency(request.getFrequency());
 
         // Update fields
         schedule.setScheduleName(request.getScheduleName());
         schedule.setReportType(request.getReportType());
         schedule.setFormat(request.getFormat());
-        schedule.setFrequency(request.getFrequency());
+        schedule.setFrequency(normalizedFrequency);
+        schedule.setDeliveryChannel(resolveDeliveryChannel(request.getRecipients()));
         schedule.setCronExpression(request.getCronExpression());
         schedule.setStartDate(request.getStartDate());
         schedule.setEndDate(request.getEndDate());
-        schedule.setParameters(request.getParameters() != null ? request.getParameters() : new java.util.HashMap<>());
+        schedule.setParameters(request.getParameters() != null ? request.getParameters() : new HashMap<>());
         schedule.setRecipients(request.getRecipients());
 
         // Recalculate next run date

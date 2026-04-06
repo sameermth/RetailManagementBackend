@@ -88,4 +88,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findByOrganizationIdOrderByIdAsc(Long organizationId);
 
     Optional<User> findByIdAndOrganizationId(Long id, Long organizationId);
+
+    Boolean existsByOrganizationIdAndEmployeeCode(Long organizationId, String employeeCode);
+
+    Boolean existsByOrganizationIdAndEmployeeCodeAndIdNot(Long organizationId, String employeeCode, Long id);
 }

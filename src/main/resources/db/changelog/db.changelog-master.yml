@@ -546,3 +546,108 @@ databaseChangeLog:
       rollback:
         - sql:
             sql: "SELECT 'Manual rollback required for owner-account subscription migration';"
+
+  - changeSet:
+      id: 044-add-hsn-master
+      author: openai
+      changes:
+        - sqlFile:
+            path: 044_add_hsn_master.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP TABLE IF EXISTS hsn_master;"
+
+  - changeSet:
+      id: 045-add-hsn-tax-rate
+      author: openai
+      changes:
+        - sqlFile:
+            path: 045_add_hsn_tax_rate.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP TABLE IF EXISTS hsn_tax_rate;"
+
+  - changeSet:
+      id: 046-add-product-attribute-metadata
+      author: openai
+      changes:
+        - sqlFile:
+            path: 046_add_product_attribute_metadata.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP TABLE IF EXISTS product_attribute_scope; DROP TABLE IF EXISTS product_attribute_option; DROP TABLE IF EXISTS product_attribute_definition;"
+
+  - changeSet:
+      id: 047-add-store-product-attribute-value
+      author: openai
+      changes:
+        - sqlFile:
+            path: 047_add_store_product_attribute_value.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP TABLE IF EXISTS store_product_attribute_value;"
+
+  - changeSet:
+      id: 048-add-store-product-warranty-fields
+      author: openai
+      changes:
+        - sqlFile:
+            path: 048_add_store_product_warranty_fields.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "ALTER TABLE store_product DROP COLUMN IF EXISTS warranty_terms, DROP COLUMN IF EXISTS default_warranty_months;"
+
+  - changeSet:
+      id: 049-add-warranty-extension-flow
+      author: openai
+      changes:
+        - sqlFile:
+            path: 049_add_warranty_extension_flow.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP TABLE IF EXISTS warranty_extension;"
+
+  - changeSet:
+      id: 050-add-service-agreement-flow
+      author: openai
+      changes:
+        - sqlFile:
+            path: 050_add_service_agreement_flow.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP TABLE IF EXISTS service_agreement_item; DROP TABLE IF EXISTS service_agreement;"
+
+  - changeSet:
+      id: 051-add-platform-admin-role
+      author: openai
+      context: seed,sample,dev,test
+      changes:
+        - sqlFile:
+            path: 051_add_platform_admin_role.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for platform admin seed migration';"

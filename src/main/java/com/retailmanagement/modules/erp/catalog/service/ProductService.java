@@ -2,16 +2,19 @@ package com.retailmanagement.modules.erp.catalog.service;
 
 import com.retailmanagement.common.exceptions.BusinessException;
 import com.retailmanagement.common.exceptions.ResourceNotFoundException;
+import com.retailmanagement.modules.erp.catalog.dto.ProductAttributeDtos;
 import com.retailmanagement.modules.erp.catalog.dto.ProductScanResponse;
 import com.retailmanagement.modules.erp.catalog.dto.ProductDtos;
 import com.retailmanagement.modules.erp.catalog.entity.Brand;
 import com.retailmanagement.modules.erp.catalog.entity.Category;
 import com.retailmanagement.modules.erp.catalog.entity.Product;
 import com.retailmanagement.modules.erp.catalog.entity.StoreProduct;
+import com.retailmanagement.modules.erp.catalog.entity.TaxGroup;
 import com.retailmanagement.modules.erp.catalog.repository.BrandRepository;
 import com.retailmanagement.modules.erp.catalog.repository.CategoryRepository;
 import com.retailmanagement.modules.erp.catalog.repository.ProductRepository;
 import com.retailmanagement.modules.erp.catalog.repository.StoreProductRepository;
+import com.retailmanagement.modules.erp.catalog.repository.TaxGroupRepository;
 import com.retailmanagement.modules.erp.catalog.repository.UomRepository;
 import com.retailmanagement.modules.erp.common.security.ErpAccessGuard;
 import com.retailmanagement.modules.erp.inventory.entity.InventoryBalance;
@@ -21,6 +24,7 @@ import com.retailmanagement.modules.erp.inventory.repository.InventoryBalanceRep
 import com.retailmanagement.modules.erp.inventory.repository.InventoryBatchRepository;
 import com.retailmanagement.modules.erp.inventory.repository.SerialNumberRepository;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +38,9 @@ public class ProductService {
  private final BrandRepository brandRepository;
  private final CategoryRepository categoryRepository;
  private final UomRepository uomRepository;
+ private final HsnMasterService hsnMasterService;
+ private final TaxGroupRepository taxGroupRepository;
+ private final ProductAttributeService productAttributeService;
  private final ErpAccessGuard accessGuard;
  private final InventoryBalanceRepository inventoryBalanceRepository;
  private final InventoryBatchRepository inventoryBatchRepository;
@@ -113,8 +120,9 @@ public class ProductService {
   throw new ResourceNotFoundException("No store product found for scan/search value: " + lookup);
  }
 
- public StoreProduct create(StoreProduct storeProduct, String hsnCode){
+ public StoreProduct create(StoreProduct storeProduct, String hsnCode, List<ProductAttributeDtos.UpsertProductAttributeValueRequest> attributes){
   accessGuard.assertOrganizationAccess(storeProduct.getOrganizationId());
+  storeProduct.setTaxGroupId(resolveRequestedOrSuggestedTaxGroupId(storeProduct.getOrganizationId(), hsnCode, storeProduct.getTaxGroupId()));
   validateReferences(storeProduct);
   Product product = resolveProduct(storeProduct, hsnCode);
 
@@ -133,7 +141,49 @@ public class ProductService {
           });
 
   storeProduct.setProductId(product.getId());
-  return storeProductRepository.save(storeProduct);
+  StoreProduct saved = storeProductRepository.save(storeProduct);
+  productAttributeService.replaceValuesForStoreProduct(saved, attributes);
+  return saved;
+ }
+
+ public StoreProduct update(Long id, StoreProduct updates, List<ProductAttributeDtos.UpsertProductAttributeValueRequest> attributes) {
+  StoreProduct existing = get(id);
+  if (!existing.getOrganizationId().equals(updates.getOrganizationId())) {
+   throw new BusinessException("Store product does not belong to organization " + updates.getOrganizationId() + ": " + id);
+  }
+
+  storeProductRepository.findByOrganizationIdAndSku(existing.getOrganizationId(), updates.getSku())
+          .filter(other -> !other.getId().equals(existing.getId()))
+          .ifPresent(other -> {
+           throw new BusinessException("Product SKU already exists in organization: " + other.getSku());
+          });
+
+  existing.setCategoryId(updates.getCategoryId());
+  existing.setBrandId(updates.getBrandId());
+  existing.setBaseUomId(updates.getBaseUomId());
+  if (updates.getTaxGroupId() != null) {
+   existing.setTaxGroupId(updates.getTaxGroupId());
+  }
+  existing.setSku(updates.getSku());
+  existing.setName(updates.getName());
+  existing.setDescription(trimToNull(updates.getDescription()));
+  existing.setInventoryTrackingMode(updates.getInventoryTrackingMode());
+  existing.setSerialTrackingEnabled(booleanValue(updates.getSerialTrackingEnabled()));
+  existing.setBatchTrackingEnabled(booleanValue(updates.getBatchTrackingEnabled()));
+  existing.setExpiryTrackingEnabled(booleanValue(updates.getExpiryTrackingEnabled()));
+  existing.setFractionalQuantityAllowed(booleanValue(updates.getFractionalQuantityAllowed()));
+  existing.setMinStockBaseQty(updates.getMinStockBaseQty() == null ? BigDecimal.ZERO : updates.getMinStockBaseQty());
+  existing.setReorderLevelBaseQty(updates.getReorderLevelBaseQty() == null ? BigDecimal.ZERO : updates.getReorderLevelBaseQty());
+  existing.setDefaultSalePrice(updates.getDefaultSalePrice());
+  existing.setDefaultWarrantyMonths(updates.getDefaultWarrantyMonths());
+  existing.setWarrantyTerms(trimToNull(updates.getWarrantyTerms()));
+  existing.setIsServiceItem(booleanValue(updates.getIsServiceItem()));
+  existing.setIsActive(updates.getIsActive() == null || updates.getIsActive());
+
+  validateReferences(existing);
+  StoreProduct saved = storeProductRepository.save(existing);
+  productAttributeService.replaceValuesForStoreProduct(saved, attributes);
+  return saved;
  }
 
  public StoreProduct linkCatalogProduct(ProductDtos.LinkCatalogProductRequest request) {
@@ -151,7 +201,7 @@ public class ProductService {
   storeProduct.setCategoryId(request.categoryId());
   storeProduct.setBrandId(request.brandId());
   storeProduct.setBaseUomId(product.getBaseUomId());
-  storeProduct.setTaxGroupId(request.taxGroupId());
+  storeProduct.setTaxGroupId(resolveRequestedOrSuggestedTaxGroupId(request.organizationId(), product.getHsnCode(), request.taxGroupId()));
   storeProduct.setSku(trimToNull(request.sku()) != null ? trimToNull(request.sku()) : fallbackSku(product));
   storeProduct.setName(trimToNull(request.name()) != null ? trimToNull(request.name()) : product.getName());
   storeProduct.setDescription(trimToNull(request.description()) != null ? trimToNull(request.description()) : trimToNull(product.getDescription()));
@@ -179,6 +229,45 @@ public class ProductService {
   return storeProductRepository.save(storeProduct);
  }
 
+ @Transactional(readOnly = true)
+ public ProductDtos.TaxGroupSuggestionResponse suggestTaxGroup(Long organizationId, String hsnCode, LocalDate effectiveDate) {
+  accessGuard.assertOrganizationAccess(organizationId);
+  String normalizedHsnCode = validateHsnCode(hsnCode);
+  if (normalizedHsnCode == null) {
+   throw new BusinessException("HSN code is required");
+  }
+  HsnMasterService.HsnReference reference = hsnMasterService.getResolvedByCode(normalizedHsnCode, effectiveDate);
+  TaxGroup taxGroup = findSuggestedTaxGroup(organizationId, reference);
+  if (taxGroup == null) {
+   return new ProductDtos.TaxGroupSuggestionResponse(
+           normalizedHsnCode,
+           null,
+           null,
+           null,
+           rate(reference, true, "cgst"),
+           rate(reference, true, "sgst"),
+           rate(reference, true, "igst"),
+           rate(reference, true, "cess"),
+           reference.taxRate() != null ? reference.taxRate().getEffectiveFrom() : reference.master().getEffectiveFrom(),
+           false,
+           "No active tax group in this organization matches the selected HSN rate"
+   );
+  }
+  return new ProductDtos.TaxGroupSuggestionResponse(
+          normalizedHsnCode,
+          taxGroup.getId(),
+          taxGroup.getCode(),
+          taxGroup.getName(),
+          taxGroup.getCgstRate(),
+          taxGroup.getSgstRate(),
+          taxGroup.getIgstRate(),
+          taxGroup.getCessRate(),
+          reference.taxRate() != null ? reference.taxRate().getEffectiveFrom() : reference.master().getEffectiveFrom(),
+          true,
+          "Suggested from HSN rate"
+  );
+ }
+
  private void validateReferences(StoreProduct storeProduct) {
   uomRepository.findById(storeProduct.getBaseUomId())
           .orElseThrow(() -> new ResourceNotFoundException("UOM not found: " + storeProduct.getBaseUomId()));
@@ -186,12 +275,19 @@ public class ProductService {
           .orElseThrow(() -> new ResourceNotFoundException("Category not found: " + storeProduct.getCategoryId()));
   brandRepository.findById(storeProduct.getBrandId())
           .orElseThrow(() -> new ResourceNotFoundException("Brand not found: " + storeProduct.getBrandId()));
+  taxGroupRepository.findByIdAndOrganizationId(storeProduct.getTaxGroupId(), storeProduct.getOrganizationId())
+          .orElseThrow(() -> new ResourceNotFoundException("Tax group not found: " + storeProduct.getTaxGroupId()));
  }
 
  private Product resolveProduct(StoreProduct storeProduct, String hsnCode) {
+  String normalizedHsnCode = validateHsnCode(hsnCode);
   if (storeProduct.getProductId() != null) {
-   return productRepository.findById(storeProduct.getProductId())
+   Product product = productRepository.findById(storeProduct.getProductId())
            .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + storeProduct.getProductId()));
+   if (normalizedHsnCode != null && product.getHsnCode() != null && !normalizedHsnCode.equals(product.getHsnCode())) {
+    throw new BusinessException("Selected catalog product already uses HSN " + product.getHsnCode());
+   }
+   return product;
   }
 
   Brand brand = brandRepository.findById(storeProduct.getBrandId())
@@ -209,14 +305,14 @@ public class ProductService {
           booleanValue(storeProduct.getExpiryTrackingEnabled()),
           booleanValue(storeProduct.getFractionalQuantityAllowed()),
           booleanValue(storeProduct.getIsServiceItem())
-  ).orElseGet(() -> createProduct(storeProduct, category, brand, hsnCode));
+  ).orElseGet(() -> createProduct(storeProduct, category, brand, normalizedHsnCode));
  }
 
  private Product createProduct(StoreProduct storeProduct, Category category, Brand brand, String hsnCode) {
   Product product = new Product();
   product.setName(storeProduct.getName());
   product.setDescription(trimToNull(storeProduct.getDescription()));
-  product.setHsnCode(trimToNull(hsnCode));
+  product.setHsnCode(validateHsnCode(hsnCode));
   product.setCategoryName(category.getName());
   product.setBrandName(brand.getName());
   product.setBaseUomId(storeProduct.getBaseUomId());
@@ -228,6 +324,83 @@ public class ProductService {
   product.setIsServiceItem(booleanValue(storeProduct.getIsServiceItem()));
   product.setIsActive(booleanValue(storeProduct.getIsActive()));
   return productRepository.save(product);
+ }
+
+ private String validateHsnCode(String hsnCode) {
+  String normalized = hsnMasterService.normalize(hsnCode);
+  if (normalized == null) {
+   return null;
+  }
+  if (!hsnMasterService.exists(normalized)) {
+   throw new BusinessException("Unknown HSN code: " + normalized);
+  }
+  return normalized;
+ }
+
+ private Long resolveRequestedOrSuggestedTaxGroupId(Long organizationId, String hsnCode, Long requestedTaxGroupId) {
+  if (requestedTaxGroupId != null) {
+   return requestedTaxGroupId;
+  }
+  String normalizedHsnCode = validateHsnCode(hsnCode);
+  if (normalizedHsnCode == null) {
+   throw new BusinessException("Tax group is required when HSN is not selected");
+  }
+  HsnMasterService.HsnReference reference = hsnMasterService.getResolvedByCode(normalizedHsnCode, LocalDate.now());
+  TaxGroup suggested = findSuggestedTaxGroup(organizationId, reference);
+  if (suggested == null) {
+   throw new BusinessException("No active tax group matches HSN " + normalizedHsnCode + " for this organization");
+  }
+  return suggested.getId();
+ }
+
+ private TaxGroup findSuggestedTaxGroup(Long organizationId, HsnMasterService.HsnReference reference) {
+  BigDecimal cgstRate = rate(reference, false, "cgst");
+  BigDecimal sgstRate = rate(reference, false, "sgst");
+  BigDecimal igstRate = rate(reference, false, "igst");
+  BigDecimal cessRate = rate(reference, false, "cess");
+  List<TaxGroup> matches = taxGroupRepository.findByOrganizationIdAndIsActiveTrueAndCgstRateAndSgstRateAndIgstRateAndCessRate(
+          organizationId,
+          cgstRate,
+          sgstRate,
+          igstRate,
+          cessRate
+  );
+  if (matches.isEmpty()) {
+   return null;
+  }
+  return matches.stream()
+          .sorted((left, right) -> {
+           boolean leftPreferred = left.getCode() != null && left.getCode().startsWith("GST_");
+           boolean rightPreferred = right.getCode() != null && right.getCode().startsWith("GST_");
+           if (leftPreferred == rightPreferred) {
+            return left.getName().compareToIgnoreCase(right.getName());
+           }
+           return leftPreferred ? -1 : 1;
+          })
+          .findFirst()
+          .orElse(null);
+ }
+
+ private BigDecimal rate(HsnMasterService.HsnReference reference, boolean allowFallback, String kind) {
+  if (reference.taxRate() != null) {
+   return switch (kind) {
+    case "cgst" -> reference.taxRate().getCgstRate();
+    case "sgst" -> reference.taxRate().getSgstRate();
+    case "igst" -> reference.taxRate().getIgstRate();
+    case "cess" -> reference.taxRate().getCessRate();
+    default -> BigDecimal.ZERO;
+   };
+  }
+  if (allowFallback || reference.master() != null) {
+   return switch (kind) {
+    case "cgst" -> reference.master().getCgstRate();
+    case "sgst" -> reference.master().getSgstRate();
+    case "igst" -> reference.master().getIgstRate();
+    case "cess" -> reference.master().getCessRate();
+    default -> BigDecimal.ZERO;
+   };
+  }
+  return BigDecimal.ZERO;
  }
 
  private ProductScanResponse buildScanResponse(

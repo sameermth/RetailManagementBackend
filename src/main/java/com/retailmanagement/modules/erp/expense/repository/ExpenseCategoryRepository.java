@@ -11,4 +11,5 @@ public interface ExpenseCategoryRepository extends JpaRepository<ExpenseCategory
     List<ExpenseCategory> findByOrganizationIdAndIsActiveTrueOrderByCodeAsc(Long organizationId);
     Optional<ExpenseCategory> findByIdAndOrganizationId(Long id, Long organizationId);
     Optional<ExpenseCategory> findByOrganizationIdAndCode(Long organizationId, String code);
+    boolean existsByOrganizationIdAndExpenseAccountId(Long organizationId, Long expenseAccountId);
 }

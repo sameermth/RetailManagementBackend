@@ -29,8 +29,17 @@ public class ErpFinanceController {
     @Operation(summary = "List chart of accounts")
     @PreAuthorize("hasAuthority('accounting.view')")
     public ErpApiResponse<List<ErpFinanceDtos.AccountResponse>> listAccounts(@RequestParam Long organizationId,
-                                                                             @RequestParam(required = false) String accountType) {
-        return ErpApiResponse.ok(erpFinanceService.listAccounts(organizationId, accountType).stream().map(this::toAccountResponse).toList());
+                                                                             @RequestParam(required = false) String accountType,
+                                                                             @RequestParam(defaultValue = "false") boolean includeInactive) {
+        return ErpApiResponse.ok(erpFinanceService.listAccounts(organizationId, accountType, includeInactive).stream().map(this::toAccountResponse).toList());
+    }
+
+    @GetMapping("/accounts/{id}")
+    @Operation(summary = "Get account details")
+    @PreAuthorize("hasAuthority('accounting.view')")
+    public ErpApiResponse<ErpFinanceDtos.AccountResponse> getAccount(@PathVariable Long id,
+                                                                     @RequestParam Long organizationId) {
+        return ErpApiResponse.ok(toAccountResponse(erpFinanceService.getAccount(organizationId, id)));
     }
 
     @PostMapping("/accounts")
@@ -38,6 +47,23 @@ public class ErpFinanceController {
     @PreAuthorize("hasAuthority('accounting.post')")
     public ErpApiResponse<ErpFinanceDtos.AccountResponse> createAccount(@RequestBody @Valid ErpFinanceDtos.CreateAccountRequest request) {
         return ErpApiResponse.ok(toAccountResponse(erpFinanceService.createAccount(request)), "Account created");
+    }
+
+    @PutMapping("/accounts/{id}")
+    @Operation(summary = "Update account")
+    @PreAuthorize("hasAuthority('accounting.post')")
+    public ErpApiResponse<ErpFinanceDtos.AccountResponse> updateAccount(@PathVariable Long id,
+                                                                        @RequestBody @Valid ErpFinanceDtos.UpdateAccountRequest request) {
+        return ErpApiResponse.ok(toAccountResponse(erpFinanceService.updateAccount(id, request)), "Account updated");
+    }
+
+    @DeleteMapping("/accounts/{id}")
+    @Operation(summary = "Delete account")
+    @PreAuthorize("hasAuthority('accounting.post')")
+    public ErpApiResponse<Void> deleteAccount(@PathVariable Long id,
+                                              @RequestParam Long organizationId) {
+        erpFinanceService.deleteAccount(organizationId, id);
+        return ErpApiResponse.ok(null, "Account deleted");
     }
 
     @GetMapping("/vouchers")
