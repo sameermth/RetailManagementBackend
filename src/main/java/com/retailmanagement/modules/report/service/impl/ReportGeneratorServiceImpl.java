@@ -50,7 +50,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,7 +75,6 @@ public class ReportGeneratorServiceImpl implements ReportGeneratorService {
     private final ExcelExporter excelExporter;
 
     @Override
-    @Async
     public ReportResponse generateReport(ReportRequest request, Long userId) {
         log.info("Generating report of type: {} for user: {}", request.getReportType(), userId);
 
