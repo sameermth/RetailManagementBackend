@@ -77,6 +77,10 @@ public class JwtTokenProvider {
                 .getBody();
     }
 
+    public int getJwtExpirationMillis() {
+        return jwtExpiration;
+    }
+
     public boolean isSubscriptionContextValid(String token, UserPrincipal principal) {
         Claims claims = getClaims(token);
         Number orgId = claims.get("organizationId", Number.class);

@@ -42,7 +42,9 @@ import com.retailmanagement.modules.notification.repository.NotificationReposito
 import com.retailmanagement.modules.report.model.ReportSchedule;
 import com.retailmanagement.modules.report.repository.ReportScheduleRepository;
 import com.retailmanagement.modules.platformadmin.dto.PlatformAdminDtos;
+import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -54,6 +56,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -81,6 +84,7 @@ public class PlatformAdminService {
     private final ReportScheduleRepository reportScheduleRepository;
     private final NotificationRepository notificationRepository;
     private final AuditEventRepository auditEventRepository;
+    private final JdbcTemplate jdbcTemplate;
 
     public PlatformAdminDtos.OverviewResponse overview() {
         List<Organization> organizations = organizationRepository.findAll();
@@ -116,6 +120,17 @@ public class PlatformAdminService {
                 .toList();
         return organizations.stream()
                 .map(this::toStoreSummary)
+                .toList();
+    }
+
+    public List<PlatformAdminDtos.OwnerAccountReferenceResponse> ownerAccounts(String query) {
+        String normalizedQuery = trimToNull(query);
+        return accountRepository.findOwnerAccountsForPlatformAdmin().stream()
+                .filter(account -> matchesOwnerAccountQuery(account, normalizedQuery))
+                .sorted(Comparator
+                        .comparing((Account account) -> account.getPerson() == null ? "" : Objects.toString(account.getPerson().getLegalName(), ""))
+                        .thenComparing(Account::getLoginIdentifier, String.CASE_INSENSITIVE_ORDER))
+                .map(this::toOwnerAccountReference)
                 .toList();
     }
 
@@ -474,25 +489,39 @@ public class PlatformAdminService {
     }
 
     public List<PlatformAdminDtos.NotificationSummaryResponse> notifications() {
-        return notificationRepository.findTop200ByOrderByCreatedAtDescIdDesc().stream()
-                .map(notification -> new PlatformAdminDtos.NotificationSummaryResponse(
-                        notification.getId(),
-                        notification.getNotificationId(),
-                        notification.getType() == null ? null : notification.getType().name(),
-                        notification.getChannel() == null ? null : notification.getChannel().name(),
-                        notification.getStatus() == null ? null : notification.getStatus().name(),
-                        notification.getPriority() == null ? null : notification.getPriority().name(),
-                        notification.getTitle(),
-                        notification.getRecipient(),
-                        notification.getReferenceType(),
-                        notification.getReferenceId(),
-                        notification.getScheduledFor(),
-                        notification.getSentAt(),
-                        notification.getCreatedAt(),
-                        notification.getRetryCount(),
-                        notification.getErrorMessage()
-                ))
-                .toList();
+        return jdbcTemplate.query("""
+                        SELECT id,
+                               organization_id,
+                               user_id,
+                               channel,
+                               status,
+                               reference_type,
+                               reference_id,
+                               scheduled_at,
+                               sent_at,
+                               read_at,
+                               created_at
+                        FROM notification
+                        ORDER BY created_at DESC, id DESC
+                        LIMIT 200
+                        """,
+                (rs, rowNum) -> new PlatformAdminDtos.NotificationSummaryResponse(
+                        rs.getLong("id"),
+                        "NTF-" + rs.getLong("id"),
+                        rs.getString("reference_type"),
+                        rs.getString("channel"),
+                        rs.getString("status"),
+                        null,
+                        null,
+                        null,
+                        rs.getString("reference_type"),
+                        getNullableLong(rs, "reference_id"),
+                        toLocalDateTime(rs.getTimestamp("scheduled_at")),
+                        toLocalDateTime(rs.getTimestamp("sent_at")),
+                        toLocalDateTime(rs.getTimestamp("created_at")),
+                        null,
+                        null
+                ));
     }
 
     public List<PlatformAdminDtos.AuditActivityResponse> auditActivity() {
@@ -516,31 +545,34 @@ public class PlatformAdminService {
     }
 
     public PlatformAdminDtos.SystemHealthResponse systemHealth() {
-        List<Notification> notifications = notificationRepository.findAll();
         List<AuditEvent> auditEvents = auditEventRepository.findAll();
+        List<PlatformAdminDtos.CountByLabel> notificationsByStatus = jdbcTemplate.query("""
+                        SELECT status, COUNT(*) AS item_count
+                        FROM notification
+                        GROUP BY status
+                        ORDER BY status
+                        """,
+                (rs, rowNum) -> new PlatformAdminDtos.CountByLabel(rs.getString("status"), rs.getLong("item_count")));
+        List<PlatformAdminDtos.CountByLabel> notificationsByType = jdbcTemplate.query("""
+                        SELECT COALESCE(reference_type, 'UNKNOWN') AS type_label, COUNT(*) AS item_count
+                        FROM notification
+                        GROUP BY COALESCE(reference_type, 'UNKNOWN')
+                        ORDER BY type_label
+                        """,
+                (rs, rowNum) -> new PlatformAdminDtos.CountByLabel(rs.getString("type_label"), rs.getLong("item_count")));
+        Long totalNotifications = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM notification", Long.class);
+        Long pendingNotifications = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM notification WHERE status = 'PENDING'", Long.class);
+        Long failedNotifications = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM notification WHERE status = 'FAILED'", Long.class);
+        Long unreadNotifications = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM notification WHERE read_at IS NULL", Long.class);
         return new PlatformAdminDtos.SystemHealthResponse(
-                notifications.size(),
-                notifications.stream().filter(n -> n.getStatus() != null && "PENDING".equals(n.getStatus().name())).count(),
-                notifications.stream().filter(n -> n.getStatus() != null && "FAILED".equals(n.getStatus().name())).count(),
-                notifications.stream().filter(n -> n.getReadAt() == null).count(),
+                totalNotifications == null ? 0 : totalNotifications,
+                pendingNotifications == null ? 0 : pendingNotifications,
+                failedNotifications == null ? 0 : failedNotifications,
+                unreadNotifications == null ? 0 : unreadNotifications,
                 reportScheduleRepository.findByIsActiveTrue().size(),
                 auditEvents.size(),
-                notifications.stream()
-                        .collect(Collectors.groupingBy(
-                                n -> n.getStatus() == null ? "UNKNOWN" : n.getStatus().name(),
-                                LinkedHashMap::new,
-                                Collectors.counting()))
-                        .entrySet().stream()
-                        .map(entry -> new PlatformAdminDtos.CountByLabel(entry.getKey(), entry.getValue()))
-                        .toList(),
-                notifications.stream()
-                        .collect(Collectors.groupingBy(
-                                n -> n.getType() == null ? "UNKNOWN" : n.getType().name(),
-                                LinkedHashMap::new,
-                                Collectors.counting()))
-                        .entrySet().stream()
-                        .map(entry -> new PlatformAdminDtos.CountByLabel(entry.getKey(), entry.getValue()))
-                        .toList()
+                notificationsByStatus,
+                notificationsByType
         );
     }
 
@@ -704,6 +736,41 @@ public class PlatformAdminService {
                 subscription == null ? null : subscription.getStartsOn(),
                 subscription == null ? null : subscription.getEndsOn()
         );
+    }
+
+    private PlatformAdminDtos.OwnerAccountReferenceResponse toOwnerAccountReference(Account account) {
+        return new PlatformAdminDtos.OwnerAccountReferenceResponse(
+                account.getId(),
+                account.getLoginIdentifier(),
+                account.getPerson() == null ? null : account.getPerson().getLegalName(),
+                account.getPerson() == null ? null : account.getPerson().getPrimaryEmail(),
+                account.getPerson() == null ? null : account.getPerson().getPrimaryPhone(),
+                account.getActive()
+        );
+    }
+
+    private boolean matchesOwnerAccountQuery(Account account, String query) {
+        if (query == null) {
+            return true;
+        }
+        String normalized = query.toLowerCase();
+        return containsIgnoreCase(account.getLoginIdentifier(), normalized)
+                || containsIgnoreCase(account.getPerson() == null ? null : account.getPerson().getLegalName(), normalized)
+                || containsIgnoreCase(account.getPerson() == null ? null : account.getPerson().getPrimaryEmail(), normalized)
+                || containsIgnoreCase(account.getPerson() == null ? null : account.getPerson().getPrimaryPhone(), normalized);
+    }
+
+    private boolean containsIgnoreCase(String value, String query) {
+        return value != null && value.toLowerCase().contains(query);
+    }
+
+    private Long getNullableLong(java.sql.ResultSet rs, String column) throws java.sql.SQLException {
+        long value = rs.getLong(column);
+        return rs.wasNull() ? null : value;
+    }
+
+    private LocalDateTime toLocalDateTime(Timestamp value) {
+        return value == null ? null : value.toLocalDateTime();
     }
 
     private PlatformAdminDtos.SubscriptionSummaryResponse toSubscriptionSummary(Organization organization) {

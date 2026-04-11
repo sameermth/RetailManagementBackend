@@ -23,7 +23,7 @@ public class EmployeeManagementController {
     private final EmployeeReferenceService employeeReferenceService;
 
     @GetMapping("/roles")
-    @PreAuthorize("hasAuthority('user.view')")
+    @PreAuthorize("hasAuthority('user.view') or hasAuthority('platform.manage')")
     @Operation(summary = "List available employee roles")
     public ResponseEntity<List<EmployeeManagementResponses.RoleReferenceResponse>> listRoles(@RequestParam(required = false) String query) {
         return ResponseEntity.ok(employeeReferenceService.listRoles(query));

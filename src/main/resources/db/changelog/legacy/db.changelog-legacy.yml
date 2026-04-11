@@ -1,0 +1,677 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-create-schema
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 001_create_erp_v4_schema.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for schema creation';"
+
+  - changeSet:
+      id: 002-seed-master-data
+      author: sameer
+      context: seed
+      changes:
+        - sqlFile:
+            path: 002_seed_erp_v4_master_data.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Use 004_reset_erp_v4_demo_data.sql for development cleanup';"
+
+  - changeSet:
+      id: 003-seed-sample-data
+      author: sameer
+      context: demo
+      changes:
+        - sqlFile:
+            path: 003_seed_erp_v4_sample_data.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Use 004_reset_erp_v4_demo_data.sql for development cleanup';"
+
+  - changeSet:
+      id: 005-add-central-product-catalog
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 005_add_central_product_catalog.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for central catalog migration';"
+
+  - changeSet:
+      id: 006-add-subscription-schema
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 006_add_subscription_schema.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for subscription schema migration';"
+
+  - changeSet:
+      id: 007-add-identity-layer
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 007_add_identity_layer.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for identity layer migration';"
+
+  - changeSet:
+      id: 008-drop-legacy-user-identity-columns
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 008_drop_legacy_user_identity_columns.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for legacy user column cleanup';"
+
+  - changeSet:
+      id: 009-seed-permission-matrix-v1
+      author: sameer
+      context: seed
+      changes:
+        - sqlFile:
+            path: 009_seed_permission_matrix_v1.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for permission matrix seed';"
+
+  - changeSet:
+      id: 010-add-tax-registration-and-gst-breakup
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 010_add_tax_registration_and_gst_breakup.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for tax registration migration';"
+
+  - changeSet:
+      id: 011-add-gst-threshold-settings
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 011_add_gst_threshold_settings.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for GST threshold settings migration';"
+
+  - changeSet:
+      id: 012-backfill-tax-snapshot-fields
+      author: sameer
+      context: seed
+      changes:
+        - sqlFile:
+            path: 012_backfill_tax_snapshot_fields.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for tax snapshot backfill';"
+
+  - changeSet:
+      id: 013-refactor-product-to-store-product
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 013_refactor_product_to_store_product.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for product/store_product refactor';"
+
+  - changeSet:
+      id: 014-seed-system-accounts-for-all-orgs
+      author: sameer
+      context: seed
+      changes:
+        - sqlFile:
+            path: 014_seed_system_accounts_for_all_orgs.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for account seed expansion';"
+
+  - changeSet:
+      id: 015-add-due-dates-and-outstanding-support
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 015_add_due_dates_and_outstanding_support.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for due date and outstanding support migration';"
+
+  - changeSet:
+      id: 016-add-erp-expense-accounting
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 016_add_erp_expense_accounting.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for ERP expense accounting migration';"
+
+  - changeSet:
+      id: 017-add-supplier-relationship-model
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 017_add_supplier_relationship_model.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for supplier relationship model migration';"
+
+  - changeSet:
+      id: 018-add-customer-relationship-model
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 018_add_customer_relationship_model.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for customer relationship model migration';"
+
+  - changeSet:
+      id: 019-add-returns-flow
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 019_add_returns_flow.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for returns flow migration';"
+
+  - changeSet:
+      id: 020-add-return-tracking-details
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 020_add_return_tracking_details.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for return tracking migration';"
+
+  - changeSet:
+      id: 021-add-service-warranty-integration-links
+      author: sameer
+      validCheckSum:
+        - 9:2ac83c68cccb5e50e9aad839a00cfceb
+      changes:
+        - sqlFile:
+            path: 021_add_service_warranty_integration_links.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+        - sqlFile:
+            path: 021_backfill_service_warranty_integration_links.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for service warranty integration migration';"
+
+  - changeSet:
+      id: 022-add-service-replacement-flow
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 022_add_service_replacement_flow.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for service replacement flow migration';"
+
+  - changeSet:
+      id: 023-seed-service-replacement-accounts
+      author: sameer
+      context: seed
+      changes:
+        - sqlFile:
+            path: 023_seed_service_replacement_accounts.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for service replacement account seed';"
+
+  - changeSet:
+      id: 024-add-service-replacement-ledger-link
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 024_add_service_replacement_ledger_link.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for service replacement ledger migration';"
+
+  - changeSet:
+      id: 025-add-sales-invoice-line-warranty-months
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 025_add_sales_invoice_line_warranty_months.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "ALTER TABLE sales_invoice_line DROP COLUMN IF EXISTS warranty_months;"
+
+  - changeSet:
+      id: 026-add-inventory-reservation-tracking
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 026_add_inventory_reservation_tracking.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "ALTER TABLE inventory_reservation DROP COLUMN IF EXISTS serial_number_id, DROP COLUMN IF EXISTS batch_id;"
+
+  - changeSet:
+      id: 027-add-store-product-pricing
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 027_add_store_product_pricing.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP TABLE IF EXISTS store_product_price; ALTER TABLE store_product DROP COLUMN IF EXISTS default_sale_price;"
+
+  - changeSet:
+      id: 028-add-sales-return-inspection
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 028_add_sales_return_inspection.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "ALTER TABLE sales_return_line DROP COLUMN IF EXISTS inspection_notes, DROP COLUMN IF EXISTS inspection_status; ALTER TABLE sales_return DROP COLUMN IF EXISTS inspection_notes, DROP COLUMN IF EXISTS inspected_by, DROP COLUMN IF EXISTS inspected_at;"
+
+  - changeSet:
+      id: 029-add-warranty-claim-routing-and-replacement-bucket
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 029_add_warranty_claim_routing_and_replacement_bucket.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "ALTER TABLE warranty_claim DROP COLUMN IF EXISTS routed_on, DROP COLUMN IF EXISTS upstream_status, DROP COLUMN IF EXISTS upstream_reference_number, DROP COLUMN IF EXISTS upstream_company_name, DROP COLUMN IF EXISTS upstream_route_type; ALTER TABLE service_replacement DROP COLUMN IF EXISTS stock_source_bucket;"
+
+  - changeSet:
+      id: 030-add-inventory-reservation-expiry
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 030_add_inventory_reservation_expiry.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP INDEX IF EXISTS idx_inventory_reservation_status_expires_at; ALTER TABLE inventory_reservation DROP COLUMN IF EXISTS release_reason, DROP COLUMN IF EXISTS released_at, DROP COLUMN IF EXISTS expires_at;"
+
+  - changeSet:
+      id: 031-align-product-hsn-and-line-snapshots
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 031_align_product_hsn_and_line_snapshots.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP INDEX IF EXISTS idx_product_hsn_code; ALTER TABLE sales_invoice_line DROP COLUMN IF EXISTS hsn_snapshot; ALTER TABLE purchase_receipt_line DROP COLUMN IF EXISTS hsn_snapshot; ALTER TABLE purchase_order_line DROP COLUMN IF EXISTS hsn_snapshot; ALTER TABLE product DROP COLUMN IF EXISTS hsn_code;"
+
+  - changeSet:
+      id: 032-drop-product-sku-and-backfill-store-product
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 032_drop_product_sku_and_backfill_store_product.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "ALTER TABLE product ADD COLUMN IF NOT EXISTS sku VARCHAR(80); CREATE INDEX IF NOT EXISTS idx_product_sku ON product(sku);"
+
+  - changeSet:
+      id: 033-seed-phase1-demo-enrichment
+      author: sameer
+      context: demo
+      changes:
+        - sqlFile:
+            path: 033_seed_phase1_demo_enrichment.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for phase 1 demo enrichment seed';"
+
+  - changeSet:
+      id: 034-add-sales-quote-and-order-flow
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 034_add_sales_quote_and_order_flow.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for sales quote and order flow migration';"
+  - changeSet:
+      id: 035-expand-sales-invoice-status-constraint
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 035_expand_sales_invoice_status_constraint.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for sales invoice status constraint migration';"
+  - changeSet:
+      id: 036-seed-sales-quote-order-demo
+      author: sameer
+      context: demo
+      changes:
+        - sqlFile:
+            path: 036_seed_sales_quote_order_demo.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for sales quote and sales order flow migration';"
+
+  - changeSet:
+      id: 037-add-recurring-invoice-and-journal-flow
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 037_add_recurring_invoice_and_journal_flow.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP TABLE IF EXISTS recurring_journal_line; DROP TABLE IF EXISTS recurring_journal; DROP TABLE IF EXISTS recurring_sales_invoice_line; DROP TABLE IF EXISTS recurring_sales_invoice;"
+
+  - changeSet:
+      id: 038-expand-inventory-operation-status-constraints
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 038_expand_inventory_operation_status_constraints.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "ALTER TABLE stock_transfer DROP CONSTRAINT IF EXISTS chk_stock_transfer_status; ALTER TABLE stock_transfer ADD CONSTRAINT chk_stock_transfer_status CHECK (status IN ('DRAFT','POSTED','CANCELLED')); ALTER TABLE stock_adjustment DROP CONSTRAINT IF EXISTS chk_stock_adjustment_status; ALTER TABLE stock_adjustment ADD CONSTRAINT chk_stock_adjustment_status CHECK (status IN ('DRAFT','APPROVED','POSTED','CANCELLED'));"
+
+  - changeSet:
+      id: 039-add-bank-reconciliation-flow
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 039_add_bank_reconciliation_flow.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP TABLE IF EXISTS bank_statement_entry;"
+
+  - changeSet:
+      id: 040-expand-serial-status-constraint
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 040_expand_serial_status_constraint.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "ALTER TABLE serial_number DROP CONSTRAINT IF EXISTS chk_serial_status; ALTER TABLE serial_number ADD CONSTRAINT chk_serial_status CHECK (status IN ('IN_STOCK','RESERVED','SOLD','RETURNED','REPLACED','SCRAPPED','SERVICE_IN','SERVICE_OUT'));"
+
+  - changeSet:
+      id: 041-expand-return-status-constraints
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 041_expand_return_status_constraints.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "ALTER TABLE sales_return DROP CONSTRAINT IF EXISTS chk_sales_return_status; ALTER TABLE sales_return ADD CONSTRAINT chk_sales_return_status CHECK (status IN ('DRAFT','POSTED','CANCELLED')); ALTER TABLE purchase_return DROP CONSTRAINT IF EXISTS chk_purchase_return_status; ALTER TABLE purchase_return ADD CONSTRAINT chk_purchase_return_status CHECK (status IN ('DRAFT','POSTED','CANCELLED'));"
+
+  - changeSet:
+      id: 042-add-store-product-supplier-preference
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 042_add_store_product_supplier_preference.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP TABLE IF EXISTS store_product_supplier_preference;"
+
+  - changeSet:
+      id: 043-owner-account-subscription-model
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 043_owner_account_subscription_model.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for owner-account subscription migration';"
+
+  - changeSet:
+      id: 044-add-hsn-master
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 044_add_hsn_master.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP TABLE IF EXISTS hsn_master;"
+
+  - changeSet:
+      id: 045-add-hsn-tax-rate
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 045_add_hsn_tax_rate.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP TABLE IF EXISTS hsn_tax_rate;"
+
+  - changeSet:
+      id: 046-add-product-attribute-metadata
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 046_add_product_attribute_metadata.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP TABLE IF EXISTS product_attribute_scope; DROP TABLE IF EXISTS product_attribute_option; DROP TABLE IF EXISTS product_attribute_definition;"
+
+  - changeSet:
+      id: 047-add-store-product-attribute-value
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 047_add_store_product_attribute_value.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP TABLE IF EXISTS store_product_attribute_value;"
+
+  - changeSet:
+      id: 048-add-store-product-warranty-fields
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 048_add_store_product_warranty_fields.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "ALTER TABLE store_product DROP COLUMN IF EXISTS warranty_terms, DROP COLUMN IF EXISTS default_warranty_months;"
+
+  - changeSet:
+      id: 049-add-warranty-extension-flow
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 049_add_warranty_extension_flow.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP TABLE IF EXISTS warranty_extension;"
+
+  - changeSet:
+      id: 050-add-service-agreement-flow
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 050_add_service_agreement_flow.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP TABLE IF EXISTS service_agreement_item; DROP TABLE IF EXISTS service_agreement;"
+
+  - changeSet:
+      id: 051-add-platform-admin-role
+      author: sameer
+      context: seed
+      changes:
+        - sqlFile:
+            path: 051_add_platform_admin_role.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for platform admin seed migration';"
+
+  - changeSet:
+      id: 052-add-auth-refresh-session
+      author: sameer
+      changes:
+        - sqlFile:
+            path: 052_add_auth_refresh_session.sql
+            relativeToChangelogFile: true
+            splitStatements: true
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "DROP TABLE IF EXISTS auth_refresh_session;"

@@ -38,6 +38,15 @@ public class PlatformAdminController {
         return ErpApiResponse.ok(platformAdminService.stores());
     }
 
+    @GetMapping("/owner-accounts")
+    @Operation(summary = "List owner accounts for store assignment")
+    @PreAuthorize(PLATFORM_ADMIN_AUTHORITY)
+    public ErpApiResponse<List<PlatformAdminDtos.OwnerAccountReferenceResponse>> ownerAccounts(
+            @RequestParam(required = false) String query
+    ) {
+        return ErpApiResponse.ok(platformAdminService.ownerAccounts(query));
+    }
+
     @GetMapping("/stores/{organizationId}")
     @Operation(summary = "Get store by organization id")
     @PreAuthorize(PLATFORM_ADMIN_AUTHORITY)

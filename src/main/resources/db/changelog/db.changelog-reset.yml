@@ -1,16 +1,4 @@
 databaseChangeLog:
-  - changeSet:
-      id: 004-reset-demo-data
-      author: openai
-      context: reset,dev,test
-      runAlways: true
-      runOnChange: true
-      changes:
-        - sqlFile:
-            path: 004_reset_erp_v4_demo_data.sql
-            relativeToChangelogFile: true
-            splitStatements: false
-            endDelimiter: ";"
-      rollback:
-        - sql:
-            sql: "SELECT 'No rollback for reset';"
+  - include:
+      file: legacy/db.changelog-reset-legacy.yml
+      relativeToChangelogFile: true

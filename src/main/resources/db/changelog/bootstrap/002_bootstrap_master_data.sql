@@ -1,571 +1,334 @@
--- Consolidated bootstrap master data for fresh databases only.
+-- liquibase formatted sql
 
--- Generated from legacy Liquibase history. Do not use on an already-migrated database.
+-- changeset sameerkhan:1775937578022-1
+INSERT INTO "role" ("id", "code", "name", "is_system", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 'OWNER', 'Owner', TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role" ("id", "code", "name", "is_system", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, 'ADMIN', 'Administrator', TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role" ("id", "code", "name", "is_system", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, 'ACCOUNTANT', 'Accountant', TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role" ("id", "code", "name", "is_system", "created_at", "created_by", "updated_at", "updated_by") VALUES (12, 'STORE_MANAGER', 'Store Manager', TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role" ("id", "code", "name", "is_system", "created_at", "created_by", "updated_at", "updated_by") VALUES (13, 'CASHIER', 'Cashier', TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role" ("id", "code", "name", "is_system", "created_at", "created_by", "updated_at", "updated_by") VALUES (14, 'PURCHASE_OPERATOR', 'Purchase Operator', TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role" ("id", "code", "name", "is_system", "created_at", "created_by", "updated_at", "updated_by") VALUES (15, 'TECHNICIAN', 'Technician', TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role" ("id", "code", "name", "is_system", "created_at", "created_by", "updated_at", "updated_by") VALUES (16, 'VIEWER', 'Viewer', TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role" ("id", "code", "name", "is_system", "created_at", "created_by", "updated_at", "updated_by") VALUES (18, 'PLATFORM_ADMIN', 'Platform Administrator', TRUE, '2026-04-05 02:11:19.371302', NULL, '2026-04-05 02:11:19.371302', NULL);
 
+-- changeset sameerkhan:1775937578022-2
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 'dashboard.view', 'View dashboard', 'DASHBOARD', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 'masters.view', 'View masters', 'MASTERS', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 'masters.manage', 'Manage masters', 'MASTERS', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 'sales.view', 'View sales', 'SALES', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 'sales.create', 'Create sales invoice', 'SALES', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 'sales.cancel', 'Cancel sales invoice', 'SALES', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 'sales.return', 'Process sales return', 'SALES', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 'purchases.view', 'View purchases', 'PURCHASE', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 'purchases.create', 'Create purchase order', 'PURCHASE', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, 'purchases.approve', 'Approve purchase order', 'PURCHASE', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, 'purchases.receive', 'Receive purchase order', 'PURCHASE', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (12, 'inventory.view', 'View inventory', 'INVENTORY', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (13, 'inventory.adjust', 'Adjust stock', 'INVENTORY', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (14, 'inventory.transfer', 'Transfer stock', 'INVENTORY', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (15, 'payments.customer', 'Manage customer receipts', 'FINANCE', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (16, 'payments.supplier', 'Manage supplier payments', 'FINANCE', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (17, 'expenses.view', 'View expenses', 'EXPENSE', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (18, 'expenses.create', 'Create expense', 'EXPENSE', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (19, 'expenses.approve', 'Approve expense', 'EXPENSE', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (20, 'reports.view', 'View reports', 'REPORTS', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (21, 'service.view', 'View service', 'SERVICE', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (22, 'service.manage', 'Manage service tickets', 'SERVICE', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (23, 'service.claims', 'Manage warranty claims', 'SERVICE', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (24, 'settings.manage', 'Manage settings', 'SETTINGS', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (25, 'users.manage', 'Manage users', 'USERS', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (26, 'approvals.manage', 'Manage approvals', 'APPROVALS', '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (27, 'org.view', 'View organization', 'FOUNDATION', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (28, 'org.manage', 'Manage organization', 'FOUNDATION', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (29, 'branch.view', 'View branches', 'FOUNDATION', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (30, 'branch.manage', 'Manage branches', 'FOUNDATION', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (31, 'warehouse.view', 'View warehouses', 'FOUNDATION', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (32, 'warehouse.manage', 'Manage warehouses', 'FOUNDATION', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (33, 'user.view', 'View users', 'USERS', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (34, 'user.manage', 'Manage users', 'USERS', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (35, 'subscription.view', 'View subscriptions', 'SUBSCRIPTION', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (36, 'subscription.manage', 'Manage subscriptions', 'SUBSCRIPTION', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (37, 'settings.view', 'View settings', 'SETTINGS', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (39, 'catalog.view', 'View catalog', 'CATALOG', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (40, 'catalog.manage', 'Manage catalog', 'CATALOG', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (42, 'inventory.receive', 'Receive inventory', 'INVENTORY', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (45, 'purchase.view', 'View purchases', 'PURCHASE', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (46, 'purchase.create', 'Create purchases', 'PURCHASE', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (47, 'purchase.approve', 'Approve purchases', 'PURCHASE', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (48, 'purchase.post', 'Post purchase documents', 'PURCHASE', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (51, 'sales.post', 'Post sales documents', 'SALES', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (53, 'payment.receive', 'Receive payments', 'PAYMENTS', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (54, 'payment.pay', 'Create outgoing payments', 'PAYMENTS', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (55, 'report.branch.view', 'View branch reports', 'REPORTS', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (56, 'report.org.view', 'View organization reports', 'REPORTS', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (57, 'tax.view', 'View tax settings', 'TAX', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (58, 'tax.manage', 'Manage tax settings', 'TAX', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (59, 'accounting.view', 'View accounting', 'ACCOUNTING', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (60, 'accounting.post', 'Post accounting entries', 'ACCOUNTING', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (63, 'approval.manage', 'Manage approvals', 'APPROVALS', '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (64, 'purchase.return', 'Process purchase returns', 'PURCHASE', '2026-03-29 13:00:21.479497', NULL, '2026-03-29 13:00:21.479497', NULL);
+INSERT INTO "permission" ("id", "code", "name", "module_code", "created_at", "created_by", "updated_at", "updated_by") VALUES (66, 'platform.manage', 'Manage platform admin console', 'PLATFORM_ADMIN', '2026-04-05 02:11:19.371302', NULL, '2026-04-05 02:11:19.371302', NULL);
 
--- ===== SOURCE: 002_seed_erp_v4_master_data.sql =====
+-- changeset sameerkhan:1775937578022-3
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 9, 26, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 9, 25, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 9, 24, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 9, 23, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 9, 22, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 9, 21, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 9, 20, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 9, 19, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 9, 18, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, 9, 17, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, 9, 16, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (12, 9, 15, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (13, 9, 14, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (14, 9, 13, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (15, 9, 12, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (16, 9, 11, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (17, 9, 10, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (18, 9, 9, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (19, 9, 8, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (20, 9, 7, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (21, 9, 6, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (22, 9, 5, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (23, 9, 4, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (24, 9, 3, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (25, 9, 2, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (26, 9, 1, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (27, 10, 26, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (28, 10, 25, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (29, 10, 23, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (30, 10, 22, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (31, 10, 21, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (32, 10, 20, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (33, 10, 19, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (34, 10, 18, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (35, 10, 17, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (36, 10, 16, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (37, 10, 15, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (38, 10, 14, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (39, 10, 13, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (40, 10, 12, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (41, 10, 11, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (42, 10, 10, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (43, 10, 9, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (44, 10, 8, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (45, 10, 7, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (46, 10, 6, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (47, 10, 5, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (48, 10, 4, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (49, 10, 3, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (50, 10, 2, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (51, 10, 1, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (52, 11, 20, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (53, 11, 18, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (54, 11, 17, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (55, 11, 16, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (56, 11, 15, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (57, 11, 12, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (58, 11, 11, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (59, 11, 9, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (60, 11, 8, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (61, 11, 5, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (62, 11, 4, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (63, 11, 2, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (64, 11, 1, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (65, 12, 22, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (66, 12, 21, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (67, 12, 20, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (68, 12, 14, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (69, 12, 13, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (70, 12, 12, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (71, 12, 11, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (72, 12, 8, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (73, 12, 5, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (74, 12, 4, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (75, 12, 2, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (76, 12, 1, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (77, 13, 12, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (78, 13, 15, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (79, 13, 5, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (80, 13, 4, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (81, 13, 1, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (82, 14, 12, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (83, 14, 11, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (84, 14, 9, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (85, 14, 8, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (86, 14, 1, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (87, 15, 12, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (88, 15, 22, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (89, 15, 21, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (90, 15, 1, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (91, 16, 21, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (92, 16, 20, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (93, 16, 17, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (94, 16, 12, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (95, 16, 8, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (96, 16, 4, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (97, 16, 2, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (98, 16, 1, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (99, 9, 27, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (100, 9, 28, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (101, 9, 29, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (102, 9, 30, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (103, 9, 31, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (104, 9, 32, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (105, 9, 33, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (106, 9, 34, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (107, 9, 35, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (108, 9, 36, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (109, 9, 37, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (111, 9, 39, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (112, 9, 40, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (114, 9, 42, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (117, 9, 45, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (118, 9, 46, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (119, 9, 47, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (120, 9, 48, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (123, 9, 51, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (125, 9, 53, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (126, 9, 54, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (127, 9, 55, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (128, 9, 56, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (129, 9, 57, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (130, 9, 58, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (131, 9, 59, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (132, 9, 60, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (135, 9, 63, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (136, 10, 27, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (137, 10, 29, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (138, 10, 30, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (139, 10, 31, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (140, 10, 32, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (141, 10, 33, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (142, 10, 34, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (143, 10, 35, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (144, 10, 37, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (145, 10, 24, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (146, 10, 39, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (147, 10, 40, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (149, 10, 42, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (152, 10, 45, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (153, 10, 46, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (154, 10, 47, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (155, 10, 48, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (158, 10, 51, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (160, 10, 53, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (161, 10, 54, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (162, 10, 55, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (163, 10, 56, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (164, 10, 57, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (165, 10, 59, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (168, 10, 63, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (169, 11, 27, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (170, 11, 29, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (171, 11, 31, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (172, 11, 39, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (174, 11, 45, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (176, 11, 53, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (177, 11, 54, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (178, 11, 55, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (179, 11, 56, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (180, 11, 57, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (181, 11, 58, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (182, 11, 59, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (183, 11, 60, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (184, 11, 21, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (185, 12, 27, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (186, 12, 29, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (187, 12, 31, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (188, 12, 39, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (189, 12, 40, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (191, 12, 42, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (194, 12, 45, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (195, 12, 46, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (196, 12, 48, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (199, 12, 51, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (200, 12, 7, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (201, 12, 53, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (202, 12, 55, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (205, 13, 29, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (206, 13, 31, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (207, 13, 39, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (211, 13, 51, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (212, 13, 7, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (213, 13, 53, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (214, 14, 29, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (215, 14, 31, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (216, 14, 39, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (218, 14, 42, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (219, 14, 45, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (220, 14, 46, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (221, 14, 48, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (222, 15, 29, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (223, 15, 39, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (227, 16, 27, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (228, 16, 29, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (229, 16, 31, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (230, 16, 39, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (232, 16, 45, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (234, 16, 55, '2026-03-25 19:06:28.050965', NULL, '2026-03-25 19:06:28.050965', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (236, 12, 64, '2026-03-29 13:00:21.479497', NULL, '2026-03-29 13:00:21.479497', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (237, 10, 64, '2026-03-29 13:00:21.479497', NULL, '2026-03-29 13:00:21.479497', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (238, 9, 64, '2026-03-29 13:00:21.479497', NULL, '2026-03-29 13:00:21.479497', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (239, 14, 64, '2026-03-29 13:00:21.479497', NULL, '2026-03-29 13:00:21.479497', NULL);
+INSERT INTO "role_permission" ("id", "role_id", "permission_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (241, 18, 66, '2026-04-05 02:11:19.371302', NULL, '2026-04-05 02:11:19.371302', NULL);
 
-BEGIN;
+-- changeset sameerkhan:1775937578022-4
+INSERT INTO "uom_group" ("id", "code", "name", "allows_fraction", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 'COUNT', 'Count', FALSE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "uom_group" ("id", "code", "name", "allows_fraction", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 'WEIGHT', 'Weight', TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "uom_group" ("id", "code", "name", "allows_fraction", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 'VOLUME', 'Volume', TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "uom_group" ("id", "code", "name", "allows_fraction", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 'LENGTH', 'Length', TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "uom_group" ("id", "code", "name", "allows_fraction", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, 'AREA', 'Area', TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
 
--- =========================================================
--- ERP V4 - Reference/master seed data
--- Run after 001_create_erp_v4_schema.sql
--- Adjust organization-scoped inserts after creating your first organization.
--- =========================================================
+-- changeset sameerkhan:1775937578022-5
+INSERT INTO "uom" ("id", "uom_group_id", "code", "name", "decimal_scale", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 6, 'PAIR', 'Pair', 0, TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "uom" ("id", "uom_group_id", "code", "name", "decimal_scale", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 6, 'CARTON', 'Carton', 0, TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "uom" ("id", "uom_group_id", "code", "name", "decimal_scale", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 6, 'BOX', 'Box', 0, TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "uom" ("id", "uom_group_id", "code", "name", "decimal_scale", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 6, 'DOZEN', 'Dozen', 0, TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "uom" ("id", "uom_group_id", "code", "name", "decimal_scale", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 6, 'PCS', 'Pieces', 0, TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "uom" ("id", "uom_group_id", "code", "name", "decimal_scale", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 7, 'TON', 'Ton', 3, TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "uom" ("id", "uom_group_id", "code", "name", "decimal_scale", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 7, 'KG', 'Kilogram', 3, TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "uom" ("id", "uom_group_id", "code", "name", "decimal_scale", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 7, 'G', 'Gram', 3, TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "uom" ("id", "uom_group_id", "code", "name", "decimal_scale", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 8, 'LTR', 'Litre', 3, TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "uom" ("id", "uom_group_id", "code", "name", "decimal_scale", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, 8, 'ML', 'Millilitre', 3, TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "uom" ("id", "uom_group_id", "code", "name", "decimal_scale", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, 9, 'MTR', 'Metre', 3, TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "uom" ("id", "uom_group_id", "code", "name", "decimal_scale", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (12, 9, 'CM', 'Centimetre', 3, TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "uom" ("id", "uom_group_id", "code", "name", "decimal_scale", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (13, 9, 'MM', 'Millimetre', 3, TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "uom" ("id", "uom_group_id", "code", "name", "decimal_scale", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (14, 10, 'SQM', 'Square Metre', 3, TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
+INSERT INTO "uom" ("id", "uom_group_id", "code", "name", "decimal_scale", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (15, 10, 'SQFT', 'Square Foot', 3, TRUE, '2026-03-25 03:15:15.428718', NULL, '2026-03-25 03:15:15.428718', NULL);
 
--- Global roles
-INSERT INTO role (code, name, is_system)
-VALUES
-  ('OWNER', 'Owner', TRUE),
-  ('ADMIN', 'Administrator', TRUE),
-  ('ACCOUNTANT', 'Accountant', TRUE),
-  ('STORE_MANAGER', 'Store Manager', TRUE),
-  ('CASHIER', 'Cashier', TRUE),
-  ('PURCHASE_OPERATOR', 'Purchase Operator', TRUE),
-  ('TECHNICIAN', 'Technician', TRUE),
-  ('VIEWER', 'Viewer', TRUE)
-ON CONFLICT (code) DO NOTHING;
+-- changeset sameerkhan:1775937578022-6
+INSERT INTO "subscription_plan" ("id", "code", "name", "description", "billing_period", "is_active", "created_at", "created_by", "updated_at", "updated_by", "max_organizations", "is_unlimited_organizations") VALUES (1, 'STARTER', 'Starter', 'Core operations for a single-location business', 'MONTHLY', TRUE, '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL, 1, FALSE);
+INSERT INTO "subscription_plan" ("id", "code", "name", "description", "billing_period", "is_active", "created_at", "created_by", "updated_at", "updated_by", "max_organizations", "is_unlimited_organizations") VALUES (2, 'GROWTH', 'Growth', 'Multi-branch operations with service and expense modules', 'MONTHLY', TRUE, '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL, 3, FALSE);
+INSERT INTO "subscription_plan" ("id", "code", "name", "description", "billing_period", "is_active", "created_at", "created_by", "updated_at", "updated_by", "max_organizations", "is_unlimited_organizations") VALUES (3, 'ENTERPRISE', 'Enterprise', 'Full access including approval workflows', 'CUSTOM', TRUE, '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL, NULL, TRUE);
 
--- UOM groups
-INSERT INTO uom_group (code, name, allows_fraction)
-VALUES
-  ('COUNT', 'Count', FALSE),
-  ('WEIGHT', 'Weight', TRUE),
-  ('VOLUME', 'Volume', TRUE),
-  ('LENGTH', 'Length', TRUE),
-  ('AREA', 'Area', TRUE)
-ON CONFLICT (code) DO NOTHING;
+-- changeset sameerkhan:1775937578022-7
+INSERT INTO "hsn_master" ("id", "hsn_code", "description", "chapter_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "is_active", "source_name", "effective_from", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, '39173100', 'Flexible tubes, pipes and hoses, of plastics', '39', 9.00, 9.00, 18.00, 0.00, TRUE, 'Curated phase-1 reference seed', '2025-01-01', '2026-04-04 02:50:58.469446', NULL, '2026-04-04 02:50:58.469446', NULL);
+INSERT INTO "hsn_master" ("id", "hsn_code", "description", "chapter_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "is_active", "source_name", "effective_from", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, '73269099', 'Other articles of iron or steel', '73', 9.00, 9.00, 18.00, 0.00, TRUE, 'Curated phase-1 reference seed', '2025-01-01', '2026-04-04 02:50:58.469446', NULL, '2026-04-04 02:50:58.469446', NULL);
+INSERT INTO "hsn_master" ("id", "hsn_code", "description", "chapter_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "is_active", "source_name", "effective_from", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, '84145190', 'Fans: table, floor, wall, window, ceiling or roof fans, other', '84', 6.00, 6.00, 12.00, 0.00, TRUE, 'Curated phase-1 reference seed', '2025-01-01', '2026-04-04 02:50:58.469446', NULL, '2026-04-04 02:50:58.469446', NULL);
+INSERT INTO "hsn_master" ("id", "hsn_code", "description", "chapter_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "is_active", "source_name", "effective_from", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, '85043190', 'Electrical transformers, other', '85', 9.00, 9.00, 18.00, 0.00, TRUE, 'Curated phase-1 reference seed', '2025-01-01', '2026-04-04 02:50:58.469446', NULL, '2026-04-04 02:50:58.469446', NULL);
+INSERT INTO "hsn_master" ("id", "hsn_code", "description", "chapter_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "is_active", "source_name", "effective_from", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, '85362000', 'Automatic circuit breakers', '85', 9.00, 9.00, 18.00, 0.00, TRUE, 'Curated phase-1 reference seed', '2025-01-01', '2026-04-04 02:50:58.469446', NULL, '2026-04-04 02:50:58.469446', NULL);
+INSERT INTO "hsn_master" ("id", "hsn_code", "description", "chapter_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "is_active", "source_name", "effective_from", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, '85365090', 'Electrical switches, other', '85', 9.00, 9.00, 18.00, 0.00, TRUE, 'Curated phase-1 reference seed', '2025-01-01', '2026-04-04 02:50:58.469446', NULL, '2026-04-04 02:50:58.469446', NULL);
+INSERT INTO "hsn_master" ("id", "hsn_code", "description", "chapter_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "is_active", "source_name", "effective_from", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, '85366990', 'Plugs and sockets, other', '85', 9.00, 9.00, 18.00, 0.00, TRUE, 'Curated phase-1 reference seed', '2025-01-01', '2026-04-04 02:50:58.469446', NULL, '2026-04-04 02:50:58.469446', NULL);
+INSERT INTO "hsn_master" ("id", "hsn_code", "description", "chapter_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "is_active", "source_name", "effective_from", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, '85371000', 'Boards, panels, consoles, cabinets and other bases for electric control or distribution', '85', 9.00, 9.00, 18.00, 0.00, TRUE, 'Curated phase-1 reference seed', '2025-01-01', '2026-04-04 02:50:58.469446', NULL, '2026-04-04 02:50:58.469446', NULL);
+INSERT INTO "hsn_master" ("id", "hsn_code", "description", "chapter_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "is_active", "source_name", "effective_from", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, '85444299', 'Insulated electric conductors fitted with connectors, other', '85', 9.00, 9.00, 18.00, 0.00, TRUE, 'Curated phase-1 reference seed', '2025-01-01', '2026-04-04 02:50:58.469446', NULL, '2026-04-04 02:50:58.469446', NULL);
+INSERT INTO "hsn_master" ("id", "hsn_code", "description", "chapter_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "is_active", "source_name", "effective_from", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, '85444999', 'Other insulated electric conductors, other', '85', 9.00, 9.00, 18.00, 0.00, TRUE, 'Curated phase-1 reference seed', '2025-01-01', '2026-04-04 02:50:58.469446', NULL, '2026-04-04 02:50:58.469446', NULL);
+INSERT INTO "hsn_master" ("id", "hsn_code", "description", "chapter_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "is_active", "source_name", "effective_from", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, '94051090', 'Chandeliers and other electric ceiling or wall lighting fittings, other', '94', 6.00, 6.00, 12.00, 0.00, TRUE, 'Curated phase-1 reference seed', '2025-01-01', '2026-04-04 02:50:58.469446', NULL, '2026-04-04 02:50:58.469446', NULL);
+INSERT INTO "hsn_master" ("id", "hsn_code", "description", "chapter_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "is_active", "source_name", "effective_from", "created_at", "created_by", "updated_at", "updated_by") VALUES (12, '94054090', 'Other electric lamps and lighting fittings', '94', 6.00, 6.00, 12.00, 0.00, TRUE, 'Curated phase-1 reference seed', '2025-01-01', '2026-04-04 02:50:58.469446', NULL, '2026-04-04 02:50:58.469446', NULL);
 
--- UOMs
-INSERT INTO uom (uom_group_id, code, name, decimal_scale, is_active)
-SELECT ug.id, src.code, src.name, src.decimal_scale, TRUE
-FROM (
-  VALUES
-    ('COUNT','PCS','Pieces',0),
-    ('COUNT','DOZEN','Dozen',0),
-    ('COUNT','BOX','Box',0),
-    ('COUNT','CARTON','Carton',0),
-    ('COUNT','PAIR','Pair',0),
-    ('WEIGHT','G','Gram',3),
-    ('WEIGHT','KG','Kilogram',3),
-    ('WEIGHT','TON','Ton',3),
-    ('VOLUME','ML','Millilitre',3),
-    ('VOLUME','LTR','Litre',3),
-    ('LENGTH','MM','Millimetre',3),
-    ('LENGTH','CM','Centimetre',3),
-    ('LENGTH','MTR','Metre',3),
-    ('AREA','SQFT','Square Foot',3),
-    ('AREA','SQM','Square Metre',3)
-) AS src(group_code, code, name, decimal_scale)
-JOIN uom_group ug ON ug.code = src.group_code
-ON CONFLICT (code) DO NOTHING;
+-- changeset sameerkhan:1775937578022-8
+INSERT INTO "hsn_tax_rate" ("id", "hsn_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "effective_from", "effective_to", "is_active", "source_name", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, '39173100', 9.00, 9.00, 18.00, 0.00, '2025-01-01', NULL, TRUE, 'Curated phase-1 reference seed', '2026-04-04 17:53:06.654796', NULL, '2026-04-04 17:53:06.654796', NULL);
+INSERT INTO "hsn_tax_rate" ("id", "hsn_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "effective_from", "effective_to", "is_active", "source_name", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, '73269099', 9.00, 9.00, 18.00, 0.00, '2025-01-01', NULL, TRUE, 'Curated phase-1 reference seed', '2026-04-04 17:53:06.654796', NULL, '2026-04-04 17:53:06.654796', NULL);
+INSERT INTO "hsn_tax_rate" ("id", "hsn_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "effective_from", "effective_to", "is_active", "source_name", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, '84145190', 6.00, 6.00, 12.00, 0.00, '2025-01-01', NULL, TRUE, 'Curated phase-1 reference seed', '2026-04-04 17:53:06.654796', NULL, '2026-04-04 17:53:06.654796', NULL);
+INSERT INTO "hsn_tax_rate" ("id", "hsn_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "effective_from", "effective_to", "is_active", "source_name", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, '85043190', 9.00, 9.00, 18.00, 0.00, '2025-01-01', NULL, TRUE, 'Curated phase-1 reference seed', '2026-04-04 17:53:06.654796', NULL, '2026-04-04 17:53:06.654796', NULL);
+INSERT INTO "hsn_tax_rate" ("id", "hsn_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "effective_from", "effective_to", "is_active", "source_name", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, '85362000', 9.00, 9.00, 18.00, 0.00, '2025-01-01', NULL, TRUE, 'Curated phase-1 reference seed', '2026-04-04 17:53:06.654796', NULL, '2026-04-04 17:53:06.654796', NULL);
+INSERT INTO "hsn_tax_rate" ("id", "hsn_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "effective_from", "effective_to", "is_active", "source_name", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, '85365090', 9.00, 9.00, 18.00, 0.00, '2025-01-01', NULL, TRUE, 'Curated phase-1 reference seed', '2026-04-04 17:53:06.654796', NULL, '2026-04-04 17:53:06.654796', NULL);
+INSERT INTO "hsn_tax_rate" ("id", "hsn_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "effective_from", "effective_to", "is_active", "source_name", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, '85366990', 9.00, 9.00, 18.00, 0.00, '2025-01-01', NULL, TRUE, 'Curated phase-1 reference seed', '2026-04-04 17:53:06.654796', NULL, '2026-04-04 17:53:06.654796', NULL);
+INSERT INTO "hsn_tax_rate" ("id", "hsn_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "effective_from", "effective_to", "is_active", "source_name", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, '85371000', 9.00, 9.00, 18.00, 0.00, '2025-01-01', NULL, TRUE, 'Curated phase-1 reference seed', '2026-04-04 17:53:06.654796', NULL, '2026-04-04 17:53:06.654796', NULL);
+INSERT INTO "hsn_tax_rate" ("id", "hsn_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "effective_from", "effective_to", "is_active", "source_name", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, '85444299', 9.00, 9.00, 18.00, 0.00, '2025-01-01', NULL, TRUE, 'Curated phase-1 reference seed', '2026-04-04 17:53:06.654796', NULL, '2026-04-04 17:53:06.654796', NULL);
+INSERT INTO "hsn_tax_rate" ("id", "hsn_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "effective_from", "effective_to", "is_active", "source_name", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, '85444999', 9.00, 9.00, 18.00, 0.00, '2025-01-01', NULL, TRUE, 'Curated phase-1 reference seed', '2026-04-04 17:53:06.654796', NULL, '2026-04-04 17:53:06.654796', NULL);
+INSERT INTO "hsn_tax_rate" ("id", "hsn_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "effective_from", "effective_to", "is_active", "source_name", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, '94051090', 6.00, 6.00, 12.00, 0.00, '2025-01-01', NULL, TRUE, 'Curated phase-1 reference seed', '2026-04-04 17:53:06.654796', NULL, '2026-04-04 17:53:06.654796', NULL);
+INSERT INTO "hsn_tax_rate" ("id", "hsn_code", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "effective_from", "effective_to", "is_active", "source_name", "created_at", "created_by", "updated_at", "updated_by") VALUES (12, '94054090', 6.00, 6.00, 12.00, 0.00, '2025-01-01', NULL, TRUE, 'Curated phase-1 reference seed', '2026-04-04 17:53:06.654796', NULL, '2026-04-04 17:53:06.654796', NULL);
 
--- Permissions
-INSERT INTO permission (code, name, module_code)
-VALUES
-  ('dashboard.view', 'View dashboard', 'DASHBOARD'),
-  ('masters.view', 'View masters', 'MASTERS'),
-  ('masters.manage', 'Manage masters', 'MASTERS'),
-  ('sales.view', 'View sales', 'SALES'),
-  ('sales.create', 'Create sales invoice', 'SALES'),
-  ('sales.cancel', 'Cancel sales invoice', 'SALES'),
-  ('sales.return', 'Process sales return', 'SALES'),
-  ('purchases.view', 'View purchases', 'PURCHASE'),
-  ('purchases.create', 'Create purchase order', 'PURCHASE'),
-  ('purchases.approve', 'Approve purchase order', 'PURCHASE'),
-  ('purchases.receive', 'Receive purchase order', 'PURCHASE'),
-  ('inventory.view', 'View inventory', 'INVENTORY'),
-  ('inventory.adjust', 'Adjust stock', 'INVENTORY'),
-  ('inventory.transfer', 'Transfer stock', 'INVENTORY'),
-  ('payments.customer', 'Manage customer receipts', 'FINANCE'),
-  ('payments.supplier', 'Manage supplier payments', 'FINANCE'),
-  ('expenses.view', 'View expenses', 'EXPENSE'),
-  ('expenses.create', 'Create expense', 'EXPENSE'),
-  ('expenses.approve', 'Approve expense', 'EXPENSE'),
-  ('reports.view', 'View reports', 'REPORTS'),
-  ('service.view', 'View service', 'SERVICE'),
-  ('service.manage', 'Manage service tickets', 'SERVICE'),
-  ('service.claims', 'Manage warranty claims', 'SERVICE'),
-  ('settings.manage', 'Manage settings', 'SETTINGS'),
-  ('users.manage', 'Manage users', 'USERS'),
-  ('approvals.manage', 'Manage approvals', 'APPROVALS')
-ON CONFLICT (code) DO NOTHING;
-
--- Role -> permission mapping
-WITH rp(role_code, permission_code) AS (
-  VALUES
-    ('OWNER','dashboard.view'),('OWNER','masters.view'),('OWNER','masters.manage'),('OWNER','sales.view'),('OWNER','sales.create'),('OWNER','sales.cancel'),('OWNER','sales.return'),
-    ('OWNER','purchases.view'),('OWNER','purchases.create'),('OWNER','purchases.approve'),('OWNER','purchases.receive'),('OWNER','inventory.view'),('OWNER','inventory.adjust'),('OWNER','inventory.transfer'),
-    ('OWNER','payments.customer'),('OWNER','payments.supplier'),('OWNER','expenses.view'),('OWNER','expenses.create'),('OWNER','expenses.approve'),('OWNER','reports.view'),('OWNER','service.view'),('OWNER','service.manage'),('OWNER','service.claims'),('OWNER','settings.manage'),('OWNER','users.manage'),('OWNER','approvals.manage'),
-    ('ADMIN','dashboard.view'),('ADMIN','masters.view'),('ADMIN','masters.manage'),('ADMIN','sales.view'),('ADMIN','sales.create'),('ADMIN','sales.cancel'),('ADMIN','sales.return'),
-    ('ADMIN','purchases.view'),('ADMIN','purchases.create'),('ADMIN','purchases.approve'),('ADMIN','purchases.receive'),('ADMIN','inventory.view'),('ADMIN','inventory.adjust'),('ADMIN','inventory.transfer'),
-    ('ADMIN','payments.customer'),('ADMIN','payments.supplier'),('ADMIN','expenses.view'),('ADMIN','expenses.create'),('ADMIN','expenses.approve'),('ADMIN','reports.view'),('ADMIN','service.view'),('ADMIN','service.manage'),('ADMIN','service.claims'),('ADMIN','users.manage'),('ADMIN','approvals.manage'),
-    ('ACCOUNTANT','dashboard.view'),('ACCOUNTANT','masters.view'),('ACCOUNTANT','sales.view'),('ACCOUNTANT','sales.create'),('ACCOUNTANT','purchases.view'),('ACCOUNTANT','purchases.create'),('ACCOUNTANT','purchases.receive'),('ACCOUNTANT','inventory.view'),('ACCOUNTANT','payments.customer'),('ACCOUNTANT','payments.supplier'),('ACCOUNTANT','expenses.view'),('ACCOUNTANT','expenses.create'),('ACCOUNTANT','reports.view'),
-    ('STORE_MANAGER','dashboard.view'),('STORE_MANAGER','masters.view'),('STORE_MANAGER','sales.view'),('STORE_MANAGER','sales.create'),('STORE_MANAGER','purchases.view'),('STORE_MANAGER','purchases.receive'),('STORE_MANAGER','inventory.view'),('STORE_MANAGER','inventory.adjust'),('STORE_MANAGER','inventory.transfer'),('STORE_MANAGER','reports.view'),('STORE_MANAGER','service.view'),('STORE_MANAGER','service.manage'),
-    ('CASHIER','dashboard.view'),('CASHIER','sales.view'),('CASHIER','sales.create'),('CASHIER','payments.customer'),('CASHIER','inventory.view'),
-    ('PURCHASE_OPERATOR','dashboard.view'),('PURCHASE_OPERATOR','purchases.view'),('PURCHASE_OPERATOR','purchases.create'),('PURCHASE_OPERATOR','purchases.receive'),('PURCHASE_OPERATOR','inventory.view'),
-    ('TECHNICIAN','dashboard.view'),('TECHNICIAN','service.view'),('TECHNICIAN','service.manage'),('TECHNICIAN','inventory.view'),
-    ('VIEWER','dashboard.view'),('VIEWER','masters.view'),('VIEWER','sales.view'),('VIEWER','purchases.view'),('VIEWER','inventory.view'),('VIEWER','expenses.view'),('VIEWER','reports.view'),('VIEWER','service.view')
-)
-INSERT INTO role_permission (role_id, permission_id)
-SELECT r.id, p.id
-FROM rp
-JOIN role r ON r.code = rp.role_code
-JOIN permission p ON p.code = rp.permission_code
-ON CONFLICT (role_id, permission_id) DO NOTHING;
-
--- Optional starter organization-scoped seed data.
--- Replace/adjust organization code before running if you want this block.
-WITH org AS (
-  SELECT id FROM organization WHERE code = 'DEFAULT' LIMIT 1
-)
-INSERT INTO tax_group (organization_id, code, name, cgst_rate, sgst_rate, igst_rate, cess_rate, is_active)
-SELECT org.id, src.code, src.name, src.cgst, src.sgst, src.igst, src.cess, TRUE
-FROM org
-JOIN (
-  VALUES
-    ('GST_0',  'GST 0%',  0.0, 0.0, 0.0, 0.0),
-    ('GST_5',  'GST 5%',  2.5, 2.5, 5.0, 0.0),
-    ('GST_12', 'GST 12%', 6.0, 6.0, 12.0, 0.0),
-    ('GST_18', 'GST 18%', 9.0, 9.0, 18.0, 0.0),
-    ('GST_28', 'GST 28%', 14.0, 14.0, 28.0, 0.0)
-) AS src(code, name, cgst, sgst, igst, cess) ON TRUE
-ON CONFLICT (organization_id, code) DO NOTHING;
-
-WITH org AS (
-  SELECT id FROM organization WHERE code = 'DEFAULT' LIMIT 1
-)
-INSERT INTO price_list (organization_id, code, name, price_list_type, is_active)
-SELECT org.id, src.code, src.name, src.price_list_type, TRUE
-FROM org
-JOIN (
-  VALUES
-    ('MRP', 'MRP', 'MRP'),
-    ('RETAIL', 'Retail', 'RETAIL'),
-    ('WHOLESALE', 'Wholesale', 'WHOLESALE'),
-    ('DEALER', 'Dealer', 'DEALER')
-) AS src(code, name, price_list_type) ON TRUE
-ON CONFLICT (organization_id, code) DO NOTHING;
-
-WITH org AS (
-  SELECT id FROM organization WHERE code = 'DEFAULT' LIMIT 1
-)
-INSERT INTO expense_category (organization_id, code, name, is_active)
-SELECT org.id, src.code, src.name, TRUE
-FROM org
-JOIN (
-  VALUES
-    ('RENT', 'Rent'),
-    ('SALARY', 'Salary'),
-    ('ELECTRICITY', 'Electricity'),
-    ('TRANSPORT', 'Transport'),
-    ('MAINTENANCE', 'Maintenance'),
-    ('OFFICE', 'Office Expense'),
-    ('MISC', 'Miscellaneous')
-) AS src(code, name) ON TRUE
-ON CONFLICT (organization_id, code) DO NOTHING;
-
-WITH org AS (
-  SELECT id FROM organization WHERE code = 'DEFAULT' LIMIT 1
-)
-INSERT INTO account (organization_id, code, name, account_type, is_system, is_active)
-SELECT org.id, src.code, src.name, src.account_type, TRUE, TRUE
-FROM org
-JOIN (
-  VALUES
-    ('CASH', 'Cash In Hand', 'ASSET'),
-    ('BANK', 'Bank Account', 'ASSET'),
-    ('AR', 'Accounts Receivable', 'ASSET'),
-    ('INVENTORY', 'Inventory', 'ASSET'),
-    ('AP', 'Accounts Payable', 'LIABILITY'),
-    ('OUTPUT_GST', 'Output GST', 'LIABILITY'),
-    ('INPUT_GST', 'Input GST', 'ASSET'),
-    ('SALES', 'Sales Revenue', 'INCOME'),
-    ('DISCOUNT_ALLOWED', 'Discount Allowed', 'EXPENSE'),
-    ('PURCHASES', 'Purchases', 'EXPENSE'),
-    ('EXPENSE_CONTROL', 'Operating Expenses', 'EXPENSE'),
-    ('STOCK_LOSS', 'Stock Adjustment Loss', 'EXPENSE'),
-    ('STOCK_GAIN', 'Stock Adjustment Gain', 'INCOME')
-) AS src(code, name, account_type) ON TRUE
-ON CONFLICT (organization_id, code) DO NOTHING;
-
-COMMIT;
-
-
--- ===== SOURCE: 009_seed_permission_matrix_v1.sql =====
-
-BEGIN;
-
-INSERT INTO permission (code, name, module_code)
-VALUES
-  ('org.view', 'View organization', 'FOUNDATION'),
-  ('org.manage', 'Manage organization', 'FOUNDATION'),
-  ('branch.view', 'View branches', 'FOUNDATION'),
-  ('branch.manage', 'Manage branches', 'FOUNDATION'),
-  ('warehouse.view', 'View warehouses', 'FOUNDATION'),
-  ('warehouse.manage', 'Manage warehouses', 'FOUNDATION'),
-  ('user.view', 'View users', 'USERS'),
-  ('user.manage', 'Manage users', 'USERS'),
-  ('subscription.view', 'View subscriptions', 'SUBSCRIPTION'),
-  ('subscription.manage', 'Manage subscriptions', 'SUBSCRIPTION'),
-  ('settings.view', 'View settings', 'SETTINGS'),
-  ('settings.manage', 'Manage settings', 'SETTINGS'),
-  ('catalog.view', 'View catalog', 'CATALOG'),
-  ('catalog.manage', 'Manage catalog', 'CATALOG'),
-  ('inventory.view', 'View inventory', 'INVENTORY'),
-  ('inventory.receive', 'Receive inventory', 'INVENTORY'),
-  ('inventory.adjust', 'Adjust inventory', 'INVENTORY'),
-  ('inventory.transfer', 'Transfer inventory', 'INVENTORY'),
-  ('purchase.view', 'View purchases', 'PURCHASE'),
-  ('purchase.create', 'Create purchases', 'PURCHASE'),
-  ('purchase.approve', 'Approve purchases', 'PURCHASE'),
-  ('purchase.post', 'Post purchase documents', 'PURCHASE'),
-  ('sales.view', 'View sales', 'SALES'),
-  ('sales.create', 'Create sales', 'SALES'),
-  ('sales.post', 'Post sales documents', 'SALES'),
-  ('sales.return', 'Process sales returns', 'SALES'),
-  ('payment.receive', 'Receive payments', 'PAYMENTS'),
-  ('payment.pay', 'Create outgoing payments', 'PAYMENTS'),
-  ('report.branch.view', 'View branch reports', 'REPORTS'),
-  ('report.org.view', 'View organization reports', 'REPORTS'),
-  ('tax.view', 'View tax settings', 'TAX'),
-  ('tax.manage', 'Manage tax settings', 'TAX'),
-  ('accounting.view', 'View accounting', 'ACCOUNTING'),
-  ('accounting.post', 'Post accounting entries', 'ACCOUNTING'),
-  ('service.view', 'View service', 'SERVICE'),
-  ('service.manage', 'Manage service', 'SERVICE'),
-  ('approval.manage', 'Manage approvals', 'APPROVALS')
-ON CONFLICT (code) DO NOTHING;
-
-WITH rp(role_code, permission_code) AS (
-  VALUES
-    ('OWNER','org.view'),
-    ('OWNER','org.manage'),
-    ('OWNER','branch.view'),
-    ('OWNER','branch.manage'),
-    ('OWNER','warehouse.view'),
-    ('OWNER','warehouse.manage'),
-    ('OWNER','user.view'),
-    ('OWNER','user.manage'),
-    ('OWNER','subscription.view'),
-    ('OWNER','subscription.manage'),
-    ('OWNER','settings.view'),
-    ('OWNER','settings.manage'),
-    ('OWNER','catalog.view'),
-    ('OWNER','catalog.manage'),
-    ('OWNER','inventory.view'),
-    ('OWNER','inventory.receive'),
-    ('OWNER','inventory.adjust'),
-    ('OWNER','inventory.transfer'),
-    ('OWNER','purchase.view'),
-    ('OWNER','purchase.create'),
-    ('OWNER','purchase.approve'),
-    ('OWNER','purchase.post'),
-    ('OWNER','sales.view'),
-    ('OWNER','sales.create'),
-    ('OWNER','sales.post'),
-    ('OWNER','sales.return'),
-    ('OWNER','payment.receive'),
-    ('OWNER','payment.pay'),
-    ('OWNER','report.branch.view'),
-    ('OWNER','report.org.view'),
-    ('OWNER','tax.view'),
-    ('OWNER','tax.manage'),
-    ('OWNER','accounting.view'),
-    ('OWNER','accounting.post'),
-    ('OWNER','service.view'),
-    ('OWNER','service.manage'),
-    ('OWNER','approval.manage'),
-
-    ('ADMIN','org.view'),
-    ('ADMIN','branch.view'),
-    ('ADMIN','branch.manage'),
-    ('ADMIN','warehouse.view'),
-    ('ADMIN','warehouse.manage'),
-    ('ADMIN','user.view'),
-    ('ADMIN','user.manage'),
-    ('ADMIN','subscription.view'),
-    ('ADMIN','settings.view'),
-    ('ADMIN','settings.manage'),
-    ('ADMIN','catalog.view'),
-    ('ADMIN','catalog.manage'),
-    ('ADMIN','inventory.view'),
-    ('ADMIN','inventory.receive'),
-    ('ADMIN','inventory.adjust'),
-    ('ADMIN','inventory.transfer'),
-    ('ADMIN','purchase.view'),
-    ('ADMIN','purchase.create'),
-    ('ADMIN','purchase.approve'),
-    ('ADMIN','purchase.post'),
-    ('ADMIN','sales.view'),
-    ('ADMIN','sales.create'),
-    ('ADMIN','sales.post'),
-    ('ADMIN','sales.return'),
-    ('ADMIN','payment.receive'),
-    ('ADMIN','payment.pay'),
-    ('ADMIN','report.branch.view'),
-    ('ADMIN','report.org.view'),
-    ('ADMIN','tax.view'),
-    ('ADMIN','accounting.view'),
-    ('ADMIN','service.view'),
-    ('ADMIN','service.manage'),
-    ('ADMIN','approval.manage'),
-
-    ('ACCOUNTANT','org.view'),
-    ('ACCOUNTANT','branch.view'),
-    ('ACCOUNTANT','warehouse.view'),
-    ('ACCOUNTANT','catalog.view'),
-    ('ACCOUNTANT','inventory.view'),
-    ('ACCOUNTANT','purchase.view'),
-    ('ACCOUNTANT','sales.view'),
-    ('ACCOUNTANT','payment.receive'),
-    ('ACCOUNTANT','payment.pay'),
-    ('ACCOUNTANT','report.branch.view'),
-    ('ACCOUNTANT','report.org.view'),
-    ('ACCOUNTANT','tax.view'),
-    ('ACCOUNTANT','tax.manage'),
-    ('ACCOUNTANT','accounting.view'),
-    ('ACCOUNTANT','accounting.post'),
-    ('ACCOUNTANT','service.view'),
-
-    ('STORE_MANAGER','org.view'),
-    ('STORE_MANAGER','branch.view'),
-    ('STORE_MANAGER','warehouse.view'),
-    ('STORE_MANAGER','catalog.view'),
-    ('STORE_MANAGER','catalog.manage'),
-    ('STORE_MANAGER','inventory.view'),
-    ('STORE_MANAGER','inventory.receive'),
-    ('STORE_MANAGER','inventory.adjust'),
-    ('STORE_MANAGER','inventory.transfer'),
-    ('STORE_MANAGER','purchase.view'),
-    ('STORE_MANAGER','purchase.create'),
-    ('STORE_MANAGER','purchase.post'),
-    ('STORE_MANAGER','sales.view'),
-    ('STORE_MANAGER','sales.create'),
-    ('STORE_MANAGER','sales.post'),
-    ('STORE_MANAGER','sales.return'),
-    ('STORE_MANAGER','payment.receive'),
-    ('STORE_MANAGER','report.branch.view'),
-    ('STORE_MANAGER','service.view'),
-    ('STORE_MANAGER','service.manage'),
-
-    ('CASHIER','branch.view'),
-    ('CASHIER','warehouse.view'),
-    ('CASHIER','catalog.view'),
-    ('CASHIER','inventory.view'),
-    ('CASHIER','sales.view'),
-    ('CASHIER','sales.create'),
-    ('CASHIER','sales.post'),
-    ('CASHIER','sales.return'),
-    ('CASHIER','payment.receive'),
-
-    ('PURCHASE_OPERATOR','branch.view'),
-    ('PURCHASE_OPERATOR','warehouse.view'),
-    ('PURCHASE_OPERATOR','catalog.view'),
-    ('PURCHASE_OPERATOR','inventory.view'),
-    ('PURCHASE_OPERATOR','inventory.receive'),
-    ('PURCHASE_OPERATOR','purchase.view'),
-    ('PURCHASE_OPERATOR','purchase.create'),
-    ('PURCHASE_OPERATOR','purchase.post'),
-
-    ('TECHNICIAN','branch.view'),
-    ('TECHNICIAN','catalog.view'),
-    ('TECHNICIAN','inventory.view'),
-    ('TECHNICIAN','service.view'),
-    ('TECHNICIAN','service.manage'),
-
-    ('VIEWER','org.view'),
-    ('VIEWER','branch.view'),
-    ('VIEWER','warehouse.view'),
-    ('VIEWER','catalog.view'),
-    ('VIEWER','inventory.view'),
-    ('VIEWER','purchase.view'),
-    ('VIEWER','sales.view'),
-    ('VIEWER','report.branch.view'),
-    ('VIEWER','service.view')
-)
-INSERT INTO role_permission (role_id, permission_id)
-SELECT r.id, p.id
-FROM rp
-JOIN role r ON r.code = rp.role_code
-JOIN permission p ON p.code = rp.permission_code
-ON CONFLICT (role_id, permission_id) DO NOTHING;
-
-COMMIT;
-
-
--- ===== SOURCE: 014_seed_system_accounts_for_all_orgs.sql =====
-
-INSERT INTO account (organization_id, code, name, account_type, is_system, is_active)
-SELECT o.id, src.code, src.name, src.account_type, TRUE, TRUE
-FROM organization o
-JOIN (
-  VALUES
-    ('CASH', 'Cash In Hand', 'ASSET'),
-    ('BANK', 'Bank Account', 'ASSET'),
-    ('AR', 'Accounts Receivable', 'ASSET'),
-    ('INVENTORY', 'Inventory', 'ASSET'),
-    ('AP', 'Accounts Payable', 'LIABILITY'),
-    ('OUTPUT_GST', 'Output GST', 'LIABILITY'),
-    ('INPUT_GST', 'Input GST', 'ASSET'),
-    ('SALES', 'Sales Revenue', 'INCOME'),
-    ('COGS', 'Cost of Goods Sold', 'EXPENSE'),
-    ('DISCOUNT_ALLOWED', 'Discount Allowed', 'EXPENSE'),
-    ('PURCHASES', 'Purchases', 'EXPENSE'),
-    ('EXPENSE_CONTROL', 'Operating Expenses', 'EXPENSE'),
-    ('STOCK_LOSS', 'Stock Adjustment Loss', 'EXPENSE'),
-    ('STOCK_GAIN', 'Stock Adjustment Gain', 'INCOME')
-) AS src(code, name, account_type) ON TRUE
-ON CONFLICT (organization_id, code) DO NOTHING;
-
-
--- ===== SOURCE: 023_seed_service_replacement_accounts.sql =====
-
-INSERT INTO account (organization_id, code, name, account_type, is_system, is_active)
-SELECT o.id, src.code, src.name, src.account_type, TRUE, TRUE
-FROM organization o
-JOIN (
-  VALUES
-    ('WARRANTY_EXPENSE', 'Warranty Replacement Expense', 'EXPENSE'),
-    ('GOODWILL_EXPENSE', 'Goodwill Replacement Expense', 'EXPENSE')
-) AS src(code, name, account_type) ON TRUE
-ON CONFLICT (organization_id, code) DO NOTHING;
-
-
--- ===== SOURCE: 044_add_hsn_master.sql (seed section) =====
-
-INSERT INTO hsn_master (
-  hsn_code, description, chapter_code, cgst_rate, sgst_rate, igst_rate, cess_rate, is_active, source_name, effective_from
-) VALUES
-  ('39173100', 'Flexible tubes, pipes and hoses, of plastics', '39', 9.00, 9.00, 18.00, 0.00, TRUE, 'Curated phase-1 reference seed', DATE '2025-01-01'),
-  ('73269099', 'Other articles of iron or steel', '73', 9.00, 9.00, 18.00, 0.00, TRUE, 'Curated phase-1 reference seed', DATE '2025-01-01'),
-  ('84145190', 'Fans: table, floor, wall, window, ceiling or roof fans, other', '84', 6.00, 6.00, 12.00, 0.00, TRUE, 'Curated phase-1 reference seed', DATE '2025-01-01'),
-  ('85043190', 'Electrical transformers, other', '85', 9.00, 9.00, 18.00, 0.00, TRUE, 'Curated phase-1 reference seed', DATE '2025-01-01'),
-  ('85362000', 'Automatic circuit breakers', '85', 9.00, 9.00, 18.00, 0.00, TRUE, 'Curated phase-1 reference seed', DATE '2025-01-01'),
-  ('85365090', 'Electrical switches, other', '85', 9.00, 9.00, 18.00, 0.00, TRUE, 'Curated phase-1 reference seed', DATE '2025-01-01'),
-  ('85366990', 'Plugs and sockets, other', '85', 9.00, 9.00, 18.00, 0.00, TRUE, 'Curated phase-1 reference seed', DATE '2025-01-01'),
-  ('85371000', 'Boards, panels, consoles, cabinets and other bases for electric control or distribution', '85', 9.00, 9.00, 18.00, 0.00, TRUE, 'Curated phase-1 reference seed', DATE '2025-01-01'),
-  ('85444299', 'Insulated electric conductors fitted with connectors, other', '85', 9.00, 9.00, 18.00, 0.00, TRUE, 'Curated phase-1 reference seed', DATE '2025-01-01'),
-  ('85444999', 'Other insulated electric conductors, other', '85', 9.00, 9.00, 18.00, 0.00, TRUE, 'Curated phase-1 reference seed', DATE '2025-01-01'),
-  ('94051090', 'Chandeliers and other electric ceiling or wall lighting fittings, other', '94', 6.00, 6.00, 12.00, 0.00, TRUE, 'Curated phase-1 reference seed', DATE '2025-01-01'),
-  ('94054090', 'Other electric lamps and lighting fittings', '94', 6.00, 6.00, 12.00, 0.00, TRUE, 'Curated phase-1 reference seed', DATE '2025-01-01');
-
-UPDATE product
-SET hsn_code = '94054090'
-WHERE lower(name) LIKE '%flood light%'
-  AND (hsn_code IS NULL OR trim(hsn_code) = '');
-
-
--- ===== SOURCE: 045_add_hsn_tax_rate.sql (seed section) =====
-
-INSERT INTO hsn_tax_rate (
-  hsn_code, cgst_rate, sgst_rate, igst_rate, cess_rate, effective_from, effective_to, is_active, source_name
-)
-SELECT
-  hsn_code,
-  cgst_rate,
-  sgst_rate,
-  igst_rate,
-  cess_rate,
-  COALESCE(effective_from, CURRENT_DATE),
-  NULL,
-  is_active,
-  source_name
-FROM hsn_master
-WHERE NOT EXISTS (
-  SELECT 1
-  FROM hsn_tax_rate rate
-  WHERE rate.hsn_code = hsn_master.hsn_code
-    AND rate.effective_from = COALESCE(hsn_master.effective_from, CURRENT_DATE)
-);
-
-
--- ===== SOURCE: 046_add_product_attribute_metadata.sql (seed section) =====
-
-WITH owner_ctx AS (
-  SELECT o.id AS organization_id, u.id AS owner_user_id
-  FROM organization o
-  JOIN app_user u ON u.organization_id = o.id
-  WHERE u.employee_code IN ('SPC-OWN-01','UHL-OWN-01')
-),
-defs AS (
-  INSERT INTO product_attribute_definition (
-    organization_id, code, label, description, data_type, input_type, is_required, is_active,
-    unit_label, placeholder, help_text, sort_order, created_by, updated_by
-  )
-  SELECT owner_ctx.organization_id, src.code, src.label, src.description, src.data_type, src.input_type, src.is_required, TRUE,
-         src.unit_label, src.placeholder, src.help_text, src.sort_order, owner_ctx.owner_user_id, owner_ctx.owner_user_id
-  FROM owner_ctx
-  JOIN (
-    VALUES
-      ('battery_type', 'Battery Type', 'Battery fitment / maintenance type', 'OPTION', 'SELECT', TRUE, NULL, 'Select battery type', 'Used to distinguish RMF / LMF / tubular types', 10),
-      ('capacity_ah', 'Capacity (Ah)', 'Battery capacity in ampere-hour', 'NUMBER', 'NUMBER', FALSE, 'Ah', 'Enter capacity', 'Useful for battery sizing and search', 20),
-      ('voltage', 'Voltage', 'Nominal voltage of the battery', 'NUMBER', 'NUMBER', FALSE, 'V', 'Enter voltage', 'Common battery voltage rating', 30),
-      ('viscosity_grade', 'Viscosity Grade', 'Lubricant viscosity grade', 'OPTION', 'SELECT', TRUE, NULL, 'Select viscosity', 'Examples: 20W40, 10W30', 10),
-      ('pack_size', 'Pack Size', 'Retail pack size', 'OPTION', 'SELECT', TRUE, NULL, 'Select pack size', 'Examples: 500ML, 1L, 4L', 20),
-      ('oil_type', 'Oil Type', 'Type of lubricant', 'OPTION', 'SELECT', FALSE, NULL, 'Select oil type', 'Engine oil, gear oil, coolant, etc.', 30)
-  ) AS src(code, label, description, data_type, input_type, is_required, unit_label, placeholder, help_text, sort_order) ON TRUE
-  ON CONFLICT (organization_id, code) DO NOTHING
-  RETURNING id, organization_id, code, created_by
-),
-all_defs AS (
-  SELECT d.id, d.organization_id, d.code, d.created_by
-  FROM defs d
-  UNION
-  SELECT pad.id, pad.organization_id, pad.code, pad.created_by
-  FROM product_attribute_definition pad
-  WHERE pad.code IN ('battery_type','capacity_ah','voltage','viscosity_grade','pack_size','oil_type')
-),
-scopes AS (
-  INSERT INTO product_attribute_scope (
-    organization_id, attribute_definition_id, category_id, brand_id, created_by, updated_by
-  )
-  SELECT ad.organization_id, ad.id, c.id, NULL, ad.created_by, ad.created_by
-  FROM all_defs ad
-  JOIN category c ON c.organization_id = ad.organization_id
-  WHERE (
-      ad.code IN ('battery_type','capacity_ah','voltage') AND c.code = 'BATTERY'
-    ) OR (
-      ad.code IN ('viscosity_grade','pack_size','oil_type') AND c.code = 'LUBE'
-    )
-  AND NOT EXISTS (
-    SELECT 1
-    FROM product_attribute_scope existing
-    WHERE existing.organization_id = ad.organization_id
-      AND existing.attribute_definition_id = ad.id
-      AND existing.category_id = c.id
-      AND existing.brand_id IS NULL
-  )
-  RETURNING id
-)
-INSERT INTO product_attribute_option (
-  attribute_definition_id, code, label, sort_order, is_active, created_by, updated_by
-)
-SELECT ad.id, opt.code, opt.label, opt.sort_order, TRUE, ad.created_by, ad.created_by
-FROM all_defs ad
-JOIN (
-  VALUES
-    ('battery_type', 'RMF', 'RMF', 10),
-    ('battery_type', 'LMF', 'LMF', 20),
-    ('battery_type', 'TUBULAR', 'Tubular', 30),
-    ('battery_type', 'SMF', 'SMF', 40),
-    ('viscosity_grade', '10W30', '10W30', 10),
-    ('viscosity_grade', '15W40', '15W40', 20),
-    ('viscosity_grade', '20W40', '20W40', 30),
-    ('viscosity_grade', '5W30', '5W30', 40),
-    ('pack_size', '500ML', '500 ML', 10),
-    ('pack_size', '900ML', '900 ML', 20),
-    ('pack_size', '1L', '1 L', 30),
-    ('pack_size', '4L', '4 L', 40),
-    ('oil_type', 'ENGINE_OIL', 'Engine Oil', 10),
-    ('oil_type', 'GEAR_OIL', 'Gear Oil', 20),
-    ('oil_type', 'COOLANT', 'Coolant', 30),
-    ('oil_type', 'BRAKE_FLUID', 'Brake Fluid', 40)
-) AS opt(attribute_code, code, label, sort_order)
-  ON opt.attribute_code = ad.code
-WHERE NOT EXISTS (
-  SELECT 1
-  FROM product_attribute_option existing
-  WHERE existing.attribute_definition_id = ad.id
-    AND existing.code = opt.code
-);

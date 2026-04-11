@@ -1,0 +1,2 @@
+databaseChangeLog:
+  # Add new migrations here after the consolidated bootstrap baseline.

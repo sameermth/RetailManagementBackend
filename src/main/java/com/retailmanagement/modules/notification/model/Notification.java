@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "notifications")
+@Table(name = "notification")
 @EntityListeners(AuditingEntityListener.class)
 public class Notification {
 

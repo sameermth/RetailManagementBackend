@@ -13,4 +13,7 @@ public class LoginRequest {
     private String password;
 
     private Long organizationId;
+
+    // Optional override; when missing, backend derives client type from headers.
+    private String clientType;
 }

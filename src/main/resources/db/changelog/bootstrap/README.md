@@ -5,8 +5,17 @@ This directory contains a consolidated bootstrap path for fresh databases:
 - `003_bootstrap_demo_data.sql`
 - `../db.changelog-bootstrap.yml`
 
+Liquibase context usage:
+
+- `seed` for `002_bootstrap_master_data.sql`
+- `demo` for `003_bootstrap_demo_data.sql`
+
 Important notes:
 
-- Use this bootstrap changelog only for a brand new database.
-- The legacy numbered migration files are still the source of truth for already-migrated databases.
-- Do not delete the legacy files until every environment has either been rebuilt from bootstrap or migrated to a new consolidated history strategy.
+- This bootstrap path is the active default via `db.changelog-master.yml`.
+- It is safe for fresh environments and guarded with preconditions for already-initialized environments.
+- The files are generated from the current DB state via Liquibase and then sanitized for bootstrap safety.
+- `001_bootstrap_schema.sql` is schema-only and identity starts are normalized.
+- `002_bootstrap_master_data.sql` contains reference/master data only.
+- `003_bootstrap_demo_data.sql` contains demo/sample data only and must not be enabled in upper environments.
+- Legacy incremental files are archived under `../legacy/`.

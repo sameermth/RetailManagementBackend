@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-reset-demo-data
+      author: sameer
+      context: reset
+      runAlways: true
+      runOnChange: true
+      changes:
+        - sqlFile:
+            path: 004_reset_erp_v4_demo_data.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'No rollback for reset';"

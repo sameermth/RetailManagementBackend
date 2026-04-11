@@ -1,2371 +1,1153 @@
--- Consolidated bootstrap demo/sample data for fresh databases only.
-
--- Generated from legacy Liquibase history. Do not use on an already-migrated database.
-
-
--- ===== SOURCE: 003_seed_erp_v4_sample_data.sql =====
-
-
--- =========================================================
--- ERP V4 demo/sample data
--- Run after:
---   001_create_erp_v4_schema.sql
---   002_seed_erp_v4_master_data.sql
--- Purpose:
---   realistic multi-tenant sample data for faster backend testing.
--- =========================================================
--- Important note:
---   In the current schema, a warehouse belongs to exactly one branch
---   (warehouse.branch_id is mandatory). So this sample models central
---   godowns per branch/org, but not a single warehouse shared by multiple
---   branches. If you want true shared-warehouse access across branches,
---   add a branch_warehouse_access mapping table in a later migration.
--- =========================================================
-
--- ---------------------------------------------------------
--- 1) Organizations
--- ---------------------------------------------------------
-INSERT INTO organization (code, name, legal_name, phone, email, gstin, is_active)
-VALUES
-  ('SPC', 'Shakti Power Centre', 'Shakti Power Centre Private Limited', '+91-9876500001', 'admin@shaktipower.test', '24AAVCS1234Q1Z5', TRUE),
-  ('UHL', 'Urban Home Lights', 'Urban Home Lights LLP', '+91-9876500002', 'admin@urbanlights.test', '24AAAFU5678R1Z2', TRUE)
-ON CONFLICT (code) DO NOTHING;
-
--- ---------------------------------------------------------
--- 2) Branches
--- ---------------------------------------------------------
-INSERT INTO branch (organization_id, code, name, phone, email, address_line1, city, state, postal_code, country, is_active)
-SELECT o.id, x.code, x.name, x.phone, x.email, x.address, x.city, x.state, x.postal_code, 'India', TRUE
-FROM organization o
-JOIN (
-  VALUES
-    ('SPC', 'SPC-HQ',   'Mithapur Head Office', '+91-9876501001', 'hq@shaktipower.test', 'Station Road', 'Mithapur', 'Gujarat', '361345'),
-    ('SPC', 'SPC-JAM',  'Jamnagar Retail',      '+91-9876501002', 'jam@shaktipower.test', 'Ranjit Road', 'Jamnagar', 'Gujarat', '361001'),
-    ('SPC', 'SPC-RJK',  'Rajkot Retail',        '+91-9876501003', 'rajkot@shaktipower.test', 'Kalawad Road', 'Rajkot', 'Gujarat', '360005'),
-    ('UHL', 'UHL-AHD',  'Ahmedabad Showroom',   '+91-9876502001', 'ahd@urbanlights.test', 'CG Road', 'Ahmedabad', 'Gujarat', '380009'),
-    ('UHL', 'UHL-SUR',  'Surat Lighting Hub',   '+91-9876502002', 'surat@urbanlights.test', 'Ring Road', 'Surat', 'Gujarat', '395002')
-) AS x(org_code, code, name, phone, email, address, city, state, postal_code)
-  ON o.code = x.org_code
-ON CONFLICT (organization_id, code) DO NOTHING;
-
--- ---------------------------------------------------------
--- 3) Warehouses
--- ---------------------------------------------------------
-INSERT INTO warehouse (organization_id, branch_id, code, name, warehouse_type, is_primary, is_active)
-SELECT o.id, b.id, x.code, x.name, x.warehouse_type, x.is_primary, TRUE
-FROM organization o
-JOIN (
-  VALUES
-    ('SPC', 'SPC-HQ',  'SPC-HQ-STORE',   'HQ Front Store',       'STORE',   TRUE),
-    ('SPC', 'SPC-HQ',  'SPC-HQ-GODOWN',  'HQ Central Godown',    'GODOWN',  FALSE),
-    ('SPC', 'SPC-HQ',  'SPC-HQ-SVC',     'HQ Service Bay',       'SERVICE', FALSE),
-    ('SPC', 'SPC-JAM', 'SPC-JAM-STORE',  'Jamnagar Store',       'STORE',   TRUE),
-    ('SPC', 'SPC-JAM', 'SPC-JAM-GODOWN', 'Jamnagar Back Godown', 'GODOWN',  FALSE),
-    ('SPC', 'SPC-RJK', 'SPC-RJK-STORE',  'Rajkot Store',         'STORE',   TRUE),
-    ('UHL', 'UHL-AHD', 'UHL-AHD-STORE',  'Ahmedabad Showroom',   'STORE',   TRUE),
-    ('UHL', 'UHL-AHD', 'UHL-AHD-GODOWN', 'Ahmedabad Stock Hub',  'GODOWN',  FALSE),
-    ('UHL', 'UHL-SUR', 'UHL-SUR-STORE',  'Surat Store',          'STORE',   TRUE),
-    ('UHL', 'UHL-SUR', 'UHL-SUR-DMG',    'Surat Damaged Area',   'DAMAGED', FALSE)
-) AS x(org_code, branch_code, code, name, warehouse_type, is_primary)
-  ON o.code = x.org_code
-JOIN branch b ON b.organization_id = o.id AND b.code = x.branch_code
-ON CONFLICT (organization_id, code) DO NOTHING;
-
--- ---------------------------------------------------------
--- 4) Users (multiple owners/admin/staff/technicians per org)
--- ---------------------------------------------------------
-INSERT INTO app_user (organization_id, default_branch_id, role_id, employee_code, full_name, email, phone, password_hash, is_active, joined_on)
-SELECT o.id, b.id, r.id, x.employee_code, x.full_name, x.email, x.phone, '{noop}secret123', TRUE, x.joined_on
-FROM organization o
-JOIN (
-  VALUES
-    ('SPC','SPC-HQ','OWNER','SPC-OWN-01','Sameer Khan','sameer@shaktipower.test','+91-9990000001', DATE '2023-01-01'),
-    ('SPC','SPC-JAM','OWNER','SPC-OWN-02','Aisha Khan','aisha@shaktipower.test','+91-9990000002', DATE '2023-02-01'),
-    ('SPC','SPC-HQ','ADMIN','SPC-ADM-01','Ritesh Patel','ritesh@shaktipower.test','+91-9990000003', DATE '2023-03-15'),
-    ('SPC','SPC-HQ','ACCOUNTANT','SPC-ACC-01','Kiran Shah','kiran@shaktipower.test','+91-9990000004', DATE '2023-04-01'),
-    ('SPC','SPC-JAM','STORE_MANAGER','SPC-MGR-01','Bhavesh Jadeja','bhavesh@shaktipower.test','+91-9990000005', DATE '2023-04-10'),
-    ('SPC','SPC-JAM','CASHIER','SPC-CAS-01','Neha Parmar','neha@shaktipower.test','+91-9990000006', DATE '2023-05-01'),
-    ('SPC','SPC-HQ','PURCHASE_OPERATOR','SPC-PUR-01','Manoj Solanki','manoj@shaktipower.test','+91-9990000007', DATE '2023-05-12'),
-    ('SPC','SPC-HQ','TECHNICIAN','SPC-TEC-01','Ravi Makwana','ravi@shaktipower.test','+91-9990000008', DATE '2023-06-01'),
-    ('UHL','UHL-AHD','OWNER','UHL-OWN-01','Priya Mehta','priya@urbanlights.test','+91-9990000011', DATE '2023-01-10'),
-    ('UHL','UHL-SUR','OWNER','UHL-OWN-02','Nirav Mehta','nirav@urbanlights.test','+91-9990000012', DATE '2023-02-10'),
-    ('UHL','UHL-AHD','ADMIN','UHL-ADM-01','Jinesh Vora','jinesh@urbanlights.test','+91-9990000013', DATE '2023-03-05'),
-    ('UHL','UHL-AHD','ACCOUNTANT','UHL-ACC-01','Pooja Shah','pooja@urbanlights.test','+91-9990000014', DATE '2023-03-20'),
-    ('UHL','UHL-SUR','STORE_MANAGER','UHL-MGR-01','Hetal Desai','hetal@urbanlights.test','+91-9990000015', DATE '2023-04-18'),
-    ('UHL','UHL-SUR','CASHIER','UHL-CAS-01','Arjun Rana','arjun@urbanlights.test','+91-9990000016', DATE '2023-05-09'),
-    ('UHL','UHL-AHD','TECHNICIAN','UHL-TEC-01','Mitesh Soni','mitesh@urbanlights.test','+91-9990000017', DATE '2023-06-09')
-) AS x(org_code, default_branch_code, role_code, employee_code, full_name, email, phone, joined_on)
-  ON o.code = x.org_code
-JOIN role r ON r.code = x.role_code
-JOIN branch b ON b.organization_id = o.id AND b.code = x.default_branch_code
-ON CONFLICT (organization_id, employee_code) DO NOTHING;
-
--- branch access (owners and admins across branches; others scoped or semi-shared)
-INSERT INTO user_branch_access (user_id, branch_id, is_default)
-SELECT u.id, b.id, (u.default_branch_id = b.id)
-FROM app_user u
-JOIN organization o ON o.id = u.organization_id
-JOIN branch b ON b.organization_id = o.id
-WHERE (o.code = 'SPC' AND u.employee_code IN ('SPC-OWN-01','SPC-OWN-02','SPC-ADM-01','SPC-ACC-01'))
-   OR (o.code = 'UHL' AND u.employee_code IN ('UHL-OWN-01','UHL-OWN-02','UHL-ADM-01','UHL-ACC-01'))
-ON CONFLICT (user_id, branch_id) DO NOTHING;
-
-INSERT INTO user_branch_access (user_id, branch_id, is_default)
-SELECT u.id, b.id, (u.default_branch_id = b.id)
-FROM app_user u
-JOIN branch b ON b.id IN (u.default_branch_id,
-  (SELECT id FROM branch x WHERE x.organization_id = u.organization_id AND x.code = CASE WHEN u.organization_id = (SELECT id FROM organization WHERE code='SPC') THEN 'SPC-HQ' ELSE 'UHL-AHD' END))
-WHERE u.employee_code IN ('SPC-MGR-01','SPC-CAS-01','SPC-PUR-01','SPC-TEC-01','UHL-MGR-01','UHL-CAS-01','UHL-TEC-01')
-ON CONFLICT (user_id, branch_id) DO NOTHING;
-
--- ---------------------------------------------------------
--- 5) Backfill created_by / updated_by on org/branch/warehouse
--- ---------------------------------------------------------
-UPDATE organization o
-SET created_by = u.id, updated_by = u.id
-FROM app_user u
-WHERE ((o.code = 'SPC' AND u.employee_code = 'SPC-OWN-01')
-    OR (o.code = 'UHL' AND u.employee_code = 'UHL-OWN-01'))
-  AND (o.created_by IS NULL OR o.updated_by IS NULL);
-
-UPDATE branch b
-SET created_by = u.id, updated_by = u.id
-FROM organization o, app_user u
-WHERE b.organization_id = o.id
-  AND ((o.code = 'SPC' AND u.employee_code = 'SPC-OWN-01')
-    OR (o.code = 'UHL' AND u.employee_code = 'UHL-OWN-01'))
-  AND u.organization_id = o.id
-  AND (b.created_by IS NULL OR b.updated_by IS NULL);
-
-UPDATE warehouse w
-SET created_by = u.id, updated_by = u.id
-FROM organization o, app_user u
-WHERE w.organization_id = o.id
-  AND ((o.code = 'SPC' AND u.employee_code = 'SPC-OWN-01')
-    OR (o.code = 'UHL' AND u.employee_code = 'UHL-OWN-01'))
-  AND u.organization_id = o.id
-  AND (w.created_by IS NULL OR w.updated_by IS NULL);
-
--- ---------------------------------------------------------
--- 6) Org-scoped masters: tax, price list, expense category, accounts
--- ---------------------------------------------------------
-INSERT INTO tax_group (organization_id, code, name, cgst_rate, sgst_rate, igst_rate, cess_rate, is_active, created_by, updated_by)
-SELECT o.id, src.code, src.name, src.cgst, src.sgst, src.igst, src.cess, TRUE, owner_u.id, owner_u.id
-FROM organization o
-JOIN app_user owner_u ON owner_u.organization_id = o.id AND owner_u.role_id = (SELECT id FROM role WHERE code='OWNER')
-JOIN (
-  VALUES
-    ('GST_0',  'GST 0%',  0.0, 0.0, 0.0, 0.0),
-    ('GST_5',  'GST 5%',  2.5, 2.5, 5.0, 0.0),
-    ('GST_12', 'GST 12%', 6.0, 6.0, 12.0, 0.0),
-    ('GST_18', 'GST 18%', 9.0, 9.0, 18.0, 0.0)
-) AS src(code, name, cgst, sgst, igst, cess) ON TRUE
-WHERE owner_u.employee_code IN ('SPC-OWN-01','UHL-OWN-01')
-ON CONFLICT (organization_id, code) DO NOTHING;
-
-INSERT INTO price_list (organization_id, code, name, price_list_type, is_active, created_by, updated_by)
-SELECT o.id, src.code, src.name, src.price_list_type, TRUE, owner_u.id, owner_u.id
-FROM organization o
-JOIN app_user owner_u ON owner_u.organization_id = o.id AND owner_u.role_id = (SELECT id FROM role WHERE code='OWNER')
-JOIN (
-  VALUES
-    ('MRP', 'MRP', 'MRP'),
-    ('RETAIL', 'Retail', 'RETAIL'),
-    ('WHOLESALE', 'Wholesale', 'WHOLESALE'),
-    ('DEALER', 'Dealer', 'DEALER')
-) AS src(code, name, price_list_type) ON TRUE
-WHERE owner_u.employee_code IN ('SPC-OWN-01','UHL-OWN-01')
-ON CONFLICT (organization_id, code) DO NOTHING;
-
-INSERT INTO expense_category (organization_id, code, name, is_active, created_by, updated_by)
-SELECT o.id, src.code, src.name, TRUE, owner_u.id, owner_u.id
-FROM organization o
-JOIN app_user owner_u ON owner_u.organization_id = o.id AND owner_u.role_id = (SELECT id FROM role WHERE code='OWNER')
-JOIN (
-  VALUES
-    ('RENT', 'Rent'),
-    ('SALARY', 'Salary'),
-    ('ELECTRICITY', 'Electricity'),
-    ('TRANSPORT', 'Transport'),
-    ('MAINTENANCE', 'Maintenance'),
-    ('OFFICE', 'Office Expense'),
-    ('MISC', 'Miscellaneous')
-) AS src(code, name) ON TRUE
-WHERE owner_u.employee_code IN ('SPC-OWN-01','UHL-OWN-01')
-ON CONFLICT (organization_id, code) DO NOTHING;
-
-INSERT INTO account (organization_id, code, name, account_type, is_system, is_active, created_by, updated_by)
-SELECT o.id, src.code, src.name, src.account_type, TRUE, TRUE, owner_u.id, owner_u.id
-FROM organization o
-JOIN app_user owner_u ON owner_u.organization_id = o.id AND owner_u.role_id = (SELECT id FROM role WHERE code='OWNER')
-JOIN (
-  VALUES
-    ('CASH', 'Cash In Hand', 'ASSET'),
-    ('BANK', 'Bank Account', 'ASSET'),
-    ('AR', 'Accounts Receivable', 'ASSET'),
-    ('INVENTORY', 'Inventory', 'ASSET'),
-    ('AP', 'Accounts Payable', 'LIABILITY'),
-    ('OUTPUT_GST', 'Output GST', 'LIABILITY'),
-    ('INPUT_GST', 'Input GST', 'ASSET'),
-    ('SALES', 'Sales Revenue', 'INCOME'),
-    ('PURCHASES', 'Purchases', 'EXPENSE'),
-    ('EXPENSE_CONTROL', 'Operating Expenses', 'EXPENSE'),
-    ('STOCK_LOSS', 'Stock Adjustment Loss', 'EXPENSE'),
-    ('STOCK_GAIN', 'Stock Adjustment Gain', 'INCOME')
-) AS src(code, name, account_type) ON TRUE
-WHERE owner_u.employee_code IN ('SPC-OWN-01','UHL-OWN-01')
-ON CONFLICT (organization_id, code) DO NOTHING;
-
--- app settings + document sequences
-INSERT INTO app_setting (organization_id, branch_id, setting_key, setting_value, created_by, updated_by)
-SELECT o.id, NULL, 'inventory.negative_stock_policy', '{"mode":"WARN"}'::jsonb, u.id, u.id
-FROM organization o JOIN app_user u ON u.organization_id=o.id AND u.employee_code IN ('SPC-OWN-01','UHL-OWN-01')
-ON CONFLICT (organization_id, branch_id, setting_key) DO NOTHING;
-
-INSERT INTO app_setting (organization_id, branch_id, setting_key, setting_value, created_by, updated_by)
-SELECT o.id, NULL, 'service.default_warranty_months', '{"months":24}'::jsonb, u.id, u.id
-FROM organization o JOIN app_user u ON u.organization_id=o.id AND u.employee_code IN ('SPC-OWN-01','UHL-OWN-01')
-ON CONFLICT (organization_id, branch_id, setting_key) DO NOTHING;
-
-INSERT INTO document_sequence (organization_id, branch_id, document_type, prefix, next_number, padding_length, reset_policy, created_by, updated_by)
-SELECT o.id, NULL, src.document_type, src.prefix, src.next_num, 5, 'YEARLY', u.id, u.id
-FROM organization o
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code IN ('SPC-OWN-01','UHL-OWN-01')
-JOIN (
-  VALUES
-    ('PURCHASE_ORDER','PO', 1003),
-    ('PURCHASE_RECEIPT','GRN', 1003),
-    ('SALES_INVOICE','INV', 1004),
-    ('CUSTOMER_RECEIPT','RCPT', 1003),
-    ('SUPPLIER_PAYMENT','PAY', 1002),
-    ('SERVICE_TICKET','SVC', 1002),
-    ('WARRANTY_CLAIM','WCL', 1002),
-    ('EXPENSE','EXP', 1003),
-    ('RECURRING_EXPENSE','REXP', 1002),
-    ('VOUCHER','VCH', 1010)
-) AS src(document_type, prefix, next_num) ON TRUE
-ON CONFLICT (organization_id, branch_id, document_type) DO NOTHING;
-
--- ---------------------------------------------------------
--- 7) Party masters
--- ---------------------------------------------------------
-INSERT INTO customer (organization_id, branch_id, customer_code, full_name, phone, email, gstin, credit_limit, status, notes, created_by, updated_by)
-SELECT o.id, b.id, x.customer_code, x.full_name, x.phone, x.email, x.gstin, x.credit_limit, 'ACTIVE', x.notes, u.id, u.id
-FROM organization o
-JOIN (
-  VALUES
-    ('SPC','SPC-JAM','CUST-SPC-001','Maa Electronics','+91-9811100001','procurement@maaelectronics.test','24AABCM1111D1Z0',200000,'Dealer customer','SPC-MGR-01'),
-    ('SPC','SPC-JAM','CUST-SPC-002','Jay Ambe Cold Drinks','+91-9811100002','owner@jayambe.test',NULL,50000,'Retail repeat customer','SPC-CAS-01'),
-    ('SPC','SPC-RJK','CUST-SPC-003','Shiv Enterprise','+91-9811100003','accounts@shiventerprise.test','24AACCS2222L1Z8',150000,'Credit customer','SPC-ADM-01'),
-    ('SPC','SPC-HQ','CUST-SPC-004','Ocean Residency Society','+91-9811100004','admin@oceanresidency.test',NULL,300000,'AMC / service customer','SPC-OWN-01'),
-    ('UHL','UHL-AHD','CUST-UHL-001','Bright Homes','+91-9822200001','hello@brighthomes.test','24AATFB3333P1Z3',100000,'Interior partner','UHL-ADM-01'),
-    ('UHL','UHL-SUR','CUST-UHL-002','Lumen Mart','+91-9822200002','purchase@lumenmart.test',NULL,75000,'Retail chain counter','UHL-MGR-01'),
-    ('UHL','UHL-SUR','CUST-UHL-003','Vijay Traders','+91-9822200003','vijay@traders.test','24AACCV4444N1ZA',120000,'Wholesale lighting buyer','UHL-CAS-01')
-) AS x(org_code, branch_code, customer_code, full_name, phone, email, gstin, credit_limit, notes, created_by_emp)
-  ON o.code = x.org_code
-JOIN branch b ON b.organization_id = o.id AND b.code = x.branch_code
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code = x.created_by_emp
-ON CONFLICT (organization_id, customer_code) DO NOTHING;
-
-INSERT INTO customer_address (customer_id, address_type, line1, line2, city, state, postal_code, country, is_default, created_by, updated_by)
-SELECT c.id, 'BILLING', 'Main Market', NULL, COALESCE(b.city,'Jamnagar'), COALESCE(b.state,'Gujarat'), COALESCE(b.postal_code,'361001'), 'India', TRUE, c.created_by, c.updated_by
-FROM customer c
-LEFT JOIN branch b ON b.id = c.branch_id
-ON CONFLICT DO NOTHING;
-
-INSERT INTO supplier (organization_id, branch_id, supplier_code, name, phone, email, gstin, status, notes, created_by, updated_by)
-SELECT o.id, b.id, x.supplier_code, x.name, x.phone, x.email, x.gstin, 'ACTIVE', x.notes, u.id, u.id
-FROM organization o
-JOIN (
-  VALUES
-    ('SPC','SPC-HQ','SUP-SPC-001','Exide Industrial Supplies','+91-9833300001','sales@exide.test','24AACES5555B1ZZ','Battery supplier','SPC-PUR-01'),
-    ('SPC','SPC-HQ','SUP-SPC-002','Luminous Power Tech','+91-9833300002','partner@luminous.test','24AACCL6666M1ZX','Inverter supplier','SPC-PUR-01'),
-    ('SPC','SPC-HQ','SUP-SPC-003','Polycab Distribution','+91-9833300003','wire@polycab.test','24AACCP7777Q1Z7','Wire and cable supplier','SPC-PUR-01'),
-    ('UHL','UHL-AHD','SUP-UHL-001','Philips Lighting India','+91-9844400001','b2b@philips.test','24AACCP8888W1Z5','Lighting supplier','UHL-ADM-01'),
-    ('UHL','UHL-AHD','SUP-UHL-002','Havells Trade Channel','+91-9844400002','trade@havells.test','24AABCH9999T1Z4','Electrical goods supplier','UHL-ADM-01')
-) AS x(org_code, branch_code, supplier_code, name, phone, email, gstin, notes, created_by_emp)
-  ON o.code = x.org_code
-JOIN branch b ON b.organization_id = o.id AND b.code = x.branch_code
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code = x.created_by_emp
-ON CONFLICT (organization_id, supplier_code) DO NOTHING;
-
-INSERT INTO supplier_address (supplier_id, address_type, line1, line2, city, state, postal_code, country, is_default, created_by, updated_by)
-SELECT s.id, 'BILLING', 'Industrial Estate', NULL, 'Ahmedabad', 'Gujarat', '380001', 'India', TRUE, s.created_by, s.updated_by
-FROM supplier s
-ON CONFLICT DO NOTHING;
-
-INSERT INTO distributor (organization_id, branch_id, distributor_code, name, phone, email, gstin, status, notes, created_by, updated_by)
-SELECT o.id, b.id, x.distributor_code, x.name, x.phone, x.email, x.gstin, 'ACTIVE', x.notes, u.id, u.id
-FROM organization o
-JOIN (
-  VALUES
-    ('SPC','SPC-HQ','DST-SPC-001','Gujarat Energy Distribution','+91-9855500001','warranty@ged.test','24AACCG1111F1Z2','Warranty routing partner','SPC-ADM-01'),
-    ('UHL','UHL-AHD','DST-UHL-001','West India Electrical Distributors','+91-9855500002','claims@wied.test','24AACCW2222H1Z9','Regional lighting distributor','UHL-ADM-01')
-) AS x(org_code, branch_code, distributor_code, name, phone, email, gstin, notes, created_by_emp)
-  ON o.code = x.org_code
-JOIN branch b ON b.organization_id = o.id AND b.code = x.branch_code
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code = x.created_by_emp
-ON CONFLICT (organization_id, distributor_code) DO NOTHING;
-
-INSERT INTO distributor_address (distributor_id, address_type, line1, line2, city, state, postal_code, country, is_default, created_by, updated_by)
-SELECT d.id, 'BILLING', 'Corporate Park', NULL, 'Vadodara', 'Gujarat', '390001', 'India', TRUE, d.created_by, d.updated_by
-FROM distributor d
-ON CONFLICT DO NOTHING;
-
--- ---------------------------------------------------------
--- 8) Categories, brands, products, UOM conversions, pricing
--- ---------------------------------------------------------
-INSERT INTO category (organization_id, parent_category_id, name, code, is_active, created_by, updated_by)
-SELECT o.id, NULL, x.name, x.code, TRUE, u.id, u.id
-FROM organization o
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code IN ('SPC-OWN-01','UHL-OWN-01')
-JOIN (
-  VALUES ('POWER','Power Solutions'), ('BATTERY','Battery'), ('WIRE','Wires & Cables'), ('LUBE','Lubricants'), ('LIGHT','Lighting')
-) AS x(code, name) ON TRUE
-ON CONFLICT (organization_id, parent_category_id, name) DO NOTHING;
-
-INSERT INTO brand (organization_id, name, code, is_active, created_by, updated_by)
-SELECT o.id, x.name, x.code, TRUE, u.id, u.id
-FROM organization o
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code IN ('SPC-OWN-01','UHL-OWN-01')
-JOIN (
-  VALUES ('LUMINOUS','LUMI'), ('EXIDE','EXID'), ('POLYCAB','POLY'), ('SERVO','SERV'), ('PHILIPS','PHIL'), ('HAVELLS','HAVL')
-) AS x(name, code) ON TRUE
-ON CONFLICT (organization_id, name) DO NOTHING;
-
--- SPC products
-INSERT INTO product (
-  organization_id, category_id, brand_id, base_uom_id, tax_group_id, sku, name, description,
-  inventory_tracking_mode, serial_tracking_enabled, batch_tracking_enabled, expiry_tracking_enabled,
-  fractional_quantity_allowed, min_stock_base_qty, reorder_level_base_qty, is_service_item, is_active,
-  created_by, updated_by
-)
-SELECT o.id, c.id, br.id, uom.id, tg.id, x.sku, x.name, x.description,
-       x.tracking_mode, x.serial_enabled, x.batch_enabled, x.expiry_enabled,
-       x.fractional_allowed, x.min_stock, x.reorder_level, x.is_service_item, TRUE,
-       usr.id, usr.id
-FROM organization o
-JOIN app_user usr ON usr.organization_id = o.id AND usr.employee_code = 'SPC-OWN-01'
-JOIN (
-  VALUES
-    ('INV-900VA', 'EcoVolt 900VA Inverter', 'Home inverter with serial tracking', 'POWER', 'LUMI', 'PCS', 'GST_18', 'SERIALIZED', TRUE, FALSE, FALSE, FALSE, 2, 5, FALSE),
-    ('BAT-150AH', 'Tubular Battery 150AH', 'Battery with serial tracking and warranty', 'BATTERY', 'EXID', 'PCS', 'GST_18', 'SERIALIZED', TRUE, FALSE, FALSE, FALSE, 3, 8, FALSE),
-    ('WIRE-6SQ', 'Copper Wire 6 Sqmm', 'Wire sold by metre', 'WIRE', 'POLY', 'MTR', 'GST_18', 'FRACTIONAL', FALSE, FALSE, FALSE, TRUE, 100, 300, FALSE),
-    ('OIL-1LTR', 'Servo Battery Distilled Water 1L', 'Consumable sold by bottle / carton', 'LUBE', 'SERV', 'LTR', 'GST_18', 'BATCHED', FALSE, TRUE, FALSE, TRUE, 20, 50, FALSE),
-    ('BULB-9W', 'LED Bulb 9W', 'Bulb sold in piece/dozen/carton', 'LIGHT', 'PHIL', 'PCS', 'GST_12', 'MIXED_UOM', FALSE, TRUE, FALSE, FALSE, 24, 120, FALSE)
- ) AS x(sku, name, description, category_code, brand_code, base_uom_code, tax_code, tracking_mode, serial_enabled, batch_enabled, expiry_enabled, fractional_allowed, min_stock, reorder_level, is_service_item) ON TRUE
-JOIN category c ON c.organization_id = o.id AND c.code = x.category_code
-JOIN brand br ON br.organization_id = o.id AND br.code = x.brand_code
-JOIN uom ON uom.code = x.base_uom_code
-JOIN tax_group tg ON tg.organization_id = o.id AND tg.code = x.tax_code
-WHERE o.code = 'SPC'
-ON CONFLICT (organization_id, sku) DO NOTHING;
-
--- UHL products
-INSERT INTO product (
-  organization_id, category_id, brand_id, base_uom_id, tax_group_id, sku, name, description,
-  inventory_tracking_mode, serial_tracking_enabled, batch_tracking_enabled, expiry_tracking_enabled,
-  fractional_quantity_allowed, min_stock_base_qty, reorder_level_base_qty, is_service_item, is_active,
-  created_by, updated_by
-)
-SELECT o.id, c.id, br.id, uom.id, tg.id, x.sku, x.name, x.description,
-       x.tracking_mode, x.serial_enabled, x.batch_enabled, x.expiry_enabled,
-       x.fractional_allowed, x.min_stock, x.reorder_level, x.is_service_item, TRUE,
-       usr.id, usr.id
-FROM organization o
-JOIN app_user usr ON usr.organization_id = o.id AND usr.employee_code = 'UHL-OWN-01'
-JOIN (
-  VALUES
-    ('LIGHT-PANEL18', 'Slim Panel Light 18W', 'Ceiling panel light', 'LIGHT', 'PHIL', 'PCS', 'GST_18', 'SIMPLE', FALSE, FALSE, FALSE, FALSE, 20, 60, FALSE),
-    ('FAN-CLG-1200', 'Ceiling Fan 1200mm', 'Fan with serial tracking', 'LIGHT', 'HAVL', 'PCS', 'GST_18', 'SERIALIZED', TRUE, FALSE, FALSE, FALSE, 4, 10, FALSE),
-    ('WIRE-1.5SQ', 'House Wire 1.5 Sqmm', 'Electrical wire sold by metre', 'WIRE', 'HAVL', 'MTR', 'GST_18', 'FRACTIONAL', FALSE, FALSE, FALSE, TRUE, 200, 500, FALSE),
-    ('STRIP-LED5M', 'LED Strip 5M', 'Strip lighting with batch control', 'LIGHT', 'PHIL', 'PCS', 'GST_18', 'BATCHED', FALSE, TRUE, FALSE, FALSE, 10, 40, FALSE),
-    ('SWITCH-6A', 'Modular Switch 6A', 'Switch sold in box/carton', 'LIGHT', 'HAVL', 'PCS', 'GST_18', 'MIXED_UOM', FALSE, TRUE, FALSE, FALSE, 100, 500, FALSE)
- ) AS x(sku, name, description, category_code, brand_code, base_uom_code, tax_code, tracking_mode, serial_enabled, batch_enabled, expiry_enabled, fractional_allowed, min_stock, reorder_level, is_service_item) ON TRUE
-JOIN category c ON c.organization_id = o.id AND c.code = x.category_code
-JOIN brand br ON br.organization_id = o.id AND br.code = x.brand_code
-JOIN uom ON uom.code = x.base_uom_code
-JOIN tax_group tg ON tg.organization_id = o.id AND tg.code = x.tax_code
-WHERE o.code = 'UHL'
-ON CONFLICT (organization_id, sku) DO NOTHING;
-
--- UOM conversions for mixed/fractional goods
-INSERT INTO product_uom_conversion (product_id, from_uom_id, to_uom_id, multiplier, is_purchase_uom, is_sales_uom, is_default, created_by, updated_by)
-SELECT p.id, fu.id, tu.id, x.multiplier, x.is_purchase_uom, x.is_sales_uom, x.is_default, p.created_by, p.updated_by
-FROM product p
-JOIN organization o ON o.id = p.organization_id
-JOIN (
-  VALUES
-    ('SPC','BULB-9W','DOZEN','PCS',12, TRUE, TRUE, FALSE),
-    ('SPC','BULB-9W','CARTON','PCS',120, TRUE, FALSE, FALSE),
-    ('SPC','OIL-1LTR','ML','LTR',0.001, FALSE, TRUE, FALSE),
-    ('UHL','SWITCH-6A','BOX','PCS',20, TRUE, TRUE, FALSE),
-    ('UHL','SWITCH-6A','CARTON','PCS',200, TRUE, FALSE, FALSE),
-    ('UHL','STRIP-LED5M','BOX','PCS',10, TRUE, FALSE, FALSE)
-) AS x(org_code, sku, from_uom, to_uom, multiplier, is_purchase_uom, is_sales_uom, is_default)
-  ON o.code = x.org_code AND p.sku = x.sku
-JOIN uom fu ON fu.code = x.from_uom
-JOIN uom tu ON tu.code = x.to_uom
-ON CONFLICT DO NOTHING;
-
--- price list items
-INSERT INTO price_list_item (price_list_id, product_id, uom_id, price, created_by, updated_by)
-SELECT pl.id, p.id, u.id, x.price, p.created_by, p.updated_by
-FROM organization o
-JOIN (
-  VALUES
-    ('SPC','RETAIL','INV-900VA','PCS',6500),
-    ('SPC','RETAIL','BAT-150AH','PCS',12800),
-    ('SPC','RETAIL','WIRE-6SQ','MTR',92),
-    ('SPC','RETAIL','OIL-1LTR','LTR',55),
-    ('SPC','RETAIL','BULB-9W','PCS',95),
-    ('SPC','WHOLESALE','BULB-9W','DOZEN',1020),
-    ('UHL','RETAIL','LIGHT-PANEL18','PCS',650),
-    ('UHL','RETAIL','FAN-CLG-1200','PCS',2200),
-    ('UHL','RETAIL','WIRE-1.5SQ','MTR',24),
-    ('UHL','RETAIL','STRIP-LED5M','PCS',410),
-    ('UHL','WHOLESALE','SWITCH-6A','BOX',780)
-) AS x(org_code, price_list_code, sku, uom_code, price)
-  ON o.code = x.org_code
-JOIN price_list pl ON pl.organization_id = o.id AND pl.code = x.price_list_code
-JOIN product p ON p.organization_id = o.id AND p.sku = x.sku
-JOIN uom u ON u.code = x.uom_code
-ON CONFLICT DO NOTHING;
-
--- ---------------------------------------------------------
--- 9) Opening inventory entities: batches, serials, balances, movements
--- ---------------------------------------------------------
--- batches
-INSERT INTO inventory_batch (organization_id, product_id, batch_number, manufacturer_batch_number, manufactured_on, expiry_on, status, created_by, updated_by)
-SELECT o.id, p.id, x.batch_number, x.manufacturer_batch_number, x.manufactured_on, x.expiry_on, 'ACTIVE', u.id, u.id
-FROM organization o
-JOIN (
-  VALUES
-    ('SPC','OIL-1LTR','OIL-B-2025-01','SERVO-2025-01', DATE '2025-01-01', DATE '2027-01-01','SPC-PUR-01'),
-    ('SPC','BULB-9W','BULB-B-2025-02','PHIL-2025-02', DATE '2025-02-10', NULL,'SPC-PUR-01'),
-    ('UHL','STRIP-LED5M','STRIP-B-2025-03','PHIL-2025-03', DATE '2025-03-01', NULL,'UHL-ADM-01'),
-    ('UHL','SWITCH-6A','SWITCH-B-2025-02','HAVL-2025-02', DATE '2025-02-15', NULL,'UHL-ADM-01')
-) AS x(org_code, sku, batch_number, manufacturer_batch_number, manufactured_on, expiry_on, created_by_emp)
-  ON o.code = x.org_code
-JOIN product p ON p.organization_id = o.id AND p.sku = x.sku
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code = x.created_by_emp
-ON CONFLICT (organization_id, product_id, batch_number) DO NOTHING;
-
--- serials from opening stock / initial inward
-INSERT INTO serial_number (organization_id, product_id, batch_id, serial_number, manufacturer_serial_number, status, current_warehouse_id, current_customer_id, warranty_start_date, warranty_end_date, created_by, updated_by)
-SELECT o.id, p.id, ib.id, x.serial_number, x.manufacturer_serial, x.status, w.id, NULL, NULL, NULL, u.id, u.id
-FROM organization o
-JOIN (
-  VALUES
-    ('SPC','INV-900VA',NULL,'INV900-0001','LUM-INV900-0001','IN_STOCK','SPC-HQ-GODOWN','SPC-PUR-01'),
-    ('SPC','INV-900VA',NULL,'INV900-0002','LUM-INV900-0002','IN_STOCK','SPC-HQ-GODOWN','SPC-PUR-01'),
-    ('SPC','INV-900VA',NULL,'INV900-0003','LUM-INV900-0003','IN_STOCK','SPC-JAM-STORE','SPC-PUR-01'),
-    ('SPC','BAT-150AH',NULL,'BAT150-0101','EXD-BAT150-0101','IN_STOCK','SPC-HQ-GODOWN','SPC-PUR-01'),
-    ('SPC','BAT-150AH',NULL,'BAT150-0102','EXD-BAT150-0102','IN_STOCK','SPC-HQ-GODOWN','SPC-PUR-01'),
-    ('SPC','BAT-150AH',NULL,'BAT150-0103','EXD-BAT150-0103','IN_STOCK','SPC-JAM-STORE','SPC-PUR-01'),
-    ('UHL','FAN-CLG-1200',NULL,'FAN1200-0201','HAV-FAN1200-0201','IN_STOCK','UHL-AHD-GODOWN','UHL-ADM-01'),
-    ('UHL','FAN-CLG-1200',NULL,'FAN1200-0202','HAV-FAN1200-0202','IN_STOCK','UHL-SUR-STORE','UHL-ADM-01'),
-    ('UHL','FAN-CLG-1200',NULL,'FAN1200-0203','HAV-FAN1200-0203','IN_STOCK','UHL-SUR-STORE','UHL-ADM-01')
-) AS x(org_code, sku, batch_number, serial_number, manufacturer_serial, status, warehouse_code, created_by_emp)
-  ON o.code = x.org_code
-JOIN product p ON p.organization_id = o.id AND p.sku = x.sku
-LEFT JOIN inventory_batch ib ON ib.organization_id = o.id AND ib.product_id = p.id AND ib.batch_number = x.batch_number
-JOIN warehouse w ON w.organization_id = o.id AND w.code = x.warehouse_code
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code = x.created_by_emp
-ON CONFLICT (organization_id, product_id, serial_number) DO NOTHING;
-
--- inventory balance rows
-INSERT INTO inventory_balance (organization_id, branch_id, warehouse_id, product_id, batch_id, on_hand_base_quantity, reserved_base_quantity, available_base_quantity, avg_cost, created_by, updated_by)
-SELECT o.id, b.id, w.id, p.id, ib.id, x.on_hand, x.reserved, x.available, x.avg_cost, u.id, u.id
-FROM organization o
-JOIN (
-  VALUES
-    ('SPC','SPC-HQ-GODOWN','INV-900VA',NULL,2.0,0.0,2.0,5000.000000,'SPC-PUR-01'),
-    ('SPC','SPC-JAM-STORE','INV-900VA',NULL,1.0,0.0,1.0,5050.000000,'SPC-PUR-01'),
-    ('SPC','SPC-HQ-GODOWN','BAT-150AH',NULL,2.0,0.0,2.0,9800.000000,'SPC-PUR-01'),
-    ('SPC','SPC-JAM-STORE','BAT-150AH',NULL,1.0,0.0,1.0,9900.000000,'SPC-PUR-01'),
-    ('SPC','SPC-HQ-GODOWN','WIRE-6SQ',NULL,500.0,0.0,500.0,70.000000,'SPC-PUR-01'),
-    ('SPC','SPC-HQ-GODOWN','OIL-1LTR','OIL-B-2025-01',120.0,0.0,120.0,35.000000,'SPC-PUR-01'),
-    ('SPC','SPC-JAM-STORE','BULB-9W','BULB-B-2025-02',240.0,0.0,240.0,60.000000,'SPC-PUR-01'),
-    ('UHL','UHL-AHD-GODOWN','FAN-CLG-1200',NULL,1.0,0.0,1.0,1650.000000,'UHL-ADM-01'),
-    ('UHL','UHL-SUR-STORE','FAN-CLG-1200',NULL,2.0,0.0,2.0,1680.000000,'UHL-ADM-01'),
-    ('UHL','UHL-AHD-GODOWN','LIGHT-PANEL18',NULL,80.0,0.0,80.0,420.000000,'UHL-ADM-01'),
-    ('UHL','UHL-SUR-STORE','WIRE-1.5SQ',NULL,900.0,0.0,900.0,15.500000,'UHL-ADM-01'),
-    ('UHL','UHL-AHD-GODOWN','STRIP-LED5M','STRIP-B-2025-03',70.0,0.0,70.0,250.000000,'UHL-ADM-01'),
-    ('UHL','UHL-SUR-STORE','SWITCH-6A','SWITCH-B-2025-02',600.0,0.0,600.0,22.000000,'UHL-ADM-01')
-) AS x(org_code, warehouse_code, sku, batch_number, on_hand, reserved, available, avg_cost, created_by_emp)
-  ON o.code = x.org_code
-JOIN warehouse w ON w.organization_id = o.id AND w.code = x.warehouse_code
-JOIN branch b ON b.id = w.branch_id
-JOIN product p ON p.organization_id = o.id AND p.sku = x.sku
-LEFT JOIN inventory_batch ib ON ib.organization_id = o.id AND ib.product_id = p.id AND ib.batch_number IS NOT DISTINCT FROM x.batch_number
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code = x.created_by_emp
-ON CONFLICT (organization_id, branch_id, warehouse_id, product_id, batch_id) DO NOTHING;
-
--- opening stock movements
-INSERT INTO stock_movement (organization_id, branch_id, warehouse_id, product_id, movement_type, reference_type, reference_id, reference_number, direction, uom_id, quantity, base_quantity, unit_cost, total_cost, movement_at, created_by, updated_by)
-SELECT o.id, b.id, w.id, p.id, 'OPENING_STOCK', 'OPENING', 1, 'OPEN-2025', 'IN', u.id, x.quantity, x.base_quantity, x.unit_cost, x.total_cost, x.movement_at, usr.id, usr.id
-FROM organization o
-JOIN (
-  VALUES
-    ('SPC','SPC-HQ-GODOWN','INV-900VA','PCS',2,2,5000,10000,TIMESTAMPTZ '2025-03-01 09:00:00+05:30','SPC-PUR-01'),
-    ('SPC','SPC-JAM-STORE','INV-900VA','PCS',1,1,5050,5050,TIMESTAMPTZ '2025-03-01 09:10:00+05:30','SPC-PUR-01'),
-    ('SPC','SPC-HQ-GODOWN','BAT-150AH','PCS',2,2,9800,19600,TIMESTAMPTZ '2025-03-01 09:15:00+05:30','SPC-PUR-01'),
-    ('SPC','SPC-JAM-STORE','BAT-150AH','PCS',1,1,9900,9900,TIMESTAMPTZ '2025-03-01 09:20:00+05:30','SPC-PUR-01'),
-    ('SPC','SPC-HQ-GODOWN','WIRE-6SQ','MTR',500,500,70,35000,TIMESTAMPTZ '2025-03-01 09:30:00+05:30','SPC-PUR-01'),
-    ('SPC','SPC-HQ-GODOWN','OIL-1LTR','LTR',120,120,35,4200,TIMESTAMPTZ '2025-03-01 09:40:00+05:30','SPC-PUR-01'),
-    ('SPC','SPC-JAM-STORE','BULB-9W','PCS',240,240,60,14400,TIMESTAMPTZ '2025-03-01 09:50:00+05:30','SPC-PUR-01'),
-    ('UHL','UHL-AHD-GODOWN','FAN-CLG-1200','PCS',1,1,1650,1650,TIMESTAMPTZ '2025-03-01 10:00:00+05:30','UHL-ADM-01'),
-    ('UHL','UHL-SUR-STORE','FAN-CLG-1200','PCS',2,2,1680,3360,TIMESTAMPTZ '2025-03-01 10:10:00+05:30','UHL-ADM-01'),
-    ('UHL','UHL-AHD-GODOWN','LIGHT-PANEL18','PCS',80,80,420,33600,TIMESTAMPTZ '2025-03-01 10:20:00+05:30','UHL-ADM-01'),
-    ('UHL','UHL-SUR-STORE','WIRE-1.5SQ','MTR',900,900,15.5,13950,TIMESTAMPTZ '2025-03-01 10:30:00+05:30','UHL-ADM-01'),
-    ('UHL','UHL-AHD-GODOWN','STRIP-LED5M','PCS',70,70,250,17500,TIMESTAMPTZ '2025-03-01 10:40:00+05:30','UHL-ADM-01'),
-    ('UHL','UHL-SUR-STORE','SWITCH-6A','PCS',600,600,22,13200,TIMESTAMPTZ '2025-03-01 10:50:00+05:30','UHL-ADM-01')
-) AS x(org_code, warehouse_code, sku, uom_code, quantity, base_quantity, unit_cost, total_cost, movement_at, created_by_emp)
-  ON o.code = x.org_code
-JOIN warehouse w ON w.organization_id = o.id AND w.code = x.warehouse_code
-JOIN branch b ON b.id = w.branch_id
-JOIN product p ON p.organization_id = o.id AND p.sku = x.sku
-JOIN uom u ON u.code = x.uom_code
-JOIN app_user usr ON usr.organization_id = o.id AND usr.employee_code = x.created_by_emp
-ON CONFLICT DO NOTHING;
-
--- attach opening serials to opening stock movements
-INSERT INTO stock_movement_serial (stock_movement_id, serial_number_id, created_by, updated_by)
-SELECT sm.id, sn.id, sm.created_by, sm.updated_by
-FROM stock_movement sm
-JOIN product p ON p.id = sm.product_id
-JOIN serial_number sn ON sn.product_id = p.id AND sn.current_warehouse_id = sm.warehouse_id
-WHERE sm.movement_type = 'OPENING_STOCK'
-  AND sm.reference_number = 'OPEN-2025'
-  AND p.sku IN ('INV-900VA','BAT-150AH','FAN-CLG-1200')
-ON CONFLICT DO NOTHING;
-
-INSERT INTO stock_movement_batch (stock_movement_id, batch_id, quantity, base_quantity, created_by, updated_by)
-SELECT sm.id, ib.id, sm.quantity, sm.base_quantity, sm.created_by, sm.updated_by
-FROM stock_movement sm
-JOIN inventory_batch ib ON ib.product_id = sm.product_id
-WHERE sm.movement_type = 'OPENING_STOCK'
-  AND sm.reference_number = 'OPEN-2025'
-  AND ((ib.batch_number = 'OIL-B-2025-01' AND sm.product_id = ib.product_id)
-    OR (ib.batch_number = 'BULB-B-2025-02' AND sm.product_id = ib.product_id)
-    OR (ib.batch_number = 'STRIP-B-2025-03' AND sm.product_id = ib.product_id)
-    OR (ib.batch_number = 'SWITCH-B-2025-02' AND sm.product_id = ib.product_id))
-ON CONFLICT DO NOTHING;
-
--- ---------------------------------------------------------
--- 10) Purchase flow samples
--- ---------------------------------------------------------
-INSERT INTO purchase_order (organization_id, branch_id, supplier_id, po_number, po_date, status, subtotal, tax_amount, total_amount, remarks, submitted_at, submitted_by, approved_at, approved_by, created_by, updated_by)
-SELECT o.id, b.id, s.id, x.po_number, x.po_date, x.status, x.subtotal, x.tax_amount, x.total_amount, x.remarks,
-       x.submitted_at, submit_u.id, x.approved_at, approve_u.id, create_u.id, create_u.id
-FROM organization o
-JOIN (
-  VALUES
-    ('SPC','SPC-HQ','SUP-SPC-002','PO-SPC-00001',DATE '2026-02-25','APPROVED',26000,4680,30680,'Monthly inverter and battery replenishment',TIMESTAMPTZ '2026-02-25 11:00:00+05:30','SPC-PUR-01',TIMESTAMPTZ '2026-02-25 15:00:00+05:30','SPC-OWN-01','SPC-PUR-01'),
-    ('UHL','UHL-AHD','SUP-UHL-001','PO-UHL-00001',DATE '2026-02-27','APPROVED',47000,8460,55460,'Panel and strip procurement',TIMESTAMPTZ '2026-02-27 10:30:00+05:30','UHL-ADM-01',TIMESTAMPTZ '2026-02-27 13:00:00+05:30','UHL-OWN-01','UHL-ADM-01')
-) AS x(org_code, branch_code, supplier_code, po_number, po_date, status, subtotal, tax_amount, total_amount, remarks, submitted_at, submitted_by_emp, approved_at, approved_by_emp, created_by_emp)
-  ON o.code = x.org_code
-JOIN branch b ON b.organization_id = o.id AND b.code = x.branch_code
-JOIN supplier s ON s.organization_id = o.id AND s.supplier_code = x.supplier_code
-JOIN app_user create_u ON create_u.organization_id = o.id AND create_u.employee_code = x.created_by_emp
-LEFT JOIN app_user submit_u ON submit_u.organization_id = o.id AND submit_u.employee_code = x.submitted_by_emp
-LEFT JOIN app_user approve_u ON approve_u.organization_id = o.id AND approve_u.employee_code = x.approved_by_emp
-ON CONFLICT (organization_id, po_number) DO NOTHING;
-
-INSERT INTO purchase_order_line (purchase_order_id, product_id, uom_id, quantity, base_quantity, unit_price, tax_rate, line_amount, received_base_quantity, created_by, updated_by)
-SELECT po.id, p.id, u.id, x.quantity, x.base_quantity, x.unit_price, x.tax_rate, x.line_amount, x.received_base_quantity, po.created_by, po.updated_by
-FROM purchase_order po
-JOIN organization o ON o.id = po.organization_id
-JOIN (
-  VALUES
-    ('PO-SPC-00001','INV-900VA','PCS',2,2,4900,18,9800,2),
-    ('PO-SPC-00001','BAT-150AH','PCS',1,1,9800,18,9800,1),
-    ('PO-SPC-00001','WIRE-6SQ','MTR',100,100,64,18,6400,100),
-    ('PO-UHL-00001','LIGHT-PANEL18','PCS',50,50,410,18,20500,50),
-    ('PO-UHL-00001','STRIP-LED5M','PCS',40,40,240,18,9600,40),
-    ('PO-UHL-00001','SWITCH-6A','BOX',10,200,380,18,3800,200),
-    ('PO-UHL-00001','FAN-CLG-1200','PCS',3,3,1650,18,4950,3)
- ) AS x(po_number, sku, uom_code, quantity, base_quantity, unit_price, tax_rate, line_amount, received_base_quantity)
-  ON po.po_number = x.po_number
-JOIN product p ON p.organization_id = o.id AND p.sku = x.sku
-JOIN uom u ON u.code = x.uom_code
-ON CONFLICT DO NOTHING;
-
-INSERT INTO purchase_receipt (organization_id, branch_id, warehouse_id, purchase_order_id, supplier_id, receipt_number, receipt_date, status, subtotal, tax_amount, total_amount, remarks, posted_at, created_by, updated_by)
-SELECT o.id, b.id, w.id, po.id, s.id, x.receipt_number, x.receipt_date, x.status, x.subtotal, x.tax_amount, x.total_amount, x.remarks, x.posted_at, u.id, u.id
-FROM organization o
-JOIN (
-  VALUES
-    ('SPC','SPC-HQ','SPC-HQ-GODOWN','PO-SPC-00001','SUP-SPC-002','GRN-SPC-00001',DATE '2026-02-28','POSTED',26000,4680,30680,'Goods received complete',TIMESTAMPTZ '2026-02-28 17:45:00+05:30','SPC-PUR-01'),
-    ('UHL','UHL-AHD','UHL-AHD-GODOWN','PO-UHL-00001','SUP-UHL-001','GRN-UHL-00001',DATE '2026-03-01','POSTED',38850,6993,45843,'First inward completed',TIMESTAMPTZ '2026-03-01 18:10:00+05:30','UHL-ADM-01')
-) AS x(org_code, branch_code, warehouse_code, po_number, supplier_code, receipt_number, receipt_date, status, subtotal, tax_amount, total_amount, remarks, posted_at, created_by_emp)
-  ON o.code = x.org_code
-JOIN branch b ON b.organization_id = o.id AND b.code = x.branch_code
-JOIN warehouse w ON w.organization_id = o.id AND w.code = x.warehouse_code
-JOIN purchase_order po ON po.organization_id = o.id AND po.po_number = x.po_number
-JOIN supplier s ON s.organization_id = o.id AND s.supplier_code = x.supplier_code
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code = x.created_by_emp
-ON CONFLICT (organization_id, receipt_number) DO NOTHING;
-
-INSERT INTO purchase_receipt_line (purchase_receipt_id, purchase_order_line_id, product_id, uom_id, quantity, base_quantity, unit_cost, tax_rate, line_amount, created_by, updated_by)
-SELECT pr.id, pol.id, p.id, u.id, x.quantity, x.base_quantity, x.unit_cost, x.tax_rate, x.line_amount, pr.created_by, pr.updated_by
-FROM purchase_receipt pr
-JOIN purchase_order po ON po.id = pr.purchase_order_id
-JOIN organization o ON o.id = pr.organization_id
-JOIN (
-  VALUES
-    ('GRN-SPC-00001','INV-900VA','PCS',2,2,4900,18,9800),
-    ('GRN-SPC-00001','BAT-150AH','PCS',1,1,9800,18,9800),
-    ('GRN-SPC-00001','WIRE-6SQ','MTR',100,100,64,18,6400),
-    ('GRN-UHL-00001','LIGHT-PANEL18','PCS',50,50,410,18,20500),
-    ('GRN-UHL-00001','STRIP-LED5M','PCS',20,20,240,18,4800),
-    ('GRN-UHL-00001','SWITCH-6A','BOX',8,160,380,18,3040),
-    ('GRN-UHL-00001','FAN-CLG-1200','PCS',3,3,1650,18,4950)
- ) AS x(receipt_number, sku, uom_code, quantity, base_quantity, unit_cost, tax_rate, line_amount)
-  ON pr.receipt_number = x.receipt_number
-JOIN purchase_order_line pol ON pol.purchase_order_id = po.id AND pol.product_id = (SELECT id FROM product p2 WHERE p2.organization_id = po.organization_id AND p2.sku = x.sku)
-JOIN product p ON p.organization_id = o.id AND p.sku = x.sku
-JOIN uom u ON u.code = x.uom_code
-ON CONFLICT DO NOTHING;
-
--- batches and serials received on GRN
-INSERT INTO inventory_batch (organization_id, product_id, batch_number, manufacturer_batch_number, manufactured_on, expiry_on, status, created_by, updated_by)
-SELECT o.id, p.id, x.batch_number, x.manufacturer_batch_number, x.manufactured_on, x.expiry_on, 'ACTIVE', u.id, u.id
-FROM organization o
-JOIN (
-  VALUES
-    ('UHL','STRIP-LED5M','STRIP-B-2026-01','PHIL-2026-01',DATE '2026-01-15',NULL::date,'UHL-ADM-01')
-) AS x(org_code, sku, batch_number, manufacturer_batch_number, manufactured_on, expiry_on, created_by_emp)
-  ON o.code = x.org_code
-JOIN product p ON p.organization_id = o.id AND p.sku = x.sku
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code = x.created_by_emp
-ON CONFLICT (organization_id, product_id, batch_number) DO NOTHING;
-
-INSERT INTO serial_number (organization_id, product_id, batch_id, serial_number, manufacturer_serial_number, status, current_warehouse_id, created_by, updated_by)
-SELECT o.id, p.id, NULL, x.serial_number, x.manufacturer_serial_number, 'IN_STOCK', w.id, u.id, u.id
-FROM organization o
-JOIN (
-  VALUES
-    ('SPC','INV-900VA','SPC-HQ-GODOWN','INV900-1001','LUM-INV900-1001','SPC-PUR-01'),
-    ('SPC','INV-900VA','SPC-HQ-GODOWN','INV900-1002','LUM-INV900-1002','SPC-PUR-01'),
-    ('SPC','BAT-150AH','SPC-HQ-GODOWN','BAT150-1101','EXD-BAT150-1101','SPC-PUR-01'),
-    ('UHL','FAN-CLG-1200','UHL-AHD-GODOWN','FAN1200-1201','HAV-FAN1200-1201','UHL-ADM-01'),
-    ('UHL','FAN-CLG-1200','UHL-AHD-GODOWN','FAN1200-1202','HAV-FAN1200-1202','UHL-ADM-01'),
-    ('UHL','FAN-CLG-1200','UHL-AHD-GODOWN','FAN1200-1203','HAV-FAN1200-1203','UHL-ADM-01')
-) AS x(org_code, sku, warehouse_code, serial_number, manufacturer_serial_number, created_by_emp)
-  ON o.code = x.org_code
-JOIN product p ON p.organization_id = o.id AND p.sku = x.sku
-JOIN warehouse w ON w.organization_id = o.id AND w.code = x.warehouse_code
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code = x.created_by_emp
-ON CONFLICT (organization_id, product_id, serial_number) DO NOTHING;
-
-INSERT INTO purchase_receipt_line_serial (purchase_receipt_line_id, serial_number_id, created_by, updated_by)
-SELECT prl.id, sn.id, prl.created_by, prl.updated_by
-FROM purchase_receipt_line prl
-JOIN purchase_receipt pr ON pr.id = prl.purchase_receipt_id
-JOIN organization o ON o.id = pr.organization_id
-JOIN product p ON p.id = prl.product_id
-JOIN serial_number sn ON sn.organization_id = o.id AND sn.product_id = p.id
-WHERE (pr.receipt_number = 'GRN-SPC-00001' AND sn.serial_number IN ('INV900-1001','INV900-1002','BAT150-1101'))
-   OR (pr.receipt_number = 'GRN-UHL-00001' AND sn.serial_number IN ('FAN1200-1201','FAN1200-1202','FAN1200-1203'))
-ON CONFLICT DO NOTHING;
-
-INSERT INTO purchase_receipt_line_batch (purchase_receipt_line_id, batch_id, quantity, base_quantity, created_by, updated_by)
-SELECT prl.id, ib.id, CASE WHEN u.code = 'BOX' THEN 8 ELSE 20 END, CASE WHEN u.code = 'BOX' THEN 160 ELSE 20 END, prl.created_by, prl.updated_by
-FROM purchase_receipt_line prl
-JOIN purchase_receipt pr ON pr.id = prl.purchase_receipt_id
-JOIN product p ON p.id = prl.product_id
-JOIN uom u ON u.id = prl.uom_id
-JOIN inventory_batch ib ON ib.product_id = p.id
-WHERE (pr.receipt_number = 'GRN-UHL-00001' AND p.sku = 'STRIP-LED5M' AND ib.batch_number = 'STRIP-B-2026-01')
-   OR (pr.receipt_number = 'GRN-UHL-00001' AND p.sku = 'SWITCH-6A' AND ib.batch_number = 'SWITCH-B-2025-02')
-ON CONFLICT DO NOTHING;
-
--- purchase receipt stock movements
-INSERT INTO stock_movement (organization_id, branch_id, warehouse_id, product_id, movement_type, reference_type, reference_id, reference_number, direction, uom_id, quantity, base_quantity, unit_cost, total_cost, movement_at, created_by, updated_by)
-SELECT pr.organization_id, pr.branch_id, pr.warehouse_id, prl.product_id, 'PURCHASE_RECEIPT', 'PURCHASE_RECEIPT', pr.id, pr.receipt_number, 'IN', prl.uom_id,
-       prl.quantity, prl.base_quantity, prl.unit_cost, prl.base_quantity * prl.unit_cost, pr.posted_at, pr.created_by, pr.updated_by
-FROM purchase_receipt pr
-JOIN purchase_receipt_line prl ON prl.purchase_receipt_id = pr.id
-WHERE pr.status = 'POSTED'
-ON CONFLICT DO NOTHING;
-
--- ---------------------------------------------------------
--- 11) Sales flow samples (paid and credit sales)
--- ---------------------------------------------------------
-INSERT INTO sales_invoice (organization_id, branch_id, warehouse_id, customer_id, price_list_id, invoice_number, invoice_date, status, subtotal, discount_amount, tax_amount, total_amount, remarks, printed_at, emailed_at, posted_at, created_by, updated_by)
-SELECT o.id, b.id, w.id, c.id, pl.id, x.invoice_number, x.invoice_date, x.status, x.subtotal, x.discount_amount, x.tax_amount, x.total_amount, x.remarks,
-       x.printed_at, x.emailed_at, x.posted_at, u.id, u.id
-FROM organization o
-JOIN (
-  VALUES
-    ('SPC','SPC-JAM','SPC-JAM-STORE','CUST-SPC-002','RETAIL','INV-SPC-00001',DATE '2026-03-03','PAID',19295,0,3473.10,22768.10,'Counter sale with serial tracked items',TIMESTAMPTZ '2026-03-03 13:00:00+05:30',NULL,TIMESTAMPTZ '2026-03-03 12:55:00+05:30','SPC-CAS-01'),
-    ('SPC','SPC-RJK','SPC-HQ-GODOWN','CUST-SPC-003','RETAIL','INV-SPC-00002',DATE '2026-03-05','PARTIALLY_PAID',14740,500,2563.20,16803.20,'Credit sale to trade customer',TIMESTAMPTZ '2026-03-05 18:30:00+05:30',TIMESTAMPTZ '2026-03-05 18:45:00+05:30',TIMESTAMPTZ '2026-03-05 18:20:00+05:30','SPC-ADM-01'),
-    ('UHL','UHL-SUR','UHL-SUR-STORE','CUST-UHL-002','RETAIL','INV-UHL-00001',DATE '2026-03-07','PAID',5348,0,962.64,6310.64,'Mixed retail basket',TIMESTAMPTZ '2026-03-07 20:00:00+05:30',NULL,TIMESTAMPTZ '2026-03-07 19:55:00+05:30','UHL-CAS-01')
-) AS x(org_code, branch_code, warehouse_code, customer_code, price_list_code, invoice_number, invoice_date, status, subtotal, discount_amount, tax_amount, total_amount, remarks, printed_at, emailed_at, posted_at, created_by_emp)
-  ON o.code = x.org_code
-JOIN branch b ON b.organization_id = o.id AND b.code = x.branch_code
-JOIN warehouse w ON w.organization_id = o.id AND w.code = x.warehouse_code
-JOIN customer c ON c.organization_id = o.id AND c.customer_code = x.customer_code
-LEFT JOIN price_list pl ON pl.organization_id = o.id AND pl.code = x.price_list_code
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code = x.created_by_emp
-ON CONFLICT (organization_id, invoice_number) DO NOTHING;
-
-INSERT INTO sales_invoice_line (sales_invoice_id, product_id, uom_id, quantity, base_quantity, unit_price, discount_amount, tax_rate, line_amount, created_by, updated_by)
-SELECT si.id, p.id, u.id, x.quantity, x.base_quantity, x.unit_price, x.discount_amount, x.tax_rate, x.line_amount, si.created_by, si.updated_by
-FROM sales_invoice si
-JOIN organization o ON o.id = si.organization_id
-JOIN (
-  VALUES
-    ('INV-SPC-00001','INV-900VA','PCS',1,1,6500,0,18,6500),
-    ('INV-SPC-00001','BAT-150AH','PCS',1,1,12800,0,18,12800),
-    ('INV-SPC-00002','WIRE-6SQ','MTR',80,80,92,500,18,6860),
-    ('INV-SPC-00002','OIL-1LTR','LTR',20,20,55,0,18,1100),
-    ('INV-SPC-00002','BULB-9W','DOZEN',6,72,1020,0,18,6120),
-    ('INV-UHL-00001','LIGHT-PANEL18','PCS',4,4,650,0,18,2600),
-    ('INV-UHL-00001','WIRE-1.5SQ','MTR',60,60,24,0,18,1440),
-    ('INV-UHL-00001','SWITCH-6A','BOX',1,20,780,0,18,780),
-    ('INV-UHL-00001','FAN-CLG-1200','PCS',1,1,2200,0,18,2200)
- ) AS x(invoice_number, sku, uom_code, quantity, base_quantity, unit_price, discount_amount, tax_rate, line_amount)
-  ON si.invoice_number = x.invoice_number
-JOIN product p ON p.organization_id = o.id AND p.sku = x.sku
-JOIN uom u ON u.code = x.uom_code
-ON CONFLICT DO NOTHING;
-
-INSERT INTO sales_line_serial (sales_invoice_line_id, serial_number_id, created_by, updated_by)
-SELECT sil.id, sn.id, sil.created_by, sil.updated_by
-FROM sales_invoice_line sil
-JOIN sales_invoice si ON si.id = sil.sales_invoice_id
-JOIN product p ON p.id = sil.product_id
-JOIN serial_number sn ON sn.product_id = p.id
-WHERE (si.invoice_number = 'INV-SPC-00001' AND sn.serial_number IN ('INV900-0003','BAT150-0103'))
-   OR (si.invoice_number = 'INV-UHL-00001' AND sn.serial_number IN ('FAN1200-0202'))
-ON CONFLICT DO NOTHING;
-
-INSERT INTO sales_line_batch (sales_invoice_line_id, batch_id, quantity, base_quantity, created_by, updated_by)
-SELECT sil.id, ib.id, CASE WHEN u.code='DOZEN' THEN 6 ELSE CASE WHEN p.sku='SWITCH-6A' THEN 1 ELSE 20 END END,
-       CASE WHEN u.code='DOZEN' THEN 72 ELSE CASE WHEN p.sku='SWITCH-6A' THEN 20 ELSE 20 END END,
-       sil.created_by, sil.updated_by
-FROM sales_invoice_line sil
-JOIN product p ON p.id = sil.product_id
-JOIN uom u ON u.id = sil.uom_id
-JOIN inventory_batch ib ON ib.product_id = p.id
-WHERE (p.sku='BULB-9W' AND ib.batch_number='BULB-B-2025-02' AND sil.sales_invoice_id = (SELECT id FROM sales_invoice WHERE invoice_number='INV-SPC-00002'))
-   OR (p.sku='OIL-1LTR' AND ib.batch_number='OIL-B-2025-01' AND sil.sales_invoice_id = (SELECT id FROM sales_invoice WHERE invoice_number='INV-SPC-00002'))
-   OR (p.sku='SWITCH-6A' AND ib.batch_number='SWITCH-B-2025-02' AND sil.sales_invoice_id = (SELECT id FROM sales_invoice WHERE invoice_number='INV-UHL-00001'))
-ON CONFLICT DO NOTHING;
-
--- customer receipts
-INSERT INTO customer_receipt (organization_id, branch_id, customer_id, receipt_number, receipt_date, payment_method, reference_number, amount, status, remarks, created_by, updated_by)
-SELECT o.id, b.id, c.id, x.receipt_number, x.receipt_date, x.payment_method, x.reference_number, x.amount, x.status, x.remarks, u.id, u.id
-FROM organization o
-JOIN (
-  VALUES
-    ('SPC','SPC-JAM','CUST-SPC-002','RCPT-SPC-00001',DATE '2026-03-03','UPI','UPI-7788',22768.10,'ALLOCATED','Full counter payment','SPC-CAS-01'),
-    ('SPC','SPC-RJK','CUST-SPC-003','RCPT-SPC-00002',DATE '2026-03-06','BANK','NEFT-9901',8000.00,'ALLOCATED','Part payment against trade invoice','SPC-ACC-01'),
-    ('UHL','UHL-SUR','CUST-UHL-002','RCPT-UHL-00001',DATE '2026-03-07','CARD','POS-5511',6310.64,'ALLOCATED','Retail card payment','UHL-CAS-01')
-) AS x(org_code, branch_code, customer_code, receipt_number, receipt_date, payment_method, reference_number, amount, status, remarks, created_by_emp)
-  ON o.code = x.org_code
-JOIN branch b ON b.organization_id = o.id AND b.code = x.branch_code
-JOIN customer c ON c.organization_id = o.id AND c.customer_code = x.customer_code
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code = x.created_by_emp
-ON CONFLICT (organization_id, receipt_number) DO NOTHING;
-
-INSERT INTO customer_receipt_allocation (customer_receipt_id, sales_invoice_id, allocated_amount, created_by, updated_by)
-SELECT cr.id, si.id, x.allocated_amount, cr.created_by, cr.updated_by
-FROM customer_receipt cr
-JOIN (
-  VALUES
-    ('RCPT-SPC-00001','INV-SPC-00001',22768.10),
-    ('RCPT-SPC-00002','INV-SPC-00002',8000.00),
-    ('RCPT-UHL-00001','INV-UHL-00001',6310.64)
- ) AS x(receipt_number, invoice_number, allocated_amount)
-  ON cr.receipt_number = x.receipt_number
-JOIN sales_invoice si ON si.organization_id = cr.organization_id AND si.invoice_number = x.invoice_number
-ON CONFLICT DO NOTHING;
-
--- supplier payments
-INSERT INTO supplier_payment (organization_id, branch_id, supplier_id, payment_number, payment_date, payment_method, reference_number, amount, status, remarks, created_by, updated_by)
-SELECT o.id, b.id, s.id, x.payment_number, x.payment_date, x.payment_method, x.reference_number, x.amount, x.status, x.remarks, u.id, u.id
-FROM organization o
-JOIN (
-  VALUES
-    ('SPC','SPC-HQ','SUP-SPC-002','PAY-SPC-00001',DATE '2026-03-02','BANK','UTR-SPC-001',15000.00,'ALLOCATED','Part payment against GRN-SPC-00001','SPC-ACC-01'),
-    ('UHL','UHL-AHD','SUP-UHL-001','PAY-UHL-00001',DATE '2026-03-03','BANK','UTR-UHL-001',25000.00,'ALLOCATED','Partial supplier settlement','UHL-ACC-01')
-) AS x(org_code, branch_code, supplier_code, payment_number, payment_date, payment_method, reference_number, amount, status, remarks, created_by_emp)
-  ON o.code = x.org_code
-JOIN branch b ON b.organization_id = o.id AND b.code = x.branch_code
-JOIN supplier s ON s.organization_id = o.id AND s.supplier_code = x.supplier_code
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code = x.created_by_emp
-ON CONFLICT (organization_id, payment_number) DO NOTHING;
-
-INSERT INTO supplier_payment_allocation (supplier_payment_id, purchase_receipt_id, allocated_amount, created_by, updated_by)
-SELECT sp.id, pr.id, x.allocated_amount, sp.created_by, sp.updated_by
-FROM supplier_payment sp
-JOIN (
-  VALUES
-    ('PAY-SPC-00001','GRN-SPC-00001',15000.00),
-    ('PAY-UHL-00001','GRN-UHL-00001',25000.00)
- ) AS x(payment_number, receipt_number, allocated_amount)
-  ON sp.payment_number = x.payment_number
-JOIN purchase_receipt pr ON pr.organization_id = sp.organization_id AND pr.receipt_number = x.receipt_number
-ON CONFLICT DO NOTHING;
-
--- sales stock movements
-INSERT INTO stock_movement (organization_id, branch_id, warehouse_id, product_id, movement_type, reference_type, reference_id, reference_number, direction, uom_id, quantity, base_quantity, unit_cost, total_cost, movement_at, created_by, updated_by)
-SELECT si.organization_id, si.branch_id, si.warehouse_id, sil.product_id, 'SALES_INVOICE', 'SALES_INVOICE', si.id, si.invoice_number, 'OUT', sil.uom_id,
-       sil.quantity, sil.base_quantity,
-       CASE
-         WHEN p.sku='INV-900VA' THEN 5050
-         WHEN p.sku='BAT-150AH' THEN 9900
-         WHEN p.sku='WIRE-6SQ' THEN 70
-         WHEN p.sku='OIL-1LTR' THEN 35
-         WHEN p.sku='BULB-9W' THEN 60
-         WHEN p.sku='LIGHT-PANEL18' THEN 420
-         WHEN p.sku='WIRE-1.5SQ' THEN 15.5
-         WHEN p.sku='SWITCH-6A' THEN 22
-         WHEN p.sku='FAN-CLG-1200' THEN 1680
-         ELSE 0 END,
-       sil.base_quantity * CASE
-         WHEN p.sku='INV-900VA' THEN 5050
-         WHEN p.sku='BAT-150AH' THEN 9900
-         WHEN p.sku='WIRE-6SQ' THEN 70
-         WHEN p.sku='OIL-1LTR' THEN 35
-         WHEN p.sku='BULB-9W' THEN 60
-         WHEN p.sku='LIGHT-PANEL18' THEN 420
-         WHEN p.sku='WIRE-1.5SQ' THEN 15.5
-         WHEN p.sku='SWITCH-6A' THEN 22
-         WHEN p.sku='FAN-CLG-1200' THEN 1680
-         ELSE 0 END,
-       si.posted_at, si.created_by, si.updated_by
-FROM sales_invoice si
-JOIN sales_invoice_line sil ON sil.sales_invoice_id = si.id
-JOIN product p ON p.id = sil.product_id
-WHERE si.status IN ('POSTED','PARTIALLY_PAID','PAID')
-ON CONFLICT DO NOTHING;
-
--- inventory reservations for a future UHL invoice
-INSERT INTO sales_invoice (organization_id, branch_id, warehouse_id, customer_id, price_list_id, invoice_number, invoice_date, status, subtotal, discount_amount, tax_amount, total_amount, remarks, created_by, updated_by)
-SELECT o.id, b.id, w.id, c.id, pl.id, 'INV-UHL-00002', DATE '2026-03-10', 'CONFIRMED', 2200, 0, 396, 2596, 'Confirmed sale awaiting dispatch', u.id, u.id
-FROM organization o
-JOIN branch b ON b.organization_id=o.id AND b.code='UHL-SUR'
-JOIN warehouse w ON w.organization_id=o.id AND w.code='UHL-SUR-STORE'
-JOIN customer c ON c.organization_id=o.id AND c.customer_code='CUST-UHL-003'
-JOIN price_list pl ON pl.organization_id=o.id AND pl.code='RETAIL'
-JOIN app_user u ON u.organization_id=o.id AND u.employee_code='UHL-CAS-01'
-WHERE o.code='UHL'
-ON CONFLICT (organization_id, invoice_number) DO NOTHING;
-
-INSERT INTO sales_invoice_line (sales_invoice_id, product_id, uom_id, quantity, base_quantity, unit_price, discount_amount, tax_rate, line_amount, created_by, updated_by)
-SELECT si.id, p.id, u.id, 1, 1, 2200, 0, 18, 2200, si.created_by, si.updated_by
-FROM sales_invoice si
-JOIN product p ON p.organization_id=si.organization_id AND p.sku='FAN-CLG-1200'
-JOIN uom u ON u.code='PCS'
-WHERE si.invoice_number='INV-UHL-00002'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO inventory_reservation (organization_id, branch_id, warehouse_id, product_id, source_document_type, source_document_id, source_document_line_id, reserved_base_quantity, status, created_by, updated_by)
-SELECT si.organization_id, si.branch_id, si.warehouse_id, sil.product_id, 'SALES_INVOICE', si.id, sil.id, 1, 'ACTIVE', si.created_by, si.updated_by
-FROM sales_invoice si
-JOIN sales_invoice_line sil ON sil.sales_invoice_id = si.id
-WHERE si.invoice_number='INV-UHL-00002'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO stock_movement (organization_id, branch_id, warehouse_id, product_id, movement_type, reference_type, reference_id, reference_number, direction, uom_id, quantity, base_quantity, unit_cost, total_cost, movement_at, created_by, updated_by)
-SELECT si.organization_id, si.branch_id, si.warehouse_id, sil.product_id, 'RESERVATION', 'SALES_INVOICE', si.id, si.invoice_number, 'OUT', sil.uom_id, 1, 1, 1680, 1680, NOW(), si.created_by, si.updated_by
-FROM sales_invoice si
-JOIN sales_invoice_line sil ON sil.sales_invoice_id=si.id
-WHERE si.invoice_number='INV-UHL-00002'
-ON CONFLICT DO NOTHING;
-
--- ---------------------------------------------------------
--- 12) Transfer, adjustment, expense, recurring expense
--- ---------------------------------------------------------
-INSERT INTO stock_transfer (organization_id, branch_id, from_warehouse_id, to_warehouse_id, transfer_number, transfer_date, status, remarks, created_by, updated_by)
-SELECT o.id, fb.id, fw.id, tw.id, 'TRN-SPC-00001', DATE '2026-03-04', 'POSTED', 'Move inverter from HQ to Jamnagar store', u.id, u.id
-FROM organization o
-JOIN warehouse fw ON fw.organization_id=o.id AND fw.code='SPC-HQ-GODOWN'
-JOIN warehouse tw ON tw.organization_id=o.id AND tw.code='SPC-JAM-STORE'
-JOIN branch fb ON fb.id=fw.branch_id
-JOIN app_user u ON u.organization_id=o.id AND u.employee_code='SPC-ADM-01'
-WHERE o.code='SPC'
-ON CONFLICT (organization_id, transfer_number) DO NOTHING;
-
-INSERT INTO stock_transfer_line (stock_transfer_id, product_id, uom_id, quantity, base_quantity, created_by, updated_by)
-SELECT st.id, p.id, u.id, 1, 1, st.created_by, st.updated_by
-FROM stock_transfer st
-JOIN product p ON p.organization_id=st.organization_id AND p.sku='INV-900VA'
-JOIN uom u ON u.code='PCS'
-WHERE st.transfer_number='TRN-SPC-00001'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO stock_adjustment (organization_id, branch_id, warehouse_id, adjustment_number, adjustment_date, reason, status, created_by, updated_by)
-SELECT o.id, b.id, w.id, 'ADJ-UHL-00001', DATE '2026-03-08', 'Damaged one LED strip during handling', 'POSTED', u.id, u.id
-FROM organization o
-JOIN warehouse w ON w.organization_id=o.id AND w.code='UHL-AHD-GODOWN'
-JOIN branch b ON b.id=w.branch_id
-JOIN app_user u ON u.organization_id=o.id AND u.employee_code='UHL-ADM-01'
-WHERE o.code='UHL'
-ON CONFLICT (organization_id, adjustment_number) DO NOTHING;
-
-INSERT INTO stock_adjustment_line (stock_adjustment_id, product_id, uom_id, quantity_delta, base_quantity_delta, unit_cost, line_reason, created_by, updated_by)
-SELECT sa.id, p.id, u.id, -1, -1, 250, 'Physical damage', sa.created_by, sa.updated_by
-FROM stock_adjustment sa
-JOIN product p ON p.organization_id=sa.organization_id AND p.sku='STRIP-LED5M'
-JOIN uom u ON u.code='PCS'
-WHERE sa.adjustment_number='ADJ-UHL-00001'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO expense (organization_id, branch_id, expense_category_id, expense_number, expense_date, amount, status, receipt_url, remarks, submitted_at, submitted_by, approved_at, approved_by, paid_at, created_by, updated_by)
-SELECT o.id, b.id, ec.id, x.expense_number, x.expense_date, x.amount, x.status, x.receipt_url, x.remarks,
-       x.submitted_at, submit_u.id, x.approved_at, approve_u.id, x.paid_at, create_u.id, create_u.id
-FROM organization o
-JOIN (
-  VALUES
-    ('SPC','SPC-JAM','TRANSPORT','EXP-SPC-00001',DATE '2026-03-03',1800,'PAID','https://example.test/exp/spc-1.jpg','Local transport charges',TIMESTAMPTZ '2026-03-03 20:00:00+05:30','SPC-MGR-01',TIMESTAMPTZ '2026-03-03 20:30:00+05:30','SPC-OWN-02',TIMESTAMPTZ '2026-03-03 20:45:00+05:30','SPC-MGR-01'),
-    ('UHL','UHL-SUR','MAINTENANCE','EXP-UHL-00001',DATE '2026-03-08',2400,'SUBMITTED','https://example.test/exp/uhl-1.jpg','Showroom electrical repair pending approval',TIMESTAMPTZ '2026-03-08 19:00:00+05:30','UHL-MGR-01',NULL,NULL,NULL,'UHL-MGR-01')
-) AS x(org_code, branch_code, expense_code, expense_number, expense_date, amount, status, receipt_url, remarks, submitted_at, submitted_by_emp, approved_at, approved_by_emp, paid_at, created_by_emp)
-  ON o.code=x.org_code
-JOIN branch b ON b.organization_id=o.id AND b.code=x.branch_code
-JOIN expense_category ec ON ec.organization_id=o.id AND ec.code=x.expense_code
-JOIN app_user create_u ON create_u.organization_id=o.id AND create_u.employee_code=x.created_by_emp
-LEFT JOIN app_user submit_u ON submit_u.organization_id=o.id AND submit_u.employee_code=x.submitted_by_emp
-LEFT JOIN app_user approve_u ON approve_u.organization_id=o.id AND approve_u.employee_code=x.approved_by_emp
-ON CONFLICT (organization_id, expense_number) DO NOTHING;
-
-INSERT INTO recurring_expense (organization_id, branch_id, expense_category_id, recurring_number, frequency, amount, start_date, next_run_date, is_active, remarks, created_by, updated_by)
-SELECT o.id, b.id, ec.id, x.recurring_number, x.frequency, x.amount, x.start_date, x.next_run_date, TRUE, x.remarks, u.id, u.id
-FROM organization o
-JOIN (
-  VALUES
-    ('SPC','SPC-HQ','RENT','REXP-SPC-00001','MONTHLY',35000,DATE '2026-01-01',DATE '2026-04-01','HQ rent','SPC-ACC-01'),
-    ('UHL','UHL-AHD','ELECTRICITY','REXP-UHL-00001','MONTHLY',12000,DATE '2026-01-01',DATE '2026-04-01','Ahmedabad showroom utility','UHL-ACC-01')
-) AS x(org_code, branch_code, expense_code, recurring_number, frequency, amount, start_date, next_run_date, remarks, created_by_emp)
-  ON o.code=x.org_code
-JOIN branch b ON b.organization_id=o.id AND b.code=x.branch_code
-JOIN expense_category ec ON ec.organization_id=o.id AND ec.code=x.expense_code
-JOIN app_user u ON u.organization_id=o.id AND u.employee_code=x.created_by_emp
-ON CONFLICT (organization_id, recurring_number) DO NOTHING;
-
--- ---------------------------------------------------------
--- 13) Approvals, service, warranty, ownership
--- ---------------------------------------------------------
-INSERT INTO approval_rule (organization_id, branch_id, entity_type, approval_type, min_amount, max_amount, approver_role_id, priority_order, is_active, created_by, updated_by)
-SELECT o.id, NULL, x.entity_type, x.approval_type, x.min_amount, x.max_amount, r.id, 1, TRUE, u.id, u.id
-FROM organization o
-JOIN app_user u ON u.organization_id=o.id AND u.employee_code IN ('SPC-OWN-01','UHL-OWN-01')
-JOIN (
-  VALUES
-    ('SPC','EXPENSE','EXPENSE_APPROVAL',1000,NULL::numeric,'OWNER'),
-    ('UHL','EXPENSE','EXPENSE_APPROVAL',1000,NULL::numeric,'OWNER'),
-    ('UHL','STOCK_ADJUSTMENT','STOCK_ADJUSTMENT_APPROVAL',500,NULL::numeric,'OWNER')
-) AS x(org_code, entity_type, approval_type, min_amount, max_amount, role_code)
-  ON o.code = x.org_code
-JOIN role r ON r.code = x.role_code
-ON CONFLICT DO NOTHING;
-
-INSERT INTO approval_request (organization_id, branch_id, entity_type, entity_id, entity_number, approval_type, status, requested_by, requested_at, current_approver_user_id, current_approver_role_snapshot, request_reason, created_by, updated_by)
-SELECT e.organization_id, e.branch_id, 'EXPENSE', e.id, e.expense_number, 'EXPENSE_APPROVAL', 'PENDING', req_u.id, e.submitted_at, appr_u.id, 'OWNER', 'Maintenance spend above threshold', req_u.id, req_u.id
-FROM expense e
-JOIN app_user req_u ON req_u.organization_id=e.organization_id AND req_u.employee_code='UHL-MGR-01'
-JOIN app_user appr_u ON appr_u.organization_id=e.organization_id AND appr_u.employee_code='UHL-OWN-02'
-WHERE e.expense_number='EXP-UHL-00001'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO approval_history (approval_request_id, approver_user_id, action, approver_role_snapshot, remarks, action_at, created_by, updated_by)
-SELECT ar.id, ar.requested_by, 'REQUESTED', 'STORE_MANAGER', 'Submitted for owner approval', ar.requested_at, ar.requested_by, ar.requested_by
-FROM approval_request ar
-WHERE ar.entity_number='EXP-UHL-00001'
-ON CONFLICT DO NOTHING;
-
--- Product ownership from serialized sales
-INSERT INTO product_ownership (organization_id, customer_id, product_id, serial_number_id, sales_invoice_id, sales_invoice_line_id, ownership_start_date, warranty_start_date, warranty_end_date, status, created_by, updated_by)
-SELECT si.organization_id, si.customer_id, sil.product_id, sls.serial_number_id, si.id, sil.id,
-       si.invoice_date, si.invoice_date, si.invoice_date + INTERVAL '24 months', 'ACTIVE', si.created_by, si.updated_by
-FROM sales_invoice si
-JOIN sales_invoice_line sil ON sil.sales_invoice_id = si.id
-JOIN sales_line_serial sls ON sls.sales_invoice_line_id = sil.id
-WHERE si.invoice_number IN ('INV-SPC-00001','INV-UHL-00001')
-ON CONFLICT DO NOTHING;
-
--- update sold serial ownership state
-UPDATE serial_number sn
-SET status = 'SOLD',
-    current_customer_id = si.customer_id,
-    warranty_start_date = si.invoice_date,
-    warranty_end_date = si.invoice_date + INTERVAL '24 months',
-    updated_by = si.created_by
-FROM sales_line_serial sls
-JOIN sales_invoice_line sil ON sil.id = sls.sales_invoice_line_id
-JOIN sales_invoice si ON si.id = sil.sales_invoice_id
-WHERE sn.id = sls.serial_number_id;
-
-INSERT INTO service_ticket (organization_id, branch_id, customer_id, sales_invoice_id, ticket_number, source_type, priority, status, complaint_summary, issue_description, reported_on, assigned_to_user_id, created_by, updated_by)
-SELECT si.organization_id, si.branch_id, si.customer_id, si.id, 'SVC-SPC-00001', 'INVOICE', 'HIGH', 'IN_PROGRESS',
-       'Battery backup issue', 'Customer reported low backup and repeated cut-off after installation.', DATE '2026-03-20', tech_u.id, owner_u.id, owner_u.id
-FROM sales_invoice si
-JOIN app_user tech_u ON tech_u.organization_id=si.organization_id AND tech_u.employee_code='SPC-TEC-01'
-JOIN app_user owner_u ON owner_u.organization_id=si.organization_id AND owner_u.employee_code='SPC-OWN-01'
-WHERE si.invoice_number='INV-SPC-00001'
-ON CONFLICT (organization_id, ticket_number) DO NOTHING;
-
-INSERT INTO service_ticket_item (service_ticket_id, product_id, serial_number_id, product_ownership_id, symptom_notes, diagnosis_notes, resolution_status, created_by, updated_by)
-SELECT st.id, po.product_id, po.serial_number_id, po.id, 'Battery discharges quickly', 'Likely cell issue, claim with supplier', 'PENDING', st.created_by, st.updated_by
-FROM service_ticket st
-JOIN product_ownership po ON po.sales_invoice_id = st.sales_invoice_id
-JOIN product p ON p.id = po.product_id AND p.sku='BAT-150AH'
-WHERE st.ticket_number='SVC-SPC-00001'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO service_visit (organization_id, branch_id, service_ticket_id, technician_user_id, scheduled_at, started_at, completed_at, visit_status, visit_notes, parts_used_json, customer_feedback, created_by, updated_by)
-SELECT st.organization_id, st.branch_id, st.id, tech_u.id,
-       TIMESTAMPTZ '2026-03-21 10:00:00+05:30', TIMESTAMPTZ '2026-03-21 10:20:00+05:30', TIMESTAMPTZ '2026-03-21 11:10:00+05:30', 'COMPLETED',
-       'Voltage measured below threshold. Logged warranty case.', '[{"part":"Terminal Kit","qty":1}]'::jsonb, 'Please resolve under warranty', st.created_by, st.updated_by
-FROM service_ticket st
-JOIN app_user tech_u ON tech_u.id = st.assigned_to_user_id
-WHERE st.ticket_number='SVC-SPC-00001'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO warranty_claim (organization_id, branch_id, service_ticket_id, customer_id, product_id, serial_number_id, supplier_id, distributor_id, claim_number, claim_type, status, claim_date, approved_on, claim_notes, created_by, updated_by)
-SELECT st.organization_id, st.branch_id, st.id, st.customer_id, sti.product_id, sti.serial_number_id,
-       s.id, d.id, 'WCL-SPC-00001', 'REPLACEMENT', 'SUBMITTED', DATE '2026-03-21', NULL,
-       'Battery serial submitted for replacement under warranty.', st.created_by, st.updated_by
-FROM service_ticket st
-JOIN service_ticket_item sti ON sti.service_ticket_id = st.id
-LEFT JOIN supplier s ON s.organization_id = st.organization_id AND s.supplier_code='SUP-SPC-001'
-LEFT JOIN distributor d ON d.organization_id = st.organization_id AND d.distributor_code='DST-SPC-001'
-WHERE st.ticket_number='SVC-SPC-00001'
-ON CONFLICT (organization_id, claim_number) DO NOTHING;
-
--- ---------------------------------------------------------
--- 14) Notifications, schedules, vouchers, ledger, audit evidence
--- ---------------------------------------------------------
-INSERT INTO notification_template (organization_id, template_code, channel, subject, body, is_active, created_by, updated_by)
-SELECT o.id, x.template_code, x.channel, x.subject, x.body, TRUE, u.id, u.id
-FROM organization o
-JOIN app_user u ON u.organization_id=o.id AND u.employee_code IN ('SPC-OWN-01','UHL-OWN-01')
-JOIN (
-  VALUES
-    ('SPC','PAYMENT_REMINDER','WHATSAPP','Payment Reminder','Dear {{customer_name}}, your payment of {{amount}} is due for invoice {{invoice_number}}.'),
-    ('SPC','SERVICE_UPDATE','SMS','Service Update','Your service ticket {{ticket_number}} is now {{status}}.'),
-    ('UHL','PAYMENT_REMINDER','WHATSAPP','Payment Reminder','Dear {{customer_name}}, kindly clear due invoice {{invoice_number}}.'),
-    ('UHL','LOW_STOCK_ALERT','EMAIL','Low Stock Alert','The item {{sku}} is below reorder level at {{branch_name}}.')
-) AS x(org_code, template_code, channel, subject, body)
-  ON o.code=x.org_code
-ON CONFLICT (organization_id, template_code) DO NOTHING;
-
-INSERT INTO notification (organization_id, user_id, customer_id, supplier_id, template_id, channel, status, reference_type, reference_id, scheduled_at, sent_at, read_at, payload_json, created_by, updated_by)
-SELECT o.id, u.id, c.id, NULL, nt.id, nt.channel, 'SENT', 'SALES_INVOICE', si.id,
-       si.posted_at, si.posted_at + INTERVAL '5 minutes', NULL,
-       jsonb_build_object('invoice_number', si.invoice_number, 'customer_name', c.full_name, 'amount', si.total_amount),
-       si.created_by, si.updated_by
-FROM sales_invoice si
-JOIN organization o ON o.id=si.organization_id
-JOIN customer c ON c.id=si.customer_id
-JOIN notification_template nt ON nt.organization_id=o.id AND nt.template_code='PAYMENT_REMINDER'
-JOIN app_user u ON u.organization_id=o.id AND u.employee_code IN ('SPC-CAS-01','UHL-CAS-01')
-WHERE si.invoice_number IN ('INV-SPC-00002','INV-UHL-00002')
-ON CONFLICT DO NOTHING;
-
-INSERT INTO report_schedule (organization_id, user_id, schedule_code, report_type, frequency, delivery_channel, is_active, next_run_at, config_json, created_by, updated_by)
-SELECT o.id, u.id, x.schedule_code, x.report_type, x.frequency, x.delivery_channel, TRUE, x.next_run_at, x.config_json, u.id, u.id
-FROM organization o
-JOIN (
-  VALUES
-    ('SPC','SPC-OWN-01','RPT-SPC-DAILY','DAILY_SALES_SUMMARY','DAILY','EMAIL',TIMESTAMPTZ '2026-03-26 07:00:00+05:30','{"scope":"organization"}'::jsonb),
-    ('UHL','UHL-OWN-01','RPT-UHL-LOWSTOCK','LOW_STOCK_SUMMARY','WEEKLY','APP',TIMESTAMPTZ '2026-03-27 09:00:00+05:30','{"scope":"organization"}'::jsonb)
-) AS x(org_code, user_emp, schedule_code, report_type, frequency, delivery_channel, next_run_at, config_json)
-  ON o.code=x.org_code
-JOIN app_user u ON u.organization_id=o.id AND u.employee_code=x.user_emp
-ON CONFLICT (organization_id, schedule_code) DO NOTHING;
-
--- vouchers and ledger entries
-INSERT INTO voucher (organization_id, branch_id, voucher_number, voucher_date, voucher_type, reference_type, reference_id, remarks, status, created_by, updated_by)
-SELECT si.organization_id, si.branch_id, 'VCH-' || si.invoice_number, si.invoice_date, 'SALES', 'SALES_INVOICE', si.id, 'Auto sales voucher', 'POSTED', si.created_by, si.updated_by
-FROM sales_invoice si
-WHERE si.invoice_number IN ('INV-SPC-00001','INV-SPC-00002','INV-UHL-00001')
-ON CONFLICT (organization_id, voucher_number) DO NOTHING;
-
-INSERT INTO ledger_entry (organization_id, branch_id, voucher_id, account_id, entry_date, debit_amount, credit_amount, narrative, customer_id, supplier_id, sales_invoice_id, purchase_receipt_id, created_by, updated_by)
-SELECT v.organization_id, v.branch_id, v.id, a.id, v.voucher_date,
-       CASE WHEN a.code = 'AR' THEN si.total_amount ELSE 0 END,
-       CASE WHEN a.code = 'SALES' THEN si.subtotal - si.discount_amount ELSE 0 END,
-       'Sales posting', si.customer_id, NULL, si.id, NULL, v.created_by, v.updated_by
-FROM voucher v
-JOIN sales_invoice si ON si.id = v.reference_id AND v.reference_type='SALES_INVOICE'
-JOIN account a ON a.organization_id = v.organization_id AND a.code IN ('AR','SALES')
-WHERE v.voucher_number LIKE 'VCH-INV-%'
-  AND ((a.code='AR' AND si.total_amount>0) OR (a.code='SALES' AND si.subtotal>0))
-ON CONFLICT DO NOTHING;
-
-INSERT INTO voucher (organization_id, branch_id, voucher_number, voucher_date, voucher_type, reference_type, reference_id, remarks, status, created_by, updated_by)
-SELECT cr.organization_id, cr.branch_id, 'VCH-' || cr.receipt_number, cr.receipt_date, 'RECEIPT', 'CUSTOMER_RECEIPT', cr.id, 'Customer receipt voucher', 'POSTED', cr.created_by, cr.updated_by
-FROM customer_receipt cr
-ON CONFLICT (organization_id, voucher_number) DO NOTHING;
-
-INSERT INTO ledger_entry (organization_id, branch_id, voucher_id, account_id, entry_date, debit_amount, credit_amount, narrative, customer_id, sales_invoice_id, created_by, updated_by)
-SELECT v.organization_id, v.branch_id, v.id, a.id, v.voucher_date,
-       CASE WHEN a.code='CASH' THEN cr.amount ELSE 0 END,
-       CASE WHEN a.code='AR' THEN cr.amount ELSE 0 END,
-       'Customer receipt posting', cr.customer_id,
-       (SELECT cra.sales_invoice_id FROM customer_receipt_allocation cra WHERE cra.customer_receipt_id=cr.id LIMIT 1),
-       v.created_by, v.updated_by
-FROM voucher v
-JOIN customer_receipt cr ON cr.id = v.reference_id AND v.reference_type='CUSTOMER_RECEIPT'
-JOIN account a ON a.organization_id = v.organization_id AND a.code IN ('CASH','AR')
-ON CONFLICT DO NOTHING;
-
--- audit events as immutable business evidence
-INSERT INTO audit_event (organization_id, branch_id, event_type, entity_type, entity_id, entity_number, action, actor_user_id, actor_name_snapshot, actor_role_snapshot, warehouse_id, customer_id, supplier_id, occurred_at, summary, payload_json, device_id, app_version, ip_address, created_by, updated_by)
-SELECT si.organization_id, si.branch_id, 'SALE_POSTED', 'SALES_INVOICE', si.id, si.invoice_number, 'POSTED', u.id, u.full_name, r.name, si.warehouse_id, si.customer_id, NULL,
-       si.posted_at, 'Sales invoice posted with line snapshot',
-       jsonb_build_object(
-         'invoice', row_to_json(si),
-         'customer', (SELECT row_to_json(c) FROM customer c WHERE c.id = si.customer_id),
-         'lines', (SELECT jsonb_agg(row_to_json(sil)) FROM sales_invoice_line sil WHERE sil.sales_invoice_id = si.id),
-         'serials', (SELECT jsonb_agg(jsonb_build_object('line_id', sls.sales_invoice_line_id, 'serial_number', sn.serial_number))
-                     FROM sales_line_serial sls JOIN serial_number sn ON sn.id = sls.serial_number_id
-                     JOIN sales_invoice_line sil2 ON sil2.id=sls.sales_invoice_line_id WHERE sil2.sales_invoice_id = si.id),
-         'batches', (SELECT jsonb_agg(jsonb_build_object('line_id', slb.sales_invoice_line_id, 'batch_id', slb.batch_id, 'base_quantity', slb.base_quantity))
-                     FROM sales_line_batch slb JOIN sales_invoice_line sil3 ON sil3.id=slb.sales_invoice_line_id WHERE sil3.sales_invoice_id = si.id)
-       ),
-       'POS-' || si.branch_id, '1.0.0-demo', '10.10.10.10', si.created_by, si.updated_by
-FROM sales_invoice si
-JOIN app_user u ON u.id = si.created_by
-LEFT JOIN role r ON r.id = u.role_id
-WHERE si.invoice_number IN ('INV-SPC-00001','INV-SPC-00002','INV-UHL-00001')
-ON CONFLICT DO NOTHING;
-
-INSERT INTO audit_event (organization_id, branch_id, event_type, entity_type, entity_id, entity_number, action, actor_user_id, actor_name_snapshot, actor_role_snapshot, warehouse_id, customer_id, supplier_id, occurred_at, summary, payload_json, device_id, app_version, ip_address, created_by, updated_by)
-SELECT st.organization_id, st.branch_id, 'SERVICE_PROGRESS', 'SERVICE_TICKET', st.id, st.ticket_number, 'UPDATED', u.id, u.full_name, r.name, NULL, st.customer_id, NULL,
-       NOW(), 'Service ticket updated and warranty path created',
-       jsonb_build_object(
-         'ticket', row_to_json(st),
-         'items', (SELECT jsonb_agg(row_to_json(sti)) FROM service_ticket_item sti WHERE sti.service_ticket_id = st.id),
-         'visits', (SELECT jsonb_agg(row_to_json(sv)) FROM service_visit sv WHERE sv.service_ticket_id = st.id),
-         'warranty_claim', (SELECT row_to_json(wc) FROM warranty_claim wc WHERE wc.service_ticket_id = st.id LIMIT 1)
-       ),
-       'SERVICE-APP-01', '1.0.0-demo', '10.10.20.10', st.updated_by, st.updated_by
-FROM service_ticket st
-JOIN app_user u ON u.id = st.updated_by
-LEFT JOIN role r ON r.id = u.role_id
-WHERE st.ticket_number = 'SVC-SPC-00001'
-ON CONFLICT DO NOTHING;
-
-
--- ===== SOURCE: 012_backfill_tax_snapshot_fields.sql =====
-
-UPDATE sales_invoice si
-SET seller_tax_registration_id = tr.id,
-    seller_gstin = tr.gstin
-FROM tax_registration tr
-WHERE si.organization_id = tr.organization_id
-  AND tr.branch_id IS NULL
-  AND tr.is_active = TRUE
-  AND tr.is_default = TRUE
-  AND si.seller_tax_registration_id IS NULL;
-
-UPDATE sales_invoice si
-SET customer_gstin = c.gstin
-FROM customer c
-WHERE si.customer_id = c.id
-  AND si.customer_gstin IS NULL
-  AND c.gstin IS NOT NULL
-  AND btrim(c.gstin) <> '';
-
-UPDATE sales_invoice
-SET place_of_supply_state_code = COALESCE(
-      NULLIF(SUBSTRING(customer_gstin FROM 1 FOR 2), ''),
-      NULLIF(SUBSTRING(seller_gstin FROM 1 FOR 2), '')
-    )
-WHERE place_of_supply_state_code IS NULL;
-
-UPDATE purchase_order po
-SET seller_tax_registration_id = tr.id,
-    seller_gstin = tr.gstin
-FROM tax_registration tr
-WHERE po.organization_id = tr.organization_id
-  AND tr.branch_id IS NULL
-  AND tr.is_active = TRUE
-  AND tr.is_default = TRUE
-  AND po.seller_tax_registration_id IS NULL;
-
-UPDATE purchase_order po
-SET supplier_gstin = s.gstin
-FROM supplier s
-WHERE po.supplier_id = s.id
-  AND po.supplier_gstin IS NULL
-  AND s.gstin IS NOT NULL
-  AND btrim(s.gstin) <> '';
-
-UPDATE purchase_order
-SET place_of_supply_state_code = COALESCE(
-      NULLIF(SUBSTRING(supplier_gstin FROM 1 FOR 2), ''),
-      NULLIF(SUBSTRING(seller_gstin FROM 1 FOR 2), '')
-    )
-WHERE place_of_supply_state_code IS NULL;
-
-UPDATE purchase_receipt pr
-SET seller_tax_registration_id = tr.id,
-    seller_gstin = tr.gstin
-FROM tax_registration tr
-WHERE pr.organization_id = tr.organization_id
-  AND tr.branch_id IS NULL
-  AND tr.is_active = TRUE
-  AND tr.is_default = TRUE
-  AND pr.seller_tax_registration_id IS NULL;
-
-UPDATE purchase_receipt pr
-SET supplier_gstin = s.gstin
-FROM supplier s
-WHERE pr.supplier_id = s.id
-  AND pr.supplier_gstin IS NULL
-  AND s.gstin IS NOT NULL
-  AND btrim(s.gstin) <> '';
-
-UPDATE purchase_receipt
-SET place_of_supply_state_code = COALESCE(
-      NULLIF(SUBSTRING(supplier_gstin FROM 1 FOR 2), ''),
-      NULLIF(SUBSTRING(seller_gstin FROM 1 FOR 2), '')
-    )
-WHERE place_of_supply_state_code IS NULL;
-
-UPDATE sales_invoice_line
-SET taxable_amount = line_amount
-WHERE taxable_amount = 0
-  AND line_amount IS NOT NULL
-  AND line_amount > 0;
-
-UPDATE purchase_order_line
-SET taxable_amount = line_amount
-WHERE taxable_amount = 0
-  AND line_amount IS NOT NULL
-  AND line_amount > 0;
-
-UPDATE purchase_receipt_line
-SET taxable_amount = line_amount
-WHERE taxable_amount = 0
-  AND line_amount IS NOT NULL
-  AND line_amount > 0;
-
-WITH sales_line_tax AS (
-  SELECT
-    sil.id,
-    sil.taxable_amount,
-    sil.tax_rate,
-    COALESCE(si.place_of_supply_state_code, SUBSTRING(si.customer_gstin FROM 1 FOR 2), SUBSTRING(si.seller_gstin FROM 1 FOR 2)) AS place_state_code,
-    SUBSTRING(si.seller_gstin FROM 1 FOR 2) AS seller_state_code
-  FROM sales_invoice_line sil
-  JOIN sales_invoice si ON si.id = sil.sales_invoice_id
-  WHERE sil.tax_rate > 0
-    AND sil.taxable_amount > 0
-    AND sil.cgst_amount = 0
-    AND sil.sgst_amount = 0
-    AND sil.igst_amount = 0
-)
-UPDATE sales_invoice_line sil
-SET cgst_rate = CASE
-      WHEN slt.place_state_code = slt.seller_state_code THEN ROUND(slt.tax_rate / 2.0, 4)
-      ELSE 0
-    END,
-    cgst_amount = CASE
-      WHEN slt.place_state_code = slt.seller_state_code THEN ROUND(slt.taxable_amount * (slt.tax_rate / 2.0) / 100.0, 2)
-      ELSE 0
-    END,
-    sgst_rate = CASE
-      WHEN slt.place_state_code = slt.seller_state_code THEN ROUND(slt.tax_rate / 2.0, 4)
-      ELSE 0
-    END,
-    sgst_amount = CASE
-      WHEN slt.place_state_code = slt.seller_state_code
-        THEN ROUND((slt.taxable_amount * slt.tax_rate / 100.0) - ROUND(slt.taxable_amount * (slt.tax_rate / 2.0) / 100.0, 2), 2)
-      ELSE 0
-    END,
-    igst_rate = CASE
-      WHEN slt.place_state_code IS DISTINCT FROM slt.seller_state_code THEN slt.tax_rate
-      ELSE 0
-    END,
-    igst_amount = CASE
-      WHEN slt.place_state_code IS DISTINCT FROM slt.seller_state_code THEN ROUND(slt.taxable_amount * slt.tax_rate / 100.0, 2)
-      ELSE 0
-    END
-FROM sales_line_tax slt
-WHERE sil.id = slt.id;
-
-WITH purchase_order_line_tax AS (
-  SELECT
-    pol.id,
-    pol.taxable_amount,
-    pol.tax_rate,
-    COALESCE(po.place_of_supply_state_code, SUBSTRING(po.supplier_gstin FROM 1 FOR 2), SUBSTRING(po.seller_gstin FROM 1 FOR 2)) AS place_state_code,
-    SUBSTRING(po.seller_gstin FROM 1 FOR 2) AS seller_state_code
-  FROM purchase_order_line pol
-  JOIN purchase_order po ON po.id = pol.purchase_order_id
-  WHERE pol.tax_rate > 0
-    AND pol.taxable_amount > 0
-    AND pol.cgst_amount = 0
-    AND pol.sgst_amount = 0
-    AND pol.igst_amount = 0
-)
-UPDATE purchase_order_line pol
-SET cgst_rate = CASE
-      WHEN polt.place_state_code = polt.seller_state_code THEN ROUND(polt.tax_rate / 2.0, 4)
-      ELSE 0
-    END,
-    cgst_amount = CASE
-      WHEN polt.place_state_code = polt.seller_state_code THEN ROUND(polt.taxable_amount * (polt.tax_rate / 2.0) / 100.0, 2)
-      ELSE 0
-    END,
-    sgst_rate = CASE
-      WHEN polt.place_state_code = polt.seller_state_code THEN ROUND(polt.tax_rate / 2.0, 4)
-      ELSE 0
-    END,
-    sgst_amount = CASE
-      WHEN polt.place_state_code = polt.seller_state_code
-        THEN ROUND((polt.taxable_amount * polt.tax_rate / 100.0) - ROUND(polt.taxable_amount * (polt.tax_rate / 2.0) / 100.0, 2), 2)
-      ELSE 0
-    END,
-    igst_rate = CASE
-      WHEN polt.place_state_code IS DISTINCT FROM polt.seller_state_code THEN polt.tax_rate
-      ELSE 0
-    END,
-    igst_amount = CASE
-      WHEN polt.place_state_code IS DISTINCT FROM polt.seller_state_code THEN ROUND(polt.taxable_amount * polt.tax_rate / 100.0, 2)
-      ELSE 0
-    END
-FROM purchase_order_line_tax polt
-WHERE pol.id = polt.id;
-
-WITH purchase_receipt_line_tax AS (
-  SELECT
-    prl.id,
-    prl.taxable_amount,
-    prl.tax_rate,
-    COALESCE(pr.place_of_supply_state_code, SUBSTRING(pr.supplier_gstin FROM 1 FOR 2), SUBSTRING(pr.seller_gstin FROM 1 FOR 2)) AS place_state_code,
-    SUBSTRING(pr.seller_gstin FROM 1 FOR 2) AS seller_state_code
-  FROM purchase_receipt_line prl
-  JOIN purchase_receipt pr ON pr.id = prl.purchase_receipt_id
-  WHERE prl.tax_rate > 0
-    AND prl.taxable_amount > 0
-    AND prl.cgst_amount = 0
-    AND prl.sgst_amount = 0
-    AND prl.igst_amount = 0
-)
-UPDATE purchase_receipt_line prl
-SET cgst_rate = CASE
-      WHEN prlt.place_state_code = prlt.seller_state_code THEN ROUND(prlt.tax_rate / 2.0, 4)
-      ELSE 0
-    END,
-    cgst_amount = CASE
-      WHEN prlt.place_state_code = prlt.seller_state_code THEN ROUND(prlt.taxable_amount * (prlt.tax_rate / 2.0) / 100.0, 2)
-      ELSE 0
-    END,
-    sgst_rate = CASE
-      WHEN prlt.place_state_code = prlt.seller_state_code THEN ROUND(prlt.tax_rate / 2.0, 4)
-      ELSE 0
-    END,
-    sgst_amount = CASE
-      WHEN prlt.place_state_code = prlt.seller_state_code
-        THEN ROUND((prlt.taxable_amount * prlt.tax_rate / 100.0) - ROUND(prlt.taxable_amount * (prlt.tax_rate / 2.0) / 100.0, 2), 2)
-      ELSE 0
-    END,
-    igst_rate = CASE
-      WHEN prlt.place_state_code IS DISTINCT FROM prlt.seller_state_code THEN prlt.tax_rate
-      ELSE 0
-    END,
-    igst_amount = CASE
-      WHEN prlt.place_state_code IS DISTINCT FROM prlt.seller_state_code THEN ROUND(prlt.taxable_amount * prlt.tax_rate / 100.0, 2)
-      ELSE 0
-    END
-FROM purchase_receipt_line_tax prlt
-WHERE prl.id = prlt.id;
-
-
--- ===== SOURCE: 033_seed_phase1_demo_enrichment.sql =====
-
--- =========================================================
--- Phase 1 demo enrichment for the current ERP model
--- Adds:
---   * HSN codes on shared product master
---   * richer supplier/customer relationship terms
---   * segmented selling prices on store products
---   * one clearly shared product linked into multiple orgs
---   * supplier-product mappings for better sourcing demos
--- =========================================================
-
--- ---------------------------------------------------------
--- 1) HSN codes for existing shared master products
--- ---------------------------------------------------------
-UPDATE product
-SET hsn_code = CASE name
-    WHEN 'EcoVolt 900VA Inverter' THEN '85044090'
-    WHEN 'Tubular Battery 150AH' THEN '85072000'
-    WHEN 'Copper Wire 6 Sqmm' THEN '85444999'
-    WHEN 'House Wire 1.5 Sqmm' THEN '85444999'
-    WHEN 'Servo Battery Distilled Water 1L' THEN '38200000'
-    WHEN 'LED Bulb 9W' THEN '85395000'
-    WHEN 'LED Strip 5M' THEN '94054090'
-    WHEN 'Slim Panel Light 18W' THEN '94054090'
-    WHEN 'Ceiling Fan 1200mm' THEN '84145120'
-    WHEN 'Modular Switch 6A' THEN '85365090'
-    ELSE hsn_code
-END
-WHERE hsn_code IS NULL
-  AND name IN (
-    'EcoVolt 900VA Inverter',
-    'Tubular Battery 150AH',
-    'Copper Wire 6 Sqmm',
-    'House Wire 1.5 Sqmm',
-    'Servo Battery Distilled Water 1L',
-    'LED Bulb 9W',
-    'LED Strip 5M',
-    'Slim Panel Light 18W',
-    'Ceiling Fan 1200mm',
-    'Modular Switch 6A'
-  );
-
--- ---------------------------------------------------------
--- 2) Shared product master present in multiple organizations
--- ---------------------------------------------------------
-INSERT INTO product (
-    name,
-    description,
-    category_name,
-    brand_name,
-    hsn_code,
-    base_uom_id,
-    inventory_tracking_mode,
-    serial_tracking_enabled,
-    batch_tracking_enabled,
-    expiry_tracking_enabled,
-    fractional_quantity_allowed,
-    is_service_item,
-    is_active,
-    created_at,
-    updated_at,
-    created_by,
-    updated_by
-)
-SELECT
-    'LED Flood Light 50W',
-    'Shared flood light demo product sold by both organizations',
-    'Lighting',
-    'PHILIPS',
-    '94054090',
-    u.id,
-    'SIMPLE',
-    FALSE,
-    FALSE,
-    FALSE,
-    FALSE,
-    FALSE,
-    TRUE,
-    NOW(),
-    NOW(),
-    NULL,
-    NULL
-FROM uom u
-WHERE u.code = 'PCS'
-  AND NOT EXISTS (
-    SELECT 1
-    FROM product p
-    WHERE lower(p.name) = lower('LED Flood Light 50W')
-      AND coalesce(lower(p.brand_name), '') = lower('PHILIPS')
-  );
-
--- ---------------------------------------------------------
--- 3) Supplier enrichment and a Philips channel for SPC
--- ---------------------------------------------------------
-INSERT INTO supplier (
-    organization_id,
-    branch_id,
-    supplier_code,
-    name,
-    legal_name,
-    trade_name,
-    phone,
-    email,
-    gstin,
-    billing_address,
-    shipping_address,
-    state,
-    state_code,
-    contact_person_name,
-    contact_person_phone,
-    contact_person_email,
-    payment_terms,
-    is_platform_linked,
-    status,
-    notes,
-    created_by,
-    updated_by
-)
-SELECT
-    o.id,
-    b.id,
-    'SUP-SPC-004',
-    'Philips Trade Gujarat',
-    'Philips Trade Gujarat Private Limited',
-    'Philips Trade Gujarat',
-    '+91-9833300004',
-    'lighting@philips-gujarat.test',
-    '24AACCP8888W1Z5',
-    'Naroda GIDC, Ahmedabad',
-    'Naroda GIDC, Ahmedabad',
-    'Gujarat',
-    '24',
-    'Amit Shah',
-    '+91-9833300104',
-    'amit@philips-gujarat.test',
-    '30 DAYS',
-    FALSE,
-    'ACTIVE',
-    'Shared lighting supplier for demo walkthroughs',
-    u.id,
-    u.id
-FROM organization o
-JOIN branch b ON b.organization_id = o.id AND b.code = 'SPC-HQ'
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code = 'SPC-PUR-01'
-WHERE o.code = 'SPC'
-  AND NOT EXISTS (
-    SELECT 1
-    FROM supplier s
-    WHERE s.organization_id = o.id
-      AND s.supplier_code = 'SUP-SPC-004'
-  );
-
-UPDATE supplier
-SET legal_name = COALESCE(legal_name, name),
-    trade_name = COALESCE(trade_name, name),
-    billing_address = COALESCE(billing_address, 'Industrial Estate, Ahmedabad'),
-    shipping_address = COALESCE(shipping_address, billing_address, 'Industrial Estate, Ahmedabad'),
-    state = COALESCE(state, 'Gujarat'),
-    state_code = COALESCE(state_code, '24'),
-    payment_terms = COALESCE(payment_terms, '30 DAYS'),
-    contact_person_name = COALESCE(contact_person_name, 'Sales Desk'),
-    contact_person_phone = COALESCE(contact_person_phone, phone),
-    contact_person_email = COALESCE(contact_person_email, email)
-WHERE supplier_code IN (
-    'SUP-SPC-001',
-    'SUP-SPC-002',
-    'SUP-SPC-003',
-    'SUP-SPC-004',
-    'SUP-UHL-001',
-    'SUP-UHL-002'
-  );
-
--- ---------------------------------------------------------
--- 4) Shared product linked into both orgs as store products
--- ---------------------------------------------------------
-INSERT INTO store_product (
-    organization_id,
-    product_id,
-    category_id,
-    brand_id,
-    base_uom_id,
-    tax_group_id,
-    sku,
-    name,
-    description,
-    inventory_tracking_mode,
-    serial_tracking_enabled,
-    batch_tracking_enabled,
-    expiry_tracking_enabled,
-    fractional_quantity_allowed,
-    min_stock_base_qty,
-    reorder_level_base_qty,
-    default_sale_price,
-    is_service_item,
-    is_active,
-    created_at,
-    updated_at,
-    created_by,
-    updated_by
-)
-SELECT
-    o.id,
-    p.id,
-    c.id,
-    br.id,
-    p.base_uom_id,
-    tg.id,
-    x.sku,
-    p.name,
-    p.description,
-    p.inventory_tracking_mode,
-    p.serial_tracking_enabled,
-    p.batch_tracking_enabled,
-    p.expiry_tracking_enabled,
-    p.fractional_quantity_allowed,
-    x.min_stock,
-    x.reorder_level,
-    x.default_sale_price,
-    p.is_service_item,
-    TRUE,
-    NOW(),
-    NOW(),
-    u.id,
-    u.id
-FROM (
-    VALUES
-        ('SPC', 'SPC-FLOOD-50W', 12::numeric, 30::numeric, 890::numeric, 'SPC-OWN-01'),
-        ('UHL', 'UHL-FLOOD-50W', 20::numeric, 45::numeric, 950::numeric, 'UHL-OWN-01')
-) AS x(org_code, sku, min_stock, reorder_level, default_sale_price, owner_emp)
-JOIN organization o ON o.code = x.org_code
-JOIN product p
-  ON lower(p.name) = lower('LED Flood Light 50W')
- AND coalesce(lower(p.brand_name), '') = lower('PHILIPS')
-JOIN category c ON c.organization_id = o.id AND c.code = 'LIGHT'
-JOIN brand br ON br.organization_id = o.id AND br.code = 'PHIL'
-JOIN tax_group tg ON tg.organization_id = o.id AND tg.code = 'GST_18'
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code = x.owner_emp
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM store_product sp
-    WHERE sp.organization_id = o.id
-      AND sp.product_id = p.id
-  );
-
--- ---------------------------------------------------------
--- 5) Supplier-product mappings and store-supplier terms
--- ---------------------------------------------------------
-INSERT INTO supplier_product (
-    organization_id,
-    supplier_id,
-    product_id,
-    supplier_product_code,
-    supplier_product_name,
-    priority,
-    is_preferred,
-    is_active,
-    created_at,
-    updated_at,
-    created_by,
-    updated_by
-)
-SELECT
-    o.id,
-    s.id,
-    p.id,
-    x.supplier_product_code,
-    p.name,
-    x.priority,
-    x.is_preferred,
-    TRUE,
-    NOW(),
-    NOW(),
-    u.id,
-    u.id
-FROM (
-    VALUES
-        ('SPC', 'SUP-SPC-001', 'Tubular Battery 150AH', 'EXD-BAT-150AH', 1, TRUE, 'SPC-PUR-01'),
-        ('SPC', 'SUP-SPC-002', 'EcoVolt 900VA Inverter', 'LUM-INV-900VA', 1, TRUE, 'SPC-PUR-01'),
-        ('SPC', 'SUP-SPC-003', 'Copper Wire 6 Sqmm', 'POLY-6SQ', 1, TRUE, 'SPC-PUR-01'),
-        ('SPC', 'SUP-SPC-004', 'LED Bulb 9W', 'PHIL-BULB-9W', 1, TRUE, 'SPC-PUR-01'),
-        ('SPC', 'SUP-SPC-004', 'LED Flood Light 50W', 'PHIL-FLOOD-50W', 1, TRUE, 'SPC-PUR-01'),
-        ('UHL', 'SUP-UHL-001', 'Slim Panel Light 18W', 'PHIL-PANEL-18W', 1, TRUE, 'UHL-ADM-01'),
-        ('UHL', 'SUP-UHL-001', 'LED Strip 5M', 'PHIL-STRIP-5M', 1, TRUE, 'UHL-ADM-01'),
-        ('UHL', 'SUP-UHL-001', 'LED Flood Light 50W', 'PHIL-FLOOD-50W', 1, TRUE, 'UHL-ADM-01'),
-        ('UHL', 'SUP-UHL-002', 'Ceiling Fan 1200mm', 'HAV-FAN-1200', 1, TRUE, 'UHL-ADM-01'),
-        ('UHL', 'SUP-UHL-002', 'House Wire 1.5 Sqmm', 'HAV-WIRE-1.5SQ', 1, TRUE, 'UHL-ADM-01'),
-        ('UHL', 'SUP-UHL-002', 'Modular Switch 6A', 'HAV-SWITCH-6A', 1, TRUE, 'UHL-ADM-01')
-) AS x(org_code, supplier_code, product_name, supplier_product_code, priority, is_preferred, user_emp)
-JOIN organization o ON o.code = x.org_code
-JOIN supplier s ON s.organization_id = o.id AND s.supplier_code = x.supplier_code
-JOIN product p ON lower(p.name) = lower(x.product_name)
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code = x.user_emp
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM supplier_product sp
-    WHERE sp.organization_id = o.id
-      AND sp.supplier_id = s.id
-      AND sp.product_id = p.id
-  );
-
-UPDATE store_supplier_terms sst
-SET payment_terms = COALESCE(sst.payment_terms, CASE
-        WHEN s.supplier_code IN ('SUP-SPC-001', 'SUP-SPC-002', 'SUP-UHL-001') THEN '30 DAYS'
-        ELSE '15 DAYS'
-    END),
-    credit_limit = CASE
-        WHEN s.supplier_code IN ('SUP-SPC-001', 'SUP-SPC-002') THEN 250000
-        WHEN s.supplier_code = 'SUP-SPC-004' THEN 150000
-        WHEN s.supplier_code = 'SUP-UHL-001' THEN 300000
-        WHEN s.supplier_code = 'SUP-UHL-002' THEN 180000
-        ELSE COALESCE(sst.credit_limit, 0)
-    END,
-    credit_days = COALESCE(sst.credit_days, CASE
-        WHEN s.supplier_code IN ('SUP-SPC-001', 'SUP-SPC-002', 'SUP-UHL-001') THEN 30
-        ELSE 15
-    END),
-    is_preferred = CASE
-        WHEN s.supplier_code IN ('SUP-SPC-001', 'SUP-SPC-002', 'SUP-SPC-003', 'SUP-SPC-004', 'SUP-UHL-001', 'SUP-UHL-002')
-            THEN TRUE
-        ELSE sst.is_preferred
-    END,
-    order_via_email = TRUE,
-    order_via_whatsapp = TRUE,
-    remarks = COALESCE(sst.remarks, 'Demo commercial terms for sourcing walkthrough')
-FROM supplier s
-WHERE s.id = sst.supplier_id
-  AND s.supplier_code IN (
-      'SUP-SPC-001',
-      'SUP-SPC-002',
-      'SUP-SPC-003',
-      'SUP-SPC-004',
-      'SUP-UHL-001',
-      'SUP-UHL-002'
-  );
-
--- ---------------------------------------------------------
--- 6) Customer relationship terms for demo pricing/credit/loyalty
--- ---------------------------------------------------------
-UPDATE store_customer_terms sct
-SET customer_segment = CASE c.customer_code
-        WHEN 'CUST-SPC-001' THEN 'DEALER'
-        WHEN 'CUST-SPC-003' THEN 'B2B'
-        WHEN 'CUST-UHL-001' THEN 'B2B'
-        WHEN 'CUST-UHL-003' THEN 'WHOLESALE'
-        ELSE 'RETAIL'
-    END,
-    credit_limit = CASE c.customer_code
-        WHEN 'CUST-SPC-001' THEN 250000
-        WHEN 'CUST-SPC-003' THEN 175000
-        WHEN 'CUST-UHL-001' THEN 125000
-        WHEN 'CUST-UHL-003' THEN 150000
-        ELSE COALESCE(sct.credit_limit, 0)
-    END,
-    credit_days = CASE c.customer_code
-        WHEN 'CUST-SPC-001' THEN 30
-        WHEN 'CUST-SPC-003' THEN 21
-        WHEN 'CUST-UHL-001' THEN 21
-        WHEN 'CUST-UHL-003' THEN 14
-        ELSE sct.credit_days
-    END,
-    loyalty_enabled = CASE
-        WHEN c.customer_code IN ('CUST-SPC-002', 'CUST-UHL-002') THEN TRUE
-        ELSE FALSE
-    END,
-    loyalty_points_balance = CASE c.customer_code
-        WHEN 'CUST-SPC-002' THEN 120
-        WHEN 'CUST-UHL-002' THEN 85
-        ELSE COALESCE(sct.loyalty_points_balance, 0)
-    END,
-    price_tier = CASE c.customer_code
-        WHEN 'CUST-SPC-001' THEN 'DEALER'
-        WHEN 'CUST-SPC-003' THEN 'B2B'
-        WHEN 'CUST-UHL-001' THEN 'B2B'
-        WHEN 'CUST-UHL-003' THEN 'WHOLESALE'
-        ELSE 'RETAIL'
-    END,
-    discount_policy = CASE c.customer_code
-        WHEN 'CUST-SPC-001' THEN 'Dealer slab discount'
-        WHEN 'CUST-UHL-003' THEN 'Wholesale counter discount'
-        ELSE sct.discount_policy
-    END,
-    is_preferred = CASE
-        WHEN c.customer_code IN ('CUST-SPC-001', 'CUST-SPC-003', 'CUST-UHL-001', 'CUST-UHL-003') THEN TRUE
-        ELSE sct.is_preferred
-    END,
-    remarks = COALESCE(sct.remarks, 'Demo customer relationship terms')
-FROM customer c
-WHERE c.id = sct.customer_id;
-
-UPDATE customer
-SET billing_address = COALESCE(billing_address, 'Main Market, Gujarat'),
-    shipping_address = COALESCE(shipping_address, billing_address, 'Main Market, Gujarat'),
-    state = COALESCE(state, 'Gujarat'),
-    state_code = COALESCE(state_code, '24'),
-    contact_person_name = COALESCE(contact_person_name, full_name),
-    contact_person_phone = COALESCE(contact_person_phone, phone),
-    contact_person_email = COALESCE(contact_person_email, email)
-WHERE customer_code IN (
-    'CUST-SPC-001',
-    'CUST-SPC-002',
-    'CUST-SPC-003',
-    'CUST-SPC-004',
-    'CUST-UHL-001',
-    'CUST-UHL-002',
-    'CUST-UHL-003'
-  );
-
--- ---------------------------------------------------------
--- 7) Store-product selling defaults and segment prices
--- ---------------------------------------------------------
-UPDATE store_product
-SET default_sale_price = CASE sku
-    WHEN 'INV-900VA' THEN 6500
-    WHEN 'BAT-150AH' THEN 12800
-    WHEN 'WIRE-6SQ' THEN 92
-    WHEN 'OIL-1LTR' THEN 55
-    WHEN 'BULB-9W' THEN 95
-    WHEN 'LIGHT-PANEL18' THEN 650
-    WHEN 'FAN-CLG-1200' THEN 2200
-    WHEN 'WIRE-1.5SQ' THEN 24
-    WHEN 'STRIP-LED5M' THEN 410
-    WHEN 'SWITCH-6A' THEN 45
-    WHEN 'SPC-FLOOD-50W' THEN 890
-    WHEN 'UHL-FLOOD-50W' THEN 950
-    ELSE default_sale_price
-END
-WHERE sku IN (
-    'INV-900VA',
-    'BAT-150AH',
-    'WIRE-6SQ',
-    'OIL-1LTR',
-    'BULB-9W',
-    'LIGHT-PANEL18',
-    'FAN-CLG-1200',
-    'WIRE-1.5SQ',
-    'STRIP-LED5M',
-    'SWITCH-6A',
-    'SPC-FLOOD-50W',
-    'UHL-FLOOD-50W'
-  );
-
-INSERT INTO store_product_price (
-    organization_id,
-    store_product_id,
-    price_type,
-    customer_segment,
-    price,
-    min_quantity,
-    effective_from,
-    effective_to,
-    is_default,
-    is_active,
-    created_at,
-    updated_at,
-    created_by,
-    updated_by
-)
-SELECT
-    sp.organization_id,
-    sp.id,
-    'SELLING',
-    x.customer_segment,
-    x.price,
-    x.min_quantity,
-    DATE '2026-01-01',
-    NULL,
-    x.is_default,
-    TRUE,
-    NOW(),
-    NOW(),
-    u.id,
-    u.id
-FROM (
-    VALUES
-        ('SPC', 'INV-900VA', 'RETAIL', 6500::numeric, NULL::numeric, TRUE, 'SPC-OWN-01'),
-        ('SPC', 'INV-900VA', 'DEALER', 6200::numeric, NULL::numeric, FALSE, 'SPC-OWN-01'),
-        ('SPC', 'BAT-150AH', 'RETAIL', 12800::numeric, NULL::numeric, TRUE, 'SPC-OWN-01'),
-        ('SPC', 'BAT-150AH', 'B2B', 12350::numeric, NULL::numeric, FALSE, 'SPC-OWN-01'),
-        ('SPC', 'WIRE-6SQ', 'RETAIL', 92::numeric, NULL::numeric, TRUE, 'SPC-OWN-01'),
-        ('SPC', 'WIRE-6SQ', 'B2B', 88::numeric, 50::numeric, FALSE, 'SPC-OWN-01'),
-        ('SPC', 'BULB-9W', 'RETAIL', 95::numeric, NULL::numeric, TRUE, 'SPC-OWN-01'),
-        ('SPC', 'BULB-9W', 'WHOLESALE', 85::numeric, 24::numeric, FALSE, 'SPC-OWN-01'),
-        ('SPC', 'SPC-FLOOD-50W', 'RETAIL', 890::numeric, NULL::numeric, TRUE, 'SPC-OWN-01'),
-        ('SPC', 'SPC-FLOOD-50W', 'DEALER', 835::numeric, 5::numeric, FALSE, 'SPC-OWN-01'),
-        ('UHL', 'LIGHT-PANEL18', 'RETAIL', 650::numeric, NULL::numeric, TRUE, 'UHL-OWN-01'),
-        ('UHL', 'LIGHT-PANEL18', 'B2B', 610::numeric, 10::numeric, FALSE, 'UHL-OWN-01'),
-        ('UHL', 'FAN-CLG-1200', 'RETAIL', 2200::numeric, NULL::numeric, TRUE, 'UHL-OWN-01'),
-        ('UHL', 'FAN-CLG-1200', 'WHOLESALE', 2100::numeric, 2::numeric, FALSE, 'UHL-OWN-01'),
-        ('UHL', 'SWITCH-6A', 'RETAIL', 45::numeric, NULL::numeric, TRUE, 'UHL-OWN-01'),
-        ('UHL', 'SWITCH-6A', 'WHOLESALE', 39::numeric, 20::numeric, FALSE, 'UHL-OWN-01'),
-        ('UHL', 'UHL-FLOOD-50W', 'RETAIL', 950::numeric, NULL::numeric, TRUE, 'UHL-OWN-01'),
-        ('UHL', 'UHL-FLOOD-50W', 'B2B', 905::numeric, 6::numeric, FALSE, 'UHL-OWN-01')
-) AS x(org_code, sku, customer_segment, price, min_quantity, is_default, owner_emp)
-JOIN organization o ON o.code = x.org_code
-JOIN store_product sp ON sp.organization_id = o.id AND sp.sku = x.sku
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code = x.owner_emp
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM store_product_price spp
-    WHERE spp.organization_id = sp.organization_id
-      AND spp.store_product_id = sp.id
-      AND spp.price_type = 'SELLING'
-      AND coalesce(spp.customer_segment, 'RETAIL') = x.customer_segment
-      AND spp.effective_from = DATE '2026-01-01'
-  );
-
--- ---------------------------------------------------------
--- 8) Opening inventory for the shared product in both orgs
--- ---------------------------------------------------------
-INSERT INTO inventory_balance (
-    organization_id,
-    branch_id,
-    warehouse_id,
-    product_id,
-    batch_id,
-    on_hand_base_quantity,
-    reserved_base_quantity,
-    available_base_quantity,
-    avg_cost,
-    created_by,
-    updated_by
-)
-SELECT
-    o.id,
-    w.branch_id,
-    w.id,
-    sp.id,
-    NULL,
-    x.on_hand,
-    0,
-    x.on_hand,
-    x.avg_cost,
-    u.id,
-    u.id
-FROM (
-    VALUES
-        ('SPC', 'SPC-HQ-GODOWN', 'SPC-FLOOD-50W', 18::numeric, 610::numeric, 'SPC-PUR-01'),
-        ('UHL', 'UHL-AHD-GODOWN', 'UHL-FLOOD-50W', 25::numeric, 665::numeric, 'UHL-ADM-01')
-) AS x(org_code, warehouse_code, sku, on_hand, avg_cost, user_emp)
-JOIN organization o ON o.code = x.org_code
-JOIN warehouse w ON w.organization_id = o.id AND w.code = x.warehouse_code
-JOIN store_product sp ON sp.organization_id = o.id AND sp.sku = x.sku
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code = x.user_emp
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM inventory_balance ib
-    WHERE ib.organization_id = o.id
-      AND ib.warehouse_id = w.id
-      AND ib.product_id = sp.id
-      AND ib.batch_id IS NULL
-  );
-
-INSERT INTO stock_movement (
-    organization_id,
-    branch_id,
-    warehouse_id,
-    product_id,
-    movement_type,
-    reference_type,
-    reference_id,
-    reference_number,
-    direction,
-    uom_id,
-    quantity,
-    base_quantity,
-    unit_cost,
-    total_cost,
-    movement_at,
-    created_by,
-    updated_by
-)
-SELECT
-    o.id,
-    w.branch_id,
-    w.id,
-    sp.id,
-    'OPENING_STOCK',
-    'OPENING',
-    1,
-    'OPEN-DEMO-SHARED',
-    'IN',
-    sp.base_uom_id,
-    x.on_hand,
-    x.on_hand,
-    x.avg_cost,
-    x.on_hand * x.avg_cost,
-    TIMESTAMPTZ '2026-03-01 11:30:00+05:30',
-    u.id,
-    u.id
-FROM (
-    VALUES
-        ('SPC', 'SPC-HQ-GODOWN', 'SPC-FLOOD-50W', 18::numeric, 610::numeric, 'SPC-PUR-01'),
-        ('UHL', 'UHL-AHD-GODOWN', 'UHL-FLOOD-50W', 25::numeric, 665::numeric, 'UHL-ADM-01')
-) AS x(org_code, warehouse_code, sku, on_hand, avg_cost, user_emp)
-JOIN organization o ON o.code = x.org_code
-JOIN warehouse w ON w.organization_id = o.id AND w.code = x.warehouse_code
-JOIN store_product sp ON sp.organization_id = o.id AND sp.sku = x.sku
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code = x.user_emp
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM stock_movement sm
-    WHERE sm.organization_id = o.id
-      AND sm.warehouse_id = w.id
-      AND sm.product_id = sp.id
-      AND sm.reference_number = 'OPEN-DEMO-SHARED'
-  );
-
-
--- ===== SOURCE: 036_seed_sales_quote_order_demo.sql =====
-
--- Reproducible quotation -> sales order -> sales invoice demo trail for phase 1
-
-INSERT INTO sales_quote (
-  organization_id,
-  branch_id,
-  warehouse_id,
-  customer_id,
-  quote_type,
-  quote_number,
-  quote_date,
-  valid_until,
-  seller_gstin,
-  customer_gstin,
-  place_of_supply_state_code,
-  status,
-  subtotal,
-  discount_amount,
-  tax_amount,
-  total_amount,
-  remarks,
-  created_by,
-  updated_by
-)
-SELECT o.id, b.id, w.id, c.id, 'QUOTATION', 'QTN-SPC-DEMO-00001', DATE '2026-03-12', DATE '2026-03-20',
-       o.gstin, c.gstin, '24', 'INVOICED', 2884.00, 0.00, 519.12, 3403.12,
-       'Seeded quotation demo converted to order and invoice', u.id, u.id
-FROM organization o
-JOIN branch b ON b.organization_id = o.id AND b.code = 'SPC-RJK'
-JOIN warehouse w ON w.organization_id = o.id AND w.code = 'SPC-HQ-GODOWN'
-JOIN customer c ON c.organization_id = o.id AND c.customer_code = 'CUST-SPC-004'
-JOIN app_user u ON u.organization_id = o.id AND u.employee_code = 'SPC-OWN-01'
-WHERE o.code = 'SPC'
-  AND NOT EXISTS (
-    SELECT 1 FROM sales_quote sq
-    WHERE sq.organization_id = o.id
-      AND sq.quote_number = 'QTN-SPC-DEMO-00001'
-  );
-
-INSERT INTO sales_quote_line (
-  sales_quote_id,
-  product_id,
-  uom_id,
-  hsn_snapshot,
-  quantity,
-  base_quantity,
-  unit_price,
-  discount_amount,
-  taxable_amount,
-  tax_rate,
-  cgst_rate,
-  cgst_amount,
-  sgst_rate,
-  sgst_amount,
-  igst_rate,
-  igst_amount,
-  cess_rate,
-  cess_amount,
-  line_amount,
-  remarks,
-  created_by,
-  updated_by
-)
-SELECT sq.id, sp.id, u.id, p.hsn_code, x.quantity, x.base_quantity, x.unit_price, 0.00, x.taxable_amount, 18.0000,
-       9.0000, x.cgst_amount, 9.0000, x.sgst_amount, 0.0000, 0.00, 0.0000, 0.00, x.line_amount, NULL, sq.created_by, sq.updated_by
-FROM sales_quote sq
-JOIN organization o ON o.id = sq.organization_id
-JOIN (
-  VALUES
-    ('SPC-FLOOD-50W','PCS',2.000000,2.000000,890.00,1780.00,160.20,160.20,2100.40),
-    ('WIRE-6SQ','MTR',12.000000,12.000000,92.00,1104.00,99.36,99.36,1302.72)
-) AS x(sku, uom_code, quantity, base_quantity, unit_price, taxable_amount, cgst_amount, sgst_amount, line_amount)
-  ON TRUE
-JOIN store_product sp ON sp.organization_id = o.id AND sp.sku = x.sku
-JOIN product p ON p.id = sp.product_id
-JOIN uom u ON u.code = x.uom_code
-WHERE sq.quote_number = 'QTN-SPC-DEMO-00001'
-  AND NOT EXISTS (
-    SELECT 1 FROM sales_quote_line sql
-    WHERE sql.sales_quote_id = sq.id
-  );
-
-INSERT INTO sales_order (
-  organization_id,
-  branch_id,
-  warehouse_id,
-  customer_id,
-  source_quote_id,
-  order_number,
-  order_date,
-  seller_gstin,
-  customer_gstin,
-  place_of_supply_state_code,
-  status,
-  subtotal,
-  discount_amount,
-  tax_amount,
-  total_amount,
-  remarks,
-  created_by,
-  updated_by
-)
-SELECT sq.organization_id, sq.branch_id, sq.warehouse_id, sq.customer_id, sq.id, 'SO-SPC-DEMO-00001', DATE '2026-03-13',
-       sq.seller_gstin, sq.customer_gstin, sq.place_of_supply_state_code, 'INVOICED',
-       sq.subtotal, sq.discount_amount, sq.tax_amount, sq.total_amount,
-       'Seeded sales order converted from demo quotation', sq.created_by, sq.updated_by
-FROM sales_quote sq
-WHERE sq.quote_number = 'QTN-SPC-DEMO-00001'
-  AND NOT EXISTS (
-    SELECT 1 FROM sales_order so
-    WHERE so.organization_id = sq.organization_id
-      AND so.order_number = 'SO-SPC-DEMO-00001'
-  );
-
-INSERT INTO sales_order_line (
-  sales_order_id,
-  source_quote_line_id,
-  product_id,
-  uom_id,
-  hsn_snapshot,
-  quantity,
-  base_quantity,
-  unit_price,
-  discount_amount,
-  taxable_amount,
-  tax_rate,
-  cgst_rate,
-  cgst_amount,
-  sgst_rate,
-  sgst_amount,
-  igst_rate,
-  igst_amount,
-  cess_rate,
-  cess_amount,
-  line_amount,
-  remarks,
-  created_by,
-  updated_by
-)
-SELECT so.id, sql.id, sql.product_id, sql.uom_id, sql.hsn_snapshot, sql.quantity, sql.base_quantity,
-       sql.unit_price, sql.discount_amount, sql.taxable_amount, sql.tax_rate,
-       sql.cgst_rate, sql.cgst_amount, sql.sgst_rate, sql.sgst_amount,
-       sql.igst_rate, sql.igst_amount, sql.cess_rate, sql.cess_amount,
-       sql.line_amount, sql.remarks, so.created_by, so.updated_by
-FROM sales_order so
-JOIN sales_quote sq ON sq.id = so.source_quote_id
-JOIN sales_quote_line sql ON sql.sales_quote_id = sq.id
-WHERE so.order_number = 'SO-SPC-DEMO-00001'
-  AND NOT EXISTS (
-    SELECT 1 FROM sales_order_line sol
-    WHERE sol.sales_order_id = so.id
-  );
-
-INSERT INTO sales_invoice (
-  organization_id,
-  branch_id,
-  warehouse_id,
-  customer_id,
-  price_list_id,
-  invoice_number,
-  invoice_date,
-  status,
-  subtotal,
-  discount_amount,
-  tax_amount,
-  total_amount,
-  remarks,
-  seller_gstin,
-  customer_gstin,
-  place_of_supply_state_code,
-  due_date,
-  posted_at,
-  source_quote_id,
-  source_order_id,
-  created_by,
-  updated_by
-)
-SELECT so.organization_id, so.branch_id, so.warehouse_id, so.customer_id,
-       pl.id, 'INV-SPC-00003', DATE '2026-03-14', 'POSTED',
-       so.subtotal, so.discount_amount, so.tax_amount, so.total_amount,
-       'Seeded posted invoice converted from demo sales order',
-       so.seller_gstin, so.customer_gstin, so.place_of_supply_state_code,
-       DATE '2026-03-14', TIMESTAMPTZ '2026-03-14 14:35:00+05:30',
-       so.source_quote_id, so.id,
-       so.created_by, so.updated_by
-FROM sales_order so
-LEFT JOIN price_list pl ON pl.organization_id = so.organization_id AND pl.code = 'RETAIL'
-WHERE so.order_number = 'SO-SPC-DEMO-00001'
-  AND NOT EXISTS (
-    SELECT 1 FROM sales_invoice si
-    WHERE si.organization_id = so.organization_id
-      AND si.invoice_number = 'INV-SPC-00003'
-  );
-
-INSERT INTO sales_invoice_line (
-  sales_invoice_id,
-  product_id,
-  uom_id,
-  hsn_snapshot,
-  quantity,
-  base_quantity,
-  unit_price,
-  discount_amount,
-  tax_rate,
-  taxable_amount,
-  cgst_rate,
-  cgst_amount,
-  sgst_rate,
-  sgst_amount,
-  igst_rate,
-  igst_amount,
-  cess_rate,
-  cess_amount,
-  line_amount,
-  unit_cost_at_sale,
-  total_cost_at_sale,
-  warranty_months,
-  created_by,
-  updated_by
-)
-SELECT si.id, sol.product_id, sol.uom_id, sol.hsn_snapshot, sol.quantity, sol.base_quantity,
-       sol.unit_price, sol.discount_amount, sol.tax_rate, sol.taxable_amount,
-       sol.cgst_rate, sol.cgst_amount, sol.sgst_rate, sol.sgst_amount,
-       sol.igst_rate, sol.igst_amount, sol.cess_rate, sol.cess_amount,
-       sol.line_amount,
-       CASE WHEN sp.sku = 'SPC-FLOOD-50W' THEN 610.00 ELSE 70.00 END,
-       CASE WHEN sp.sku = 'SPC-FLOOD-50W' THEN 1220.00 ELSE 840.00 END,
-       NULL,
-       si.created_by, si.updated_by
-FROM sales_invoice si
-JOIN sales_order so ON so.id = si.source_order_id
-JOIN sales_order_line sol ON sol.sales_order_id = so.id
-JOIN store_product sp ON sp.id = sol.product_id
-WHERE si.invoice_number = 'INV-SPC-00003'
-  AND NOT EXISTS (
-    SELECT 1 FROM sales_invoice_line sil
-    WHERE sil.sales_invoice_id = si.id
-  );
-
-UPDATE sales_quote sq
-SET converted_sales_order_id = so.id,
-    converted_sales_invoice_id = si.id,
-    updated_at = NOW(),
-    updated_by = sq.created_by
-FROM sales_order so
-JOIN sales_invoice si ON si.source_order_id = so.id
-WHERE sq.id = so.source_quote_id
-  AND sq.quote_number = 'QTN-SPC-DEMO-00001';
-
-UPDATE sales_order so
-SET converted_sales_invoice_id = si.id,
-    updated_at = NOW(),
-    updated_by = so.created_by
-FROM sales_invoice si
-WHERE si.source_order_id = so.id
-  AND so.order_number = 'SO-SPC-DEMO-00001';
-
-INSERT INTO stock_movement (
-  organization_id,
-  branch_id,
-  warehouse_id,
-  product_id,
-  movement_type,
-  reference_type,
-  reference_id,
-  reference_number,
-  direction,
-  uom_id,
-  quantity,
-  base_quantity,
-  unit_cost,
-  total_cost,
-  movement_at,
-  created_by,
-  updated_by
-)
-SELECT si.organization_id, si.branch_id, si.warehouse_id, sil.product_id,
-       'SALES_INVOICE', 'SALES_INVOICE', si.id, si.invoice_number, 'OUT',
-       sil.uom_id, sil.quantity, sil.base_quantity,
-       sil.unit_cost_at_sale,
-       sil.total_cost_at_sale,
-       si.posted_at, si.created_by, si.updated_by
-FROM sales_invoice si
-JOIN sales_invoice_line sil ON sil.sales_invoice_id = si.id
-WHERE si.invoice_number = 'INV-SPC-00003'
-  AND NOT EXISTS (
-    SELECT 1 FROM stock_movement sm
-    WHERE sm.reference_type = 'SALES_INVOICE'
-      AND sm.reference_id = si.id
-      AND sm.product_id = sil.product_id
-      AND sm.movement_type = 'SALES_INVOICE'
-  );
-
-UPDATE inventory_balance ib
-SET on_hand_base_quantity = CASE
-      WHEN sp.sku = 'SPC-FLOOD-50W' THEN 16.000000
-      WHEN sp.sku = 'WIRE-6SQ' THEN 488.000000
-      ELSE ib.on_hand_base_quantity
-    END,
-    reserved_base_quantity = 0.000000,
-    available_base_quantity = CASE
-      WHEN sp.sku = 'SPC-FLOOD-50W' THEN 16.000000
-      WHEN sp.sku = 'WIRE-6SQ' THEN 488.000000
-      ELSE ib.available_base_quantity
-    END,
-    updated_at = NOW(),
-    updated_by = (
-      SELECT u.id
-      FROM app_user u
-      JOIN organization o ON o.id = u.organization_id
-      WHERE o.code = 'SPC' AND u.employee_code = 'SPC-OWN-01'
-      LIMIT 1
-    )
-FROM store_product sp
-JOIN organization o ON o.id = sp.organization_id
-WHERE ib.organization_id = sp.organization_id
-  AND ib.product_id = sp.id
-  AND ib.warehouse_id = (
-    SELECT w.id FROM warehouse w
-    WHERE w.organization_id = o.id AND w.code = 'SPC-HQ-GODOWN'
-  )
-  AND o.code = 'SPC'
-  AND sp.sku IN ('SPC-FLOOD-50W', 'WIRE-6SQ');
-
-INSERT INTO voucher (
-  organization_id,
-  branch_id,
-  voucher_number,
-  voucher_date,
-  voucher_type,
-  reference_type,
-  reference_id,
-  remarks,
-  status,
-  created_by,
-  updated_by
-)
-SELECT si.organization_id, si.branch_id, 'VCH-' || si.invoice_number, si.invoice_date,
-       'SALES', 'SALES_INVOICE', si.id, 'Seeded sales voucher for quote/order demo', 'POSTED',
-       si.created_by, si.updated_by
-FROM sales_invoice si
-WHERE si.invoice_number = 'INV-SPC-00003'
-  AND NOT EXISTS (
-    SELECT 1 FROM voucher v
-    WHERE v.organization_id = si.organization_id
-      AND v.voucher_number = 'VCH-' || si.invoice_number
-  );
-
-INSERT INTO ledger_entry (
-  organization_id,
-  branch_id,
-  voucher_id,
-  account_id,
-  entry_date,
-  debit_amount,
-  credit_amount,
-  narrative,
-  customer_id,
-  sales_invoice_id,
-  created_by,
-  updated_by
-)
-SELECT v.organization_id, v.branch_id, v.id, a.id, v.voucher_date,
-       CASE WHEN a.code = 'AR' THEN si.total_amount ELSE 0 END,
-       CASE WHEN a.code = 'SALES' THEN si.subtotal - si.discount_amount ELSE 0 END,
-       'Seeded quote-order-invoice demo posting', si.customer_id, si.id, v.created_by, v.updated_by
-FROM voucher v
-JOIN sales_invoice si ON si.id = v.reference_id AND v.reference_type = 'SALES_INVOICE'
-JOIN account a ON a.organization_id = v.organization_id AND a.code IN ('AR','SALES')
-WHERE v.voucher_number = 'VCH-INV-SPC-00003'
-  AND NOT EXISTS (
-    SELECT 1 FROM ledger_entry le
-    WHERE le.voucher_id = v.id
-      AND le.account_id = a.id
-  );
+-- liquibase formatted sql
+
+-- changeset sameerkhan:1775937591491-1
+INSERT INTO "organization" ("id", "code", "name", "legal_name", "phone", "email", "gstin", "is_active", "created_at", "created_by", "updated_at", "updated_by", "subscription_version", "gst_threshold_amount", "gst_threshold_alert_enabled", "owner_account_id") VALUES (34, 'UHL', 'Urban Home Lights', 'Urban Home Lights LLP', '+91-9876500002', 'admin@urbanlights.test', '24AAAFU5678R1Z2', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-29 21:43:03.901681', 176, 2, 4000000.00, TRUE, 9);
+INSERT INTO "organization" ("id", "code", "name", "legal_name", "phone", "email", "gstin", "is_active", "created_at", "created_by", "updated_at", "updated_by", "subscription_version", "gst_threshold_amount", "gst_threshold_alert_enabled", "owner_account_id") VALUES (16, 'LOCAL', 'Local Organization', NULL, NULL, NULL, NULL, TRUE, '2026-03-25 04:19:25.014499', NULL, '2026-03-29 21:43:03.901681', NULL, 2, 4000000.00, TRUE, 16);
+INSERT INTO "organization" ("id", "code", "name", "legal_name", "phone", "email", "gstin", "is_active", "created_at", "created_by", "updated_at", "updated_by", "subscription_version", "gst_threshold_amount", "gst_threshold_alert_enabled", "owner_account_id") VALUES (35, 'SPCDEM2', 'Shakti Power Demo 2', 'Shakti Power Demo Two Pvt Ltd', '+91-9876510002', 'demo2@shaktipower.test', '24AAVCS2234Q1Z5', TRUE, '2026-03-29 21:44:01.452899', 168, '2026-03-29 21:44:01.452899', 168, 1, 4000000.00, TRUE, 1);
+INSERT INTO "organization" ("id", "code", "name", "legal_name", "phone", "email", "gstin", "is_active", "created_at", "created_by", "updated_at", "updated_by", "subscription_version", "gst_threshold_amount", "gst_threshold_alert_enabled", "owner_account_id") VALUES (36, 'SPCDEM3', 'Shakti Power Demo 3', 'Shakti Power Demo Three Pvt Ltd', '+91-9876510003', 'demo3@shaktipower.test', '24AAVCS3234Q1Z5', TRUE, '2026-03-29 21:44:09.632368', 168, '2026-03-29 21:44:09.632368', 168, 1, 4000000.00, TRUE, 1);
+INSERT INTO "organization" ("id", "code", "name", "legal_name", "phone", "email", "gstin", "is_active", "created_at", "created_by", "updated_at", "updated_by", "subscription_version", "gst_threshold_amount", "gst_threshold_alert_enabled", "owner_account_id") VALUES (37, 'PLATFORM', 'Retail Management Platform', 'Retail Management Platform', '+91-9990000099', 'platform-admin@retailmanagement.test', NULL, TRUE, '2026-04-05 02:11:19.371302', NULL, '2026-04-05 02:11:19.371302', NULL, 1, 4000000.00, TRUE, 27);
+INSERT INTO "organization" ("id", "code", "name", "legal_name", "phone", "email", "gstin", "is_active", "created_at", "created_by", "updated_at", "updated_by", "subscription_version", "gst_threshold_amount", "gst_threshold_alert_enabled", "owner_account_id") VALUES (33, 'SPC', 'Shakti Power Centre', 'Shakti Power Centre Private Limited', '+91-9876500001', 'admin@shaktipower.test', '24AAVCS1234Q1Z5', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-04-05 04:39:02.481593', 195, 3, 4000000.00, TRUE, 1);
+
+-- changeset sameerkhan:1775937591491-2
+INSERT INTO "branch" ("id", "organization_id", "code", "name", "phone", "email", "address_line1", "address_line2", "city", "state", "postal_code", "country", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (71, 33, 'SPC-RJK', 'Rajkot Retail', '+91-9876501003', 'rajkot@shaktipower.test', 'Kalawad Road', NULL, 'Rajkot', 'Gujarat', '360005', 'India', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "branch" ("id", "organization_id", "code", "name", "phone", "email", "address_line1", "address_line2", "city", "state", "postal_code", "country", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (72, 33, 'SPC-JAM', 'Jamnagar Retail', '+91-9876501002', 'jam@shaktipower.test', 'Ranjit Road', NULL, 'Jamnagar', 'Gujarat', '361001', 'India', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "branch" ("id", "organization_id", "code", "name", "phone", "email", "address_line1", "address_line2", "city", "state", "postal_code", "country", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (73, 33, 'SPC-HQ', 'Mithapur Head Office', '+91-9876501001', 'hq@shaktipower.test', 'Station Road', NULL, 'Mithapur', 'Gujarat', '361345', 'India', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "branch" ("id", "organization_id", "code", "name", "phone", "email", "address_line1", "address_line2", "city", "state", "postal_code", "country", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (74, 34, 'UHL-SUR', 'Surat Lighting Hub', '+91-9876502002', 'surat@urbanlights.test', 'Ring Road', NULL, 'Surat', 'Gujarat', '395002', 'India', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "branch" ("id", "organization_id", "code", "name", "phone", "email", "address_line1", "address_line2", "city", "state", "postal_code", "country", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (75, 34, 'UHL-AHD', 'Ahmedabad Showroom', '+91-9876502001', 'ahd@urbanlights.test', 'CG Road', NULL, 'Ahmedabad', 'Gujarat', '380009', 'India', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "branch" ("id", "organization_id", "code", "name", "phone", "email", "address_line1", "address_line2", "city", "state", "postal_code", "country", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (76, 33, 'SPC-ADM-DEMO', 'SPC Admin Demo Branch', NULL, NULL, NULL, NULL, 'Rajkot', 'Gujarat', NULL, 'India', TRUE, '2026-03-29 23:34:45.139787', 168, '2026-03-29 23:34:45.139787', 168);
+
+-- changeset sameerkhan:1775937591491-3
+INSERT INTO "warehouse" ("id", "organization_id", "branch_id", "code", "name", "warehouse_type", "is_primary", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (141, 33, 73, 'SPC-HQ-STORE', 'HQ Front Store', 'STORE', TRUE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "warehouse" ("id", "organization_id", "branch_id", "code", "name", "warehouse_type", "is_primary", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (142, 33, 73, 'SPC-HQ-GODOWN', 'HQ Central Godown', 'GODOWN', FALSE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "warehouse" ("id", "organization_id", "branch_id", "code", "name", "warehouse_type", "is_primary", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (143, 33, 73, 'SPC-HQ-SVC', 'HQ Service Bay', 'SERVICE', FALSE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "warehouse" ("id", "organization_id", "branch_id", "code", "name", "warehouse_type", "is_primary", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (144, 33, 72, 'SPC-JAM-STORE', 'Jamnagar Store', 'STORE', TRUE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "warehouse" ("id", "organization_id", "branch_id", "code", "name", "warehouse_type", "is_primary", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (145, 33, 72, 'SPC-JAM-GODOWN', 'Jamnagar Back Godown', 'GODOWN', FALSE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "warehouse" ("id", "organization_id", "branch_id", "code", "name", "warehouse_type", "is_primary", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (146, 33, 71, 'SPC-RJK-STORE', 'Rajkot Store', 'STORE', TRUE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "warehouse" ("id", "organization_id", "branch_id", "code", "name", "warehouse_type", "is_primary", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (147, 34, 75, 'UHL-AHD-STORE', 'Ahmedabad Showroom', 'STORE', TRUE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "warehouse" ("id", "organization_id", "branch_id", "code", "name", "warehouse_type", "is_primary", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (148, 34, 75, 'UHL-AHD-GODOWN', 'Ahmedabad Stock Hub', 'GODOWN', FALSE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "warehouse" ("id", "organization_id", "branch_id", "code", "name", "warehouse_type", "is_primary", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (149, 34, 74, 'UHL-SUR-STORE', 'Surat Store', 'STORE', TRUE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "warehouse" ("id", "organization_id", "branch_id", "code", "name", "warehouse_type", "is_primary", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (150, 34, 74, 'UHL-SUR-DMG', 'Surat Damaged Area', 'DAMAGED', FALSE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "warehouse" ("id", "organization_id", "branch_id", "code", "name", "warehouse_type", "is_primary", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (151, 33, 71, 'SPC-RJK-WH2', 'Rajkot Secondary Warehouse', 'STANDARD', FALSE, TRUE, '2026-04-04 01:46:12.617984', 168, '2026-04-04 01:46:12.617984', 168);
+
+-- changeset sameerkhan:1775937591491-4
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (188, 16, NULL, 16, 'guardcheck02', TRUE, NULL, NULL, '2026-03-25 19:15:27.858078', NULL, '2026-03-25 19:15:27.858078', NULL, 36, 22);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (190, 35, NULL, 9, 'SPC-OWN-01', TRUE, NULL, NULL, '2026-03-29 21:44:01.460715', NULL, '2026-03-29 21:44:01.460715', NULL, 1, 1);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (191, 36, NULL, 9, 'SPC-OWN-01', TRUE, NULL, NULL, '2026-03-29 21:44:09.636603', NULL, '2026-03-29 21:44:09.636603', NULL, 1, 1);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (195, 37, NULL, 18, 'PLAT-ADM-01', TRUE, '2026-04-05', NULL, '2026-04-05 02:11:19.371302', NULL, '2026-04-10 19:46:08.901153', NULL, 41, 27);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (193, 33, 71, 11, 'SPC-EMP-ADM-02', TRUE, NULL, NULL, '2026-03-29 23:36:46.820688', NULL, '2026-04-05 04:40:01.684536', NULL, 39, 25);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (169, 33, 72, 9, 'SPC-OWN-02', TRUE, '2023-02-01', NULL, '2026-03-25 04:32:16.083557', NULL, '2026-04-11 16:49:06.007871', NULL, 2, 2);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (171, 33, 73, 11, 'SPC-ACC-01', TRUE, '2023-04-01', NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 10:45:54.012798', NULL, 4, 4);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (172, 33, 72, 12, 'SPC-MGR-01', TRUE, '2023-04-10', NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 10:45:54.012798', NULL, 5, 5);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (173, 33, 72, 13, 'SPC-CAS-01', TRUE, '2023-05-01', NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 10:45:54.012798', NULL, 6, 6);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (174, 33, 73, 14, 'SPC-PUR-01', TRUE, '2023-05-12', NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 10:45:54.012798', NULL, 7, 7);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (175, 33, 73, 15, 'SPC-TEC-01', TRUE, '2023-06-01', NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 10:45:54.012798', NULL, 8, 8);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (177, 34, 74, 9, 'UHL-OWN-02', TRUE, '2023-02-10', NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 10:45:54.012798', NULL, 10, 10);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (178, 34, 75, 10, 'UHL-ADM-01', TRUE, '2023-03-05', NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 10:45:54.012798', NULL, 11, 11);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (179, 34, 75, 11, 'UHL-ACC-01', TRUE, '2023-03-20', NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 10:45:54.012798', NULL, 12, 12);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (180, 34, 74, 12, 'UHL-MGR-01', TRUE, '2023-04-18', NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 10:45:54.012798', NULL, 13, 13);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (181, 34, 74, 13, 'UHL-CAS-01', TRUE, '2023-05-09', NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 10:45:54.012798', NULL, 14, 14);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (182, 34, 75, 15, 'UHL-TEC-01', TRUE, '2023-06-09', NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 10:45:54.012798', NULL, 15, 15);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (47, 16, NULL, 16, 'erpverify06', TRUE, NULL, NULL, '2026-03-25 04:19:25.139886', NULL, '2026-03-25 10:45:54.012798', NULL, 16, 16);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (186, 16, NULL, 16, 'identitycheck03', TRUE, NULL, NULL, '2026-03-25 12:39:41.542787', NULL, '2026-03-25 12:39:41.542787', NULL, 34, 20);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (168, 33, 73, 9, 'SPC-OWN-01', TRUE, '2023-01-01', NULL, '2026-03-25 04:32:16.083557', NULL, '2026-04-12 01:19:30.153296', NULL, 1, 1);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (189, 16, NULL, 16, 'guardcheck03', TRUE, NULL, NULL, '2026-03-25 19:17:24.95929', NULL, '2026-03-25 19:17:24.95929', NULL, 37, 23);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (194, 33, 73, 10, 'EMP-SPC-0001', TRUE, NULL, NULL, '2026-04-05 01:37:15.028388', NULL, '2026-04-05 01:37:15.028388', NULL, 40, 26);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (183, 16, NULL, 16, 'sameer.khan', TRUE, NULL, NULL, '2026-03-25 05:19:34.398817', NULL, '2026-03-31 17:38:38.646717', NULL, 17, 17);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (192, 33, 71, 11, 'SPC-EMP-ADM-01', TRUE, NULL, NULL, '2026-03-29 23:34:45.302324', NULL, '2026-03-29 23:34:45.302324', NULL, 38, 24);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (170, 33, 73, 10, 'SPC-ADM-01', TRUE, '2023-03-15', NULL, '2026-03-25 04:32:16.083557', NULL, '2026-04-05 01:02:05.398021', NULL, 3, 3);
+INSERT INTO "app_user" ("id", "organization_id", "default_branch_id", "role_id", "employee_code", "is_active", "joined_on", "exited_on", "created_at", "created_by", "updated_at", "updated_by", "person_id", "account_id") VALUES (176, 34, 75, 9, 'UHL-OWN-01', TRUE, '2023-01-10', NULL, '2026-03-25 04:32:16.083557', NULL, '2026-04-11 13:04:34.168345', NULL, 9, 9);
+
+-- changeset sameerkhan:1775937591491-5
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (342, 168, 71, FALSE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (343, 168, 72, FALSE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (344, 168, 73, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (345, 169, 71, FALSE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (346, 169, 72, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (347, 169, 73, FALSE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (348, 170, 71, FALSE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (349, 170, 72, FALSE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (350, 170, 73, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (351, 171, 71, FALSE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (352, 171, 72, FALSE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (353, 171, 73, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (354, 176, 74, FALSE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (355, 176, 75, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (356, 177, 74, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (357, 177, 75, FALSE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (358, 178, 74, FALSE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (359, 178, 75, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (360, 179, 74, FALSE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (361, 179, 75, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (362, 172, 72, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (363, 172, 73, FALSE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (364, 173, 72, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (365, 173, 73, FALSE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (366, 174, 73, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (367, 175, 73, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (368, 180, 74, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (369, 180, 75, FALSE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (370, 181, 74, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (371, 181, 75, FALSE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (372, 182, 75, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (373, 192, 71, TRUE, '2026-03-29 23:34:45.198365', NULL, '2026-03-29 23:34:45.198365', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (374, 192, 73, FALSE, '2026-03-29 23:34:45.198365', NULL, '2026-03-29 23:34:45.198365', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (375, 193, 71, TRUE, '2026-03-29 23:36:46.651685', NULL, '2026-03-29 23:36:46.651685', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (376, 193, 73, FALSE, '2026-03-29 23:36:46.651685', NULL, '2026-03-29 23:36:46.651685', NULL);
+INSERT INTO "user_branch_access" ("id", "user_id", "branch_id", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (377, 194, 73, TRUE, '2026-04-05 01:37:14.915351', NULL, '2026-04-05 01:37:14.915351', NULL);
+
+-- changeset sameerkhan:1775937591491-6
+INSERT INTO "app_setting" ("id", "organization_id", "branch_id", "setting_key", "setting_value", "created_at", "created_by", "updated_at", "updated_by") VALUES (45, 33, NULL, 'inventory.negative_stock_policy', '{"mode": "WARN"}', '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "app_setting" ("id", "organization_id", "branch_id", "setting_key", "setting_value", "created_at", "created_by", "updated_at", "updated_by") VALUES (46, 34, NULL, 'inventory.negative_stock_policy', '{"mode": "WARN"}', '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "app_setting" ("id", "organization_id", "branch_id", "setting_key", "setting_value", "created_at", "created_by", "updated_at", "updated_by") VALUES (47, 33, NULL, 'service.default_warranty_months', '{"months": 24}', '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "app_setting" ("id", "organization_id", "branch_id", "setting_key", "setting_value", "created_at", "created_by", "updated_at", "updated_by") VALUES (48, 34, NULL, 'service.default_warranty_months', '{"months": 24}', '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+
+-- changeset sameerkhan:1775937591491-7
+INSERT INTO "document_sequence" ("id", "organization_id", "branch_id", "document_type", "prefix", "suffix", "next_number", "padding_length", "reset_policy", "created_at", "created_by", "updated_at", "updated_by") VALUES (201, 33, NULL, 'PURCHASE_ORDER', 'PO', NULL, 1003, 5, 'YEARLY', '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "document_sequence" ("id", "organization_id", "branch_id", "document_type", "prefix", "suffix", "next_number", "padding_length", "reset_policy", "created_at", "created_by", "updated_at", "updated_by") VALUES (202, 33, NULL, 'PURCHASE_RECEIPT', 'GRN', NULL, 1003, 5, 'YEARLY', '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "document_sequence" ("id", "organization_id", "branch_id", "document_type", "prefix", "suffix", "next_number", "padding_length", "reset_policy", "created_at", "created_by", "updated_at", "updated_by") VALUES (203, 33, NULL, 'SALES_INVOICE', 'INV', NULL, 1004, 5, 'YEARLY', '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "document_sequence" ("id", "organization_id", "branch_id", "document_type", "prefix", "suffix", "next_number", "padding_length", "reset_policy", "created_at", "created_by", "updated_at", "updated_by") VALUES (204, 33, NULL, 'CUSTOMER_RECEIPT', 'RCPT', NULL, 1003, 5, 'YEARLY', '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "document_sequence" ("id", "organization_id", "branch_id", "document_type", "prefix", "suffix", "next_number", "padding_length", "reset_policy", "created_at", "created_by", "updated_at", "updated_by") VALUES (205, 33, NULL, 'SUPPLIER_PAYMENT', 'PAY', NULL, 1002, 5, 'YEARLY', '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "document_sequence" ("id", "organization_id", "branch_id", "document_type", "prefix", "suffix", "next_number", "padding_length", "reset_policy", "created_at", "created_by", "updated_at", "updated_by") VALUES (206, 33, NULL, 'SERVICE_TICKET', 'SVC', NULL, 1002, 5, 'YEARLY', '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "document_sequence" ("id", "organization_id", "branch_id", "document_type", "prefix", "suffix", "next_number", "padding_length", "reset_policy", "created_at", "created_by", "updated_at", "updated_by") VALUES (207, 33, NULL, 'WARRANTY_CLAIM', 'WCL', NULL, 1002, 5, 'YEARLY', '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "document_sequence" ("id", "organization_id", "branch_id", "document_type", "prefix", "suffix", "next_number", "padding_length", "reset_policy", "created_at", "created_by", "updated_at", "updated_by") VALUES (208, 33, NULL, 'EXPENSE', 'EXP', NULL, 1003, 5, 'YEARLY', '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "document_sequence" ("id", "organization_id", "branch_id", "document_type", "prefix", "suffix", "next_number", "padding_length", "reset_policy", "created_at", "created_by", "updated_at", "updated_by") VALUES (209, 33, NULL, 'RECURRING_EXPENSE', 'REXP', NULL, 1002, 5, 'YEARLY', '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "document_sequence" ("id", "organization_id", "branch_id", "document_type", "prefix", "suffix", "next_number", "padding_length", "reset_policy", "created_at", "created_by", "updated_at", "updated_by") VALUES (210, 33, NULL, 'VOUCHER', 'VCH', NULL, 1010, 5, 'YEARLY', '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "document_sequence" ("id", "organization_id", "branch_id", "document_type", "prefix", "suffix", "next_number", "padding_length", "reset_policy", "created_at", "created_by", "updated_at", "updated_by") VALUES (211, 34, NULL, 'PURCHASE_ORDER', 'PO', NULL, 1003, 5, 'YEARLY', '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "document_sequence" ("id", "organization_id", "branch_id", "document_type", "prefix", "suffix", "next_number", "padding_length", "reset_policy", "created_at", "created_by", "updated_at", "updated_by") VALUES (212, 34, NULL, 'PURCHASE_RECEIPT', 'GRN', NULL, 1003, 5, 'YEARLY', '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "document_sequence" ("id", "organization_id", "branch_id", "document_type", "prefix", "suffix", "next_number", "padding_length", "reset_policy", "created_at", "created_by", "updated_at", "updated_by") VALUES (213, 34, NULL, 'SALES_INVOICE', 'INV', NULL, 1004, 5, 'YEARLY', '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "document_sequence" ("id", "organization_id", "branch_id", "document_type", "prefix", "suffix", "next_number", "padding_length", "reset_policy", "created_at", "created_by", "updated_at", "updated_by") VALUES (214, 34, NULL, 'CUSTOMER_RECEIPT', 'RCPT', NULL, 1003, 5, 'YEARLY', '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "document_sequence" ("id", "organization_id", "branch_id", "document_type", "prefix", "suffix", "next_number", "padding_length", "reset_policy", "created_at", "created_by", "updated_at", "updated_by") VALUES (215, 34, NULL, 'SUPPLIER_PAYMENT', 'PAY', NULL, 1002, 5, 'YEARLY', '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "document_sequence" ("id", "organization_id", "branch_id", "document_type", "prefix", "suffix", "next_number", "padding_length", "reset_policy", "created_at", "created_by", "updated_at", "updated_by") VALUES (216, 34, NULL, 'SERVICE_TICKET', 'SVC', NULL, 1002, 5, 'YEARLY', '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "document_sequence" ("id", "organization_id", "branch_id", "document_type", "prefix", "suffix", "next_number", "padding_length", "reset_policy", "created_at", "created_by", "updated_at", "updated_by") VALUES (217, 34, NULL, 'WARRANTY_CLAIM', 'WCL', NULL, 1002, 5, 'YEARLY', '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "document_sequence" ("id", "organization_id", "branch_id", "document_type", "prefix", "suffix", "next_number", "padding_length", "reset_policy", "created_at", "created_by", "updated_at", "updated_by") VALUES (218, 34, NULL, 'EXPENSE', 'EXP', NULL, 1003, 5, 'YEARLY', '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "document_sequence" ("id", "organization_id", "branch_id", "document_type", "prefix", "suffix", "next_number", "padding_length", "reset_policy", "created_at", "created_by", "updated_at", "updated_by") VALUES (219, 34, NULL, 'RECURRING_EXPENSE', 'REXP', NULL, 1002, 5, 'YEARLY', '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "document_sequence" ("id", "organization_id", "branch_id", "document_type", "prefix", "suffix", "next_number", "padding_length", "reset_policy", "created_at", "created_by", "updated_at", "updated_by") VALUES (220, 34, NULL, 'VOUCHER', 'VCH', NULL, 1010, 5, 'YEARLY', '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+
+-- changeset sameerkhan:1775937591491-8
+INSERT INTO "approval_rule" ("id", "organization_id", "branch_id", "entity_type", "approval_type", "min_amount", "max_amount", "approver_role_id", "priority_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 33, NULL, 'EXPENSE', 'EXPENSE_APPROVAL', 1000.00, NULL, 9, 1, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "approval_rule" ("id", "organization_id", "branch_id", "entity_type", "approval_type", "min_amount", "max_amount", "approver_role_id", "priority_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 34, NULL, 'EXPENSE', 'EXPENSE_APPROVAL', 1000.00, NULL, 9, 1, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "approval_rule" ("id", "organization_id", "branch_id", "entity_type", "approval_type", "min_amount", "max_amount", "approver_role_id", "priority_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 34, NULL, 'STOCK_ADJUSTMENT', 'STOCK_ADJUSTMENT_APPROVAL', 500.00, NULL, 9, 1, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+
+-- changeset sameerkhan:1775937591491-9
+INSERT INTO "approval_request" ("id", "organization_id", "branch_id", "entity_type", "entity_id", "entity_number", "approval_type", "status", "requested_by", "requested_at", "current_approver_user_id", "current_approver_role_snapshot", "request_reason", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 34, 74, 'EXPENSE', 4, 'EXP-UHL-00001', 'EXPENSE_APPROVAL', 'PENDING', 180, '2026-03-08 19:00:00', 177, 'OWNER', 'Maintenance spend above threshold', '2026-03-25 04:32:16.083557', 180, '2026-03-25 04:32:16.083557', 180);
+
+-- changeset sameerkhan:1775937591491-10
+INSERT INTO "approval_history" ("id", "approval_request_id", "approver_user_id", "action", "approver_role_snapshot", "remarks", "action_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 2, 180, 'REQUESTED', 'STORE_MANAGER', 'Submitted for owner approval', '2026-03-08 19:00:00', '2026-03-25 04:32:16.083557', 180, '2026-03-25 04:32:16.083557', 180);
+
+-- changeset sameerkhan:1775937591491-11
+INSERT INTO "customer" ("id", "organization_id", "branch_id", "customer_code", "full_name", "phone", "email", "gstin", "credit_limit", "status", "notes", "created_at", "created_by", "updated_at", "updated_by", "organization_person_profile_id", "linked_organization_id", "customer_type", "legal_name", "trade_name", "billing_address", "shipping_address", "state", "state_code", "contact_person_name", "contact_person_phone", "contact_person_email", "is_platform_linked") VALUES (56, 34, 74, 'CUST-UHL-003', 'Vijay Traders', '+91-9822200003', 'vijay@traders.test', '24AACCV4444N1ZA', 120000.00, 'ACTIVE', 'Wholesale lighting buyer', '2026-03-25 04:32:16.083557', 181, '2026-03-29 16:35:13.535523', 181, 24, NULL, 'BUSINESS', 'Vijay Traders', 'Vijay Traders', 'Wholesale lighting buyer', 'Wholesale lighting buyer', 'Gujarat', '24', 'Vijay Traders', '+91-9822200003', 'vijay@traders.test', FALSE);
+INSERT INTO "customer" ("id", "organization_id", "branch_id", "customer_code", "full_name", "phone", "email", "gstin", "credit_limit", "status", "notes", "created_at", "created_by", "updated_at", "updated_by", "organization_person_profile_id", "linked_organization_id", "customer_type", "legal_name", "trade_name", "billing_address", "shipping_address", "state", "state_code", "contact_person_name", "contact_person_phone", "contact_person_email", "is_platform_linked") VALUES (57, 33, 73, 'CUST-SPC-0001', 'Auto Code Customer', '9999900011', 'autocode.customer@example.com', NULL, 5000.00, 'ACTIVE', NULL, '2026-04-05 01:37:14.788801', 168, '2026-04-05 01:37:14.788801', 168, NULL, NULL, 'INDIVIDUAL', 'Auto Code Customer', 'Auto Code Customer', NULL, NULL, NULL, NULL, NULL, NULL, NULL, FALSE);
+INSERT INTO "customer" ("id", "organization_id", "branch_id", "customer_code", "full_name", "phone", "email", "gstin", "credit_limit", "status", "notes", "created_at", "created_by", "updated_at", "updated_by", "organization_person_profile_id", "linked_organization_id", "customer_type", "legal_name", "trade_name", "billing_address", "shipping_address", "state", "state_code", "contact_person_name", "contact_person_phone", "contact_person_email", "is_platform_linked") VALUES (50, 33, 72, 'CUST-SPC-001', 'Maa Electronics', '+91-9811100001', 'procurement@maaelectronics.test', '24AABCM1111D1Z0', 200000.00, 'ACTIVE', 'Dealer customer', '2026-03-25 04:32:16.083557', 172, '2026-03-29 16:35:13.535523', 172, 18, NULL, 'BUSINESS', 'Maa Electronics', 'Maa Electronics', 'Dealer customer', 'Dealer customer', 'Gujarat', '24', 'Maa Electronics', '+91-9811100001', 'procurement@maaelectronics.test', FALSE);
+INSERT INTO "customer" ("id", "organization_id", "branch_id", "customer_code", "full_name", "phone", "email", "gstin", "credit_limit", "status", "notes", "created_at", "created_by", "updated_at", "updated_by", "organization_person_profile_id", "linked_organization_id", "customer_type", "legal_name", "trade_name", "billing_address", "shipping_address", "state", "state_code", "contact_person_name", "contact_person_phone", "contact_person_email", "is_platform_linked") VALUES (51, 33, 72, 'CUST-SPC-002', 'Jay Ambe Cold Drinks', '+91-9811100002', 'owner@jayambe.test', NULL, 50000.00, 'ACTIVE', 'Retail repeat customer', '2026-03-25 04:32:16.083557', 173, '2026-03-29 16:35:13.535523', 173, 19, NULL, 'INDIVIDUAL', 'Jay Ambe Cold Drinks', 'Jay Ambe Cold Drinks', 'Retail repeat customer', 'Retail repeat customer', 'Gujarat', '24', 'Jay Ambe Cold Drinks', '+91-9811100002', 'owner@jayambe.test', FALSE);
+INSERT INTO "customer" ("id", "organization_id", "branch_id", "customer_code", "full_name", "phone", "email", "gstin", "credit_limit", "status", "notes", "created_at", "created_by", "updated_at", "updated_by", "organization_person_profile_id", "linked_organization_id", "customer_type", "legal_name", "trade_name", "billing_address", "shipping_address", "state", "state_code", "contact_person_name", "contact_person_phone", "contact_person_email", "is_platform_linked") VALUES (52, 33, 71, 'CUST-SPC-003', 'Shiv Enterprise', '+91-9811100003', 'accounts@shiventerprise.test', '24AACCS2222L1Z8', 150000.00, 'ACTIVE', 'Credit customer', '2026-03-25 04:32:16.083557', 170, '2026-03-29 16:35:13.535523', 170, 20, NULL, 'BUSINESS', 'Shiv Enterprise', 'Shiv Enterprise', 'Credit customer', 'Credit customer', 'Gujarat', '24', 'Shiv Enterprise', '+91-9811100003', 'accounts@shiventerprise.test', FALSE);
+INSERT INTO "customer" ("id", "organization_id", "branch_id", "customer_code", "full_name", "phone", "email", "gstin", "credit_limit", "status", "notes", "created_at", "created_by", "updated_at", "updated_by", "organization_person_profile_id", "linked_organization_id", "customer_type", "legal_name", "trade_name", "billing_address", "shipping_address", "state", "state_code", "contact_person_name", "contact_person_phone", "contact_person_email", "is_platform_linked") VALUES (53, 33, 73, 'CUST-SPC-004', 'Ocean Residency Society', '+91-9811100004', 'admin@oceanresidency.test', NULL, 300000.00, 'ACTIVE', 'AMC / service customer', '2026-03-25 04:32:16.083557', 168, '2026-03-29 16:35:13.535523', 168, 21, NULL, 'INDIVIDUAL', 'Ocean Residency Society', 'Ocean Residency Society', 'AMC / service customer', 'AMC / service customer', 'Gujarat', '24', 'Ocean Residency Society', '+91-9811100004', 'admin@oceanresidency.test', FALSE);
+INSERT INTO "customer" ("id", "organization_id", "branch_id", "customer_code", "full_name", "phone", "email", "gstin", "credit_limit", "status", "notes", "created_at", "created_by", "updated_at", "updated_by", "organization_person_profile_id", "linked_organization_id", "customer_type", "legal_name", "trade_name", "billing_address", "shipping_address", "state", "state_code", "contact_person_name", "contact_person_phone", "contact_person_email", "is_platform_linked") VALUES (54, 34, 75, 'CUST-UHL-001', 'Bright Homes', '+91-9822200001', 'hello@brighthomes.test', '24AATFB3333P1Z3', 100000.00, 'ACTIVE', 'Interior partner', '2026-03-25 04:32:16.083557', 178, '2026-03-29 16:35:13.535523', 178, 22, NULL, 'BUSINESS', 'Bright Homes', 'Bright Homes', 'Interior partner', 'Interior partner', 'Gujarat', '24', 'Bright Homes', '+91-9822200001', 'hello@brighthomes.test', FALSE);
+INSERT INTO "customer" ("id", "organization_id", "branch_id", "customer_code", "full_name", "phone", "email", "gstin", "credit_limit", "status", "notes", "created_at", "created_by", "updated_at", "updated_by", "organization_person_profile_id", "linked_organization_id", "customer_type", "legal_name", "trade_name", "billing_address", "shipping_address", "state", "state_code", "contact_person_name", "contact_person_phone", "contact_person_email", "is_platform_linked") VALUES (55, 34, 74, 'CUST-UHL-002', 'Lumen Mart', '+91-9822200002', 'purchase@lumenmart.test', NULL, 75000.00, 'ACTIVE', 'Retail chain counter', '2026-03-25 04:32:16.083557', 180, '2026-03-29 16:35:13.535523', 180, 23, NULL, 'INDIVIDUAL', 'Lumen Mart', 'Lumen Mart', 'Retail chain counter', 'Retail chain counter', 'Gujarat', '24', 'Lumen Mart', '+91-9822200002', 'purchase@lumenmart.test', FALSE);
+
+-- changeset sameerkhan:1775937591491-12
+INSERT INTO "customer_address" ("id", "customer_id", "address_type", "line1", "line2", "city", "state", "postal_code", "country", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (50, 50, 'BILLING', 'Main Market', NULL, 'Jamnagar', 'Gujarat', '361001', 'India', TRUE, '2026-03-25 04:32:16.083557', 172, '2026-03-25 04:32:16.083557', 172);
+INSERT INTO "customer_address" ("id", "customer_id", "address_type", "line1", "line2", "city", "state", "postal_code", "country", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (51, 51, 'BILLING', 'Main Market', NULL, 'Jamnagar', 'Gujarat', '361001', 'India', TRUE, '2026-03-25 04:32:16.083557', 173, '2026-03-25 04:32:16.083557', 173);
+INSERT INTO "customer_address" ("id", "customer_id", "address_type", "line1", "line2", "city", "state", "postal_code", "country", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (52, 52, 'BILLING', 'Main Market', NULL, 'Rajkot', 'Gujarat', '360005', 'India', TRUE, '2026-03-25 04:32:16.083557', 170, '2026-03-25 04:32:16.083557', 170);
+INSERT INTO "customer_address" ("id", "customer_id", "address_type", "line1", "line2", "city", "state", "postal_code", "country", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (53, 53, 'BILLING', 'Main Market', NULL, 'Mithapur', 'Gujarat', '361345', 'India', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "customer_address" ("id", "customer_id", "address_type", "line1", "line2", "city", "state", "postal_code", "country", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (54, 54, 'BILLING', 'Main Market', NULL, 'Ahmedabad', 'Gujarat', '380009', 'India', TRUE, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "customer_address" ("id", "customer_id", "address_type", "line1", "line2", "city", "state", "postal_code", "country", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (55, 55, 'BILLING', 'Main Market', NULL, 'Surat', 'Gujarat', '395002', 'India', TRUE, '2026-03-25 04:32:16.083557', 180, '2026-03-25 04:32:16.083557', 180);
+INSERT INTO "customer_address" ("id", "customer_id", "address_type", "line1", "line2", "city", "state", "postal_code", "country", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (56, 56, 'BILLING', 'Main Market', NULL, 'Surat', 'Gujarat', '395002', 'India', TRUE, '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181);
+
+-- changeset sameerkhan:1775937591491-13
+INSERT INTO "supplier" ("id", "organization_id", "branch_id", "supplier_code", "name", "phone", "email", "gstin", "status", "notes", "created_at", "created_by", "updated_at", "updated_by", "organization_person_profile_id", "linked_organization_id", "legal_name", "trade_name", "billing_address", "shipping_address", "state", "state_code", "contact_person_name", "contact_person_phone", "contact_person_email", "payment_terms", "is_platform_linked") VALUES (42, 33, 73, 'SUP-SPC-0001', 'Auto Code Supplier', '9999900022', 'autocode.supplier@example.com', NULL, 'ACTIVE', NULL, '2026-04-05 01:37:14.852982', 168, '2026-04-05 01:37:14.852982', 168, NULL, NULL, 'Auto Code Supplier', 'Auto Code Supplier', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'NET 30', FALSE);
+INSERT INTO "supplier" ("id", "organization_id", "branch_id", "supplier_code", "name", "phone", "email", "gstin", "status", "notes", "created_at", "created_by", "updated_at", "updated_by", "organization_person_profile_id", "linked_organization_id", "legal_name", "trade_name", "billing_address", "shipping_address", "state", "state_code", "contact_person_name", "contact_person_phone", "contact_person_email", "payment_terms", "is_platform_linked") VALUES (36, 33, 73, 'SUP-SPC-001', 'Exide Industrial Supplies', '+91-9833300001', 'sales@exide.test', '24AACES5555B1ZZ', 'ACTIVE', 'Battery supplier', '2026-03-25 04:32:16.083557', 174, '2026-03-29 16:35:13.535523', 174, 25, NULL, 'Exide Industrial Supplies', 'Exide Industrial Supplies', 'Industrial Estate, Ahmedabad', 'Industrial Estate, Ahmedabad', 'Gujarat', '24', 'Sales Desk', '+91-9833300001', 'sales@exide.test', '30 DAYS', FALSE);
+INSERT INTO "supplier" ("id", "organization_id", "branch_id", "supplier_code", "name", "phone", "email", "gstin", "status", "notes", "created_at", "created_by", "updated_at", "updated_by", "organization_person_profile_id", "linked_organization_id", "legal_name", "trade_name", "billing_address", "shipping_address", "state", "state_code", "contact_person_name", "contact_person_phone", "contact_person_email", "payment_terms", "is_platform_linked") VALUES (37, 33, 73, 'SUP-SPC-002', 'Luminous Power Tech', '+91-9833300002', 'partner@luminous.test', '24AACCL6666M1ZX', 'ACTIVE', 'Inverter supplier', '2026-03-25 04:32:16.083557', 174, '2026-03-29 16:35:13.535523', 174, 26, NULL, 'Luminous Power Tech', 'Luminous Power Tech', 'Industrial Estate, Ahmedabad', 'Industrial Estate, Ahmedabad', 'Gujarat', '24', 'Sales Desk', '+91-9833300002', 'partner@luminous.test', '30 DAYS', FALSE);
+INSERT INTO "supplier" ("id", "organization_id", "branch_id", "supplier_code", "name", "phone", "email", "gstin", "status", "notes", "created_at", "created_by", "updated_at", "updated_by", "organization_person_profile_id", "linked_organization_id", "legal_name", "trade_name", "billing_address", "shipping_address", "state", "state_code", "contact_person_name", "contact_person_phone", "contact_person_email", "payment_terms", "is_platform_linked") VALUES (38, 33, 73, 'SUP-SPC-003', 'Polycab Distribution', '+91-9833300003', 'wire@polycab.test', '24AACCP7777Q1Z7', 'ACTIVE', 'Wire and cable supplier', '2026-03-25 04:32:16.083557', 174, '2026-03-29 16:35:13.535523', 174, 27, NULL, 'Polycab Distribution', 'Polycab Distribution', 'Industrial Estate, Ahmedabad', 'Industrial Estate, Ahmedabad', 'Gujarat', '24', 'Sales Desk', '+91-9833300003', 'wire@polycab.test', '30 DAYS', FALSE);
+INSERT INTO "supplier" ("id", "organization_id", "branch_id", "supplier_code", "name", "phone", "email", "gstin", "status", "notes", "created_at", "created_by", "updated_at", "updated_by", "organization_person_profile_id", "linked_organization_id", "legal_name", "trade_name", "billing_address", "shipping_address", "state", "state_code", "contact_person_name", "contact_person_phone", "contact_person_email", "payment_terms", "is_platform_linked") VALUES (39, 34, 75, 'SUP-UHL-001', 'Philips Lighting India', '+91-9844400001', 'b2b@philips.test', '24AACCP8888W1Z5', 'ACTIVE', 'Lighting supplier', '2026-03-25 04:32:16.083557', 178, '2026-03-29 16:35:13.535523', 178, 28, NULL, 'Philips Lighting India', 'Philips Lighting India', 'Industrial Estate, Ahmedabad', 'Industrial Estate, Ahmedabad', 'Gujarat', '24', 'Sales Desk', '+91-9844400001', 'b2b@philips.test', '30 DAYS', FALSE);
+INSERT INTO "supplier" ("id", "organization_id", "branch_id", "supplier_code", "name", "phone", "email", "gstin", "status", "notes", "created_at", "created_by", "updated_at", "updated_by", "organization_person_profile_id", "linked_organization_id", "legal_name", "trade_name", "billing_address", "shipping_address", "state", "state_code", "contact_person_name", "contact_person_phone", "contact_person_email", "payment_terms", "is_platform_linked") VALUES (40, 34, 75, 'SUP-UHL-002', 'Havells Trade Channel', '+91-9844400002', 'trade@havells.test', '24AABCH9999T1Z4', 'ACTIVE', 'Electrical goods supplier', '2026-03-25 04:32:16.083557', 178, '2026-03-29 16:35:13.535523', 178, 29, NULL, 'Havells Trade Channel', 'Havells Trade Channel', 'Industrial Estate, Ahmedabad', 'Industrial Estate, Ahmedabad', 'Gujarat', '24', 'Sales Desk', '+91-9844400002', 'trade@havells.test', '30 DAYS', FALSE);
+INSERT INTO "supplier" ("id", "organization_id", "branch_id", "supplier_code", "name", "phone", "email", "gstin", "status", "notes", "created_at", "created_by", "updated_at", "updated_by", "organization_person_profile_id", "linked_organization_id", "legal_name", "trade_name", "billing_address", "shipping_address", "state", "state_code", "contact_person_name", "contact_person_phone", "contact_person_email", "payment_terms", "is_platform_linked") VALUES (41, 33, 73, 'SUP-SPC-004', 'Philips Trade Gujarat', '+91-9833300004', 'lighting@philips-gujarat.test', '24AACCP8888W1Z5', 'ACTIVE', 'Shared lighting supplier for demo walkthroughs', '2026-03-29 16:35:13.535523', 174, '2026-03-29 16:35:13.535523', 174, NULL, NULL, 'Philips Trade Gujarat Private Limited', 'Philips Trade Gujarat', 'Naroda GIDC, Ahmedabad', 'Naroda GIDC, Ahmedabad', 'Gujarat', '24', 'Amit Shah', '+91-9833300104', 'amit@philips-gujarat.test', '30 DAYS', FALSE);
+
+-- changeset sameerkhan:1775937591491-14
+INSERT INTO "supplier_address" ("id", "supplier_id", "address_type", "line1", "line2", "city", "state", "postal_code", "country", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (36, 36, 'BILLING', 'Industrial Estate', NULL, 'Ahmedabad', 'Gujarat', '380001', 'India', TRUE, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "supplier_address" ("id", "supplier_id", "address_type", "line1", "line2", "city", "state", "postal_code", "country", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (37, 37, 'BILLING', 'Industrial Estate', NULL, 'Ahmedabad', 'Gujarat', '380001', 'India', TRUE, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "supplier_address" ("id", "supplier_id", "address_type", "line1", "line2", "city", "state", "postal_code", "country", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (38, 38, 'BILLING', 'Industrial Estate', NULL, 'Ahmedabad', 'Gujarat', '380001', 'India', TRUE, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "supplier_address" ("id", "supplier_id", "address_type", "line1", "line2", "city", "state", "postal_code", "country", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (39, 39, 'BILLING', 'Industrial Estate', NULL, 'Ahmedabad', 'Gujarat', '380001', 'India', TRUE, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "supplier_address" ("id", "supplier_id", "address_type", "line1", "line2", "city", "state", "postal_code", "country", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (40, 40, 'BILLING', 'Industrial Estate', NULL, 'Ahmedabad', 'Gujarat', '380001', 'India', TRUE, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+
+-- changeset sameerkhan:1775937591491-15
+INSERT INTO "distributor" ("id", "organization_id", "branch_id", "distributor_code", "name", "phone", "email", "gstin", "status", "notes", "created_at", "created_by", "updated_at", "updated_by", "organization_person_profile_id") VALUES (15, 33, 73, 'DST-SPC-001', 'Gujarat Energy Distribution', '+91-9855500001', 'warranty@ged.test', '24AACCG1111F1Z2', 'ACTIVE', 'Warranty routing partner', '2026-03-25 04:32:16.083557', 170, '2026-03-25 10:45:54.012798', 170, 30);
+INSERT INTO "distributor" ("id", "organization_id", "branch_id", "distributor_code", "name", "phone", "email", "gstin", "status", "notes", "created_at", "created_by", "updated_at", "updated_by", "organization_person_profile_id") VALUES (16, 34, 75, 'DST-UHL-001', 'West India Electrical Distributors', '+91-9855500002', 'claims@wied.test', '24AACCW2222H1Z9', 'ACTIVE', 'Regional lighting distributor', '2026-03-25 04:32:16.083557', 178, '2026-03-25 10:45:54.012798', 178, 31);
+
+-- changeset sameerkhan:1775937591491-16
+INSERT INTO "distributor_address" ("id", "distributor_id", "address_type", "line1", "line2", "city", "state", "postal_code", "country", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (15, 15, 'BILLING', 'Corporate Park', NULL, 'Vadodara', 'Gujarat', '390001', 'India', TRUE, '2026-03-25 04:32:16.083557', 170, '2026-03-25 04:32:16.083557', 170);
+INSERT INTO "distributor_address" ("id", "distributor_id", "address_type", "line1", "line2", "city", "state", "postal_code", "country", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (16, 16, 'BILLING', 'Corporate Park', NULL, 'Vadodara', 'Gujarat', '390001', 'India', TRUE, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+
+-- changeset sameerkhan:1775937591491-17
+INSERT INTO "category" ("id", "organization_id", "parent_category_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (71, 33, NULL, 'Power Solutions', 'POWER', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "category" ("id", "organization_id", "parent_category_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (72, 33, NULL, 'Battery', 'BATTERY', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "category" ("id", "organization_id", "parent_category_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (73, 33, NULL, 'Wires & Cables', 'WIRE', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "category" ("id", "organization_id", "parent_category_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (74, 33, NULL, 'Lubricants', 'LUBE', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "category" ("id", "organization_id", "parent_category_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (75, 33, NULL, 'Lighting', 'LIGHT', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "category" ("id", "organization_id", "parent_category_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (76, 34, NULL, 'Power Solutions', 'POWER', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "category" ("id", "organization_id", "parent_category_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (77, 34, NULL, 'Battery', 'BATTERY', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "category" ("id", "organization_id", "parent_category_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (78, 34, NULL, 'Wires & Cables', 'WIRE', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "category" ("id", "organization_id", "parent_category_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (79, 34, NULL, 'Lubricants', 'LUBE', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "category" ("id", "organization_id", "parent_category_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (80, 34, NULL, 'Lighting', 'LIGHT', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+
+-- changeset sameerkhan:1775937591491-18
+INSERT INTO "brand" ("id", "organization_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (85, 33, 'LUMINOUS', 'LUMI', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "brand" ("id", "organization_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (86, 33, 'EXIDE', 'EXID', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "brand" ("id", "organization_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (87, 33, 'POLYCAB', 'POLY', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "brand" ("id", "organization_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (88, 33, 'SERVO', 'SERV', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "brand" ("id", "organization_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (89, 33, 'PHILIPS', 'PHIL', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "brand" ("id", "organization_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (90, 33, 'HAVELLS', 'HAVL', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "brand" ("id", "organization_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (91, 34, 'LUMINOUS', 'LUMI', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "brand" ("id", "organization_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (92, 34, 'EXIDE', 'EXID', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "brand" ("id", "organization_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (93, 34, 'POLYCAB', 'POLY', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "brand" ("id", "organization_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (94, 34, 'SERVO', 'SERV', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "brand" ("id", "organization_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (95, 34, 'PHILIPS', 'PHIL', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "brand" ("id", "organization_id", "name", "code", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (96, 34, 'HAVELLS', 'HAVL', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+
+-- changeset sameerkhan:1775937591491-19
+INSERT INTO "tax_group" ("id", "organization_id", "code", "name", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (89, 33, 'GST_0', 'GST 0%', 0.0000, 0.0000, 0.0000, 0.0000, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "tax_group" ("id", "organization_id", "code", "name", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (90, 33, 'GST_5', 'GST 5%', 2.5000, 2.5000, 5.0000, 0.0000, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "tax_group" ("id", "organization_id", "code", "name", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (91, 33, 'GST_12', 'GST 12%', 6.0000, 6.0000, 12.0000, 0.0000, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "tax_group" ("id", "organization_id", "code", "name", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (92, 33, 'GST_18', 'GST 18%', 9.0000, 9.0000, 18.0000, 0.0000, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "tax_group" ("id", "organization_id", "code", "name", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (93, 34, 'GST_0', 'GST 0%', 0.0000, 0.0000, 0.0000, 0.0000, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "tax_group" ("id", "organization_id", "code", "name", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (94, 34, 'GST_5', 'GST 5%', 2.5000, 2.5000, 5.0000, 0.0000, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "tax_group" ("id", "organization_id", "code", "name", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (95, 34, 'GST_12', 'GST 12%', 6.0000, 6.0000, 12.0000, 0.0000, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "tax_group" ("id", "organization_id", "code", "name", "cgst_rate", "sgst_rate", "igst_rate", "cess_rate", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (96, 34, 'GST_18', 'GST 18%', 9.0000, 9.0000, 18.0000, 0.0000, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+
+-- changeset sameerkhan:1775937591491-20
+INSERT INTO "price_list" ("id", "organization_id", "code", "name", "price_list_type", "valid_from", "valid_to", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (89, 33, 'MRP', 'MRP', 'MRP', NULL, NULL, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "price_list" ("id", "organization_id", "code", "name", "price_list_type", "valid_from", "valid_to", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (90, 33, 'RETAIL', 'Retail', 'RETAIL', NULL, NULL, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "price_list" ("id", "organization_id", "code", "name", "price_list_type", "valid_from", "valid_to", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (91, 33, 'WHOLESALE', 'Wholesale', 'WHOLESALE', NULL, NULL, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "price_list" ("id", "organization_id", "code", "name", "price_list_type", "valid_from", "valid_to", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (92, 33, 'DEALER', 'Dealer', 'DEALER', NULL, NULL, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "price_list" ("id", "organization_id", "code", "name", "price_list_type", "valid_from", "valid_to", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (93, 34, 'MRP', 'MRP', 'MRP', NULL, NULL, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "price_list" ("id", "organization_id", "code", "name", "price_list_type", "valid_from", "valid_to", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (94, 34, 'RETAIL', 'Retail', 'RETAIL', NULL, NULL, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "price_list" ("id", "organization_id", "code", "name", "price_list_type", "valid_from", "valid_to", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (95, 34, 'WHOLESALE', 'Wholesale', 'WHOLESALE', NULL, NULL, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "price_list" ("id", "organization_id", "code", "name", "price_list_type", "valid_from", "valid_to", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (96, 34, 'DEALER', 'Dealer', 'DEALER', NULL, NULL, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+
+-- changeset sameerkhan:1775937591491-21
+INSERT INTO "store_product" ("id", "organization_id", "category_id", "brand_id", "base_uom_id", "tax_group_id", "sku", "name", "description", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "min_stock_base_qty", "reorder_level_base_qty", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "product_id", "default_sale_price", "default_warranty_months", "warranty_terms") VALUES (57, 33, 71, 85, 5, 91, 'LUIN1500', 'Luminous power inverter 1500 VA', NULL, 'SERIALIZED', TRUE, FALSE, FALSE, FALSE, 1.000000, 2.000000, FALSE, TRUE, '2026-04-04 19:36:02.604466', 168, '2026-04-04 20:29:04.426633', 168, 16, NULL, 0, NULL);
+INSERT INTO "store_product" ("id", "organization_id", "category_id", "brand_id", "base_uom_id", "tax_group_id", "sku", "name", "description", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "min_stock_base_qty", "reorder_level_base_qty", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "product_id", "default_sale_price", "default_warranty_months", "warranty_terms") VALUES (55, 33, 72, 86, 5, 92, 'SPC-ATTR-171225', 'Exide Dynamic Attribute Demo Battery', 'Live verification item for dynamic product attributes', 'SERIALIZED', TRUE, FALSE, FALSE, FALSE, 1.000000, 2.000000, FALSE, TRUE, '2026-04-04 18:51:35.712493', 168, '2026-04-04 20:29:04.426633', 168, 14, 7200.00, 0, NULL);
+INSERT INTO "store_product" ("id", "organization_id", "category_id", "brand_id", "base_uom_id", "tax_group_id", "sku", "name", "description", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "min_stock_base_qty", "reorder_level_base_qty", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "product_id", "default_sale_price", "default_warranty_months", "warranty_terms") VALUES (47, 34, 80, 96, 5, 96, 'FAN-CLG-1200', 'Ceiling Fan 1200mm', 'Fan with serial tracking', 'SERIALIZED', TRUE, FALSE, FALSE, FALSE, 4.000000, 10.000000, FALSE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-04-04 20:29:04.426633', 176, 1, 2200.00, 0, NULL);
+INSERT INTO "store_product" ("id", "organization_id", "category_id", "brand_id", "base_uom_id", "tax_group_id", "sku", "name", "description", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "min_stock_base_qty", "reorder_level_base_qty", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "product_id", "default_sale_price", "default_warranty_months", "warranty_terms") VALUES (44, 33, 73, 87, 11, 92, 'WIRE-6SQ', 'Copper Wire 6 Sqmm', 'Wire sold by metre', 'FRACTIONAL', FALSE, FALSE, FALSE, TRUE, 100.000000, 300.000000, FALSE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-04-04 20:29:04.426633', 168, 2, 92.00, 0, NULL);
+INSERT INTO "store_product" ("id", "organization_id", "category_id", "brand_id", "base_uom_id", "tax_group_id", "sku", "name", "description", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "min_stock_base_qty", "reorder_level_base_qty", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "product_id", "default_sale_price", "default_warranty_months", "warranty_terms") VALUES (42, 33, 71, 85, 5, 92, 'INV-900VA', 'EcoVolt 900VA Inverter', 'Home inverter with serial tracking', 'SERIALIZED', TRUE, FALSE, FALSE, FALSE, 2.000000, 5.000000, FALSE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-04-04 20:29:04.426633', 168, 3, 6500.00, 0, NULL);
+INSERT INTO "store_product" ("id", "organization_id", "category_id", "brand_id", "base_uom_id", "tax_group_id", "sku", "name", "description", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "min_stock_base_qty", "reorder_level_base_qty", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "product_id", "default_sale_price", "default_warranty_months", "warranty_terms") VALUES (48, 34, 78, 96, 11, 96, 'WIRE-1.5SQ', 'House Wire 1.5 Sqmm', 'Electrical wire sold by metre', 'FRACTIONAL', FALSE, FALSE, FALSE, TRUE, 200.000000, 500.000000, FALSE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-04-04 20:29:04.426633', 176, 4, 24.00, 0, NULL);
+INSERT INTO "store_product" ("id", "organization_id", "category_id", "brand_id", "base_uom_id", "tax_group_id", "sku", "name", "description", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "min_stock_base_qty", "reorder_level_base_qty", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "product_id", "default_sale_price", "default_warranty_months", "warranty_terms") VALUES (41, 33, 75, 89, 5, 91, 'BULB-9W', 'LED Bulb 9W', 'Bulb sold in piece/dozen/carton', 'MIXED_UOM', FALSE, TRUE, FALSE, FALSE, 24.000000, 120.000000, FALSE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-04-04 20:29:04.426633', 168, 5, 95.00, 0, NULL);
+INSERT INTO "store_product" ("id", "organization_id", "category_id", "brand_id", "base_uom_id", "tax_group_id", "sku", "name", "description", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "min_stock_base_qty", "reorder_level_base_qty", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "product_id", "default_sale_price", "default_warranty_months", "warranty_terms") VALUES (49, 34, 80, 95, 5, 96, 'STRIP-LED5M', 'LED Strip 5M', 'Strip lighting with batch control', 'BATCHED', FALSE, TRUE, FALSE, FALSE, 10.000000, 40.000000, FALSE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-04-04 20:29:04.426633', 176, 6, 410.00, 0, NULL);
+INSERT INTO "store_product" ("id", "organization_id", "category_id", "brand_id", "base_uom_id", "tax_group_id", "sku", "name", "description", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "min_stock_base_qty", "reorder_level_base_qty", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "product_id", "default_sale_price", "default_warranty_months", "warranty_terms") VALUES (50, 34, 80, 96, 5, 96, 'SWITCH-6A', 'Modular Switch 6A', 'Switch sold in box/carton', 'MIXED_UOM', FALSE, TRUE, FALSE, FALSE, 100.000000, 500.000000, FALSE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-04-04 20:29:04.426633', 176, 7, 45.00, 0, NULL);
+INSERT INTO "store_product" ("id", "organization_id", "category_id", "brand_id", "base_uom_id", "tax_group_id", "sku", "name", "description", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "min_stock_base_qty", "reorder_level_base_qty", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "product_id", "default_sale_price", "default_warranty_months", "warranty_terms") VALUES (45, 33, 74, 88, 9, 92, 'OIL-1LTR', 'Servo Battery Distilled Water 1L', 'Consumable sold by bottle / carton', 'BATCHED', FALSE, TRUE, FALSE, TRUE, 20.000000, 50.000000, FALSE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-04-04 20:29:04.426633', 168, 8, 55.00, 0, NULL);
+INSERT INTO "store_product" ("id", "organization_id", "category_id", "brand_id", "base_uom_id", "tax_group_id", "sku", "name", "description", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "min_stock_base_qty", "reorder_level_base_qty", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "product_id", "default_sale_price", "default_warranty_months", "warranty_terms") VALUES (46, 34, 80, 95, 5, 96, 'LIGHT-PANEL18', 'Slim Panel Light 18W', 'Ceiling panel light', 'SIMPLE', FALSE, FALSE, FALSE, FALSE, 20.000000, 60.000000, FALSE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-04-04 20:29:04.426633', 176, 9, 650.00, 0, NULL);
+INSERT INTO "store_product" ("id", "organization_id", "category_id", "brand_id", "base_uom_id", "tax_group_id", "sku", "name", "description", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "min_stock_base_qty", "reorder_level_base_qty", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "product_id", "default_sale_price", "default_warranty_months", "warranty_terms") VALUES (43, 33, 72, 86, 5, 92, 'BAT-150AH', 'Tubular Battery 150AH', 'Battery with serial tracking and warranty', 'SERIALIZED', TRUE, FALSE, FALSE, FALSE, 3.000000, 8.000000, FALSE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-04-04 20:29:04.426633', 168, 10, 12800.00, 0, NULL);
+INSERT INTO "store_product" ("id", "organization_id", "category_id", "brand_id", "base_uom_id", "tax_group_id", "sku", "name", "description", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "min_stock_base_qty", "reorder_level_base_qty", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "product_id", "default_sale_price", "default_warranty_months", "warranty_terms") VALUES (51, 33, 75, 89, 5, 92, 'SPC-FLOOD-50W', 'LED Flood Light 50W', 'Shared flood light demo product sold by both organizations', 'SIMPLE', FALSE, FALSE, FALSE, FALSE, 12.000000, 30.000000, FALSE, TRUE, '2026-03-29 16:35:13.535523', 168, '2026-04-04 20:29:04.426633', 168, 11, 890.00, 0, NULL);
+INSERT INTO "store_product" ("id", "organization_id", "category_id", "brand_id", "base_uom_id", "tax_group_id", "sku", "name", "description", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "min_stock_base_qty", "reorder_level_base_qty", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "product_id", "default_sale_price", "default_warranty_months", "warranty_terms") VALUES (52, 34, 80, 95, 5, 96, 'UHL-FLOOD-50W', 'LED Flood Light 50W', 'Shared flood light demo product sold by both organizations', 'SIMPLE', FALSE, FALSE, FALSE, FALSE, 20.000000, 45.000000, FALSE, TRUE, '2026-03-29 16:35:13.535523', 176, '2026-04-04 20:29:04.426633', 176, 11, 950.00, 0, NULL);
+
+-- changeset sameerkhan:1775937591491-22
+INSERT INTO "product_uom_conversion" ("id", "product_id", "from_uom_id", "to_uom_id", "multiplier", "is_purchase_uom", "is_sales_uom", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (25, 41, 2, 5, 120.000000, TRUE, FALSE, FALSE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "product_uom_conversion" ("id", "product_id", "from_uom_id", "to_uom_id", "multiplier", "is_purchase_uom", "is_sales_uom", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (26, 41, 4, 5, 12.000000, TRUE, TRUE, FALSE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "product_uom_conversion" ("id", "product_id", "from_uom_id", "to_uom_id", "multiplier", "is_purchase_uom", "is_sales_uom", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (27, 45, 10, 9, 0.001000, FALSE, TRUE, FALSE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "product_uom_conversion" ("id", "product_id", "from_uom_id", "to_uom_id", "multiplier", "is_purchase_uom", "is_sales_uom", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (28, 49, 3, 5, 10.000000, TRUE, FALSE, FALSE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "product_uom_conversion" ("id", "product_id", "from_uom_id", "to_uom_id", "multiplier", "is_purchase_uom", "is_sales_uom", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (29, 50, 2, 5, 200.000000, TRUE, FALSE, FALSE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "product_uom_conversion" ("id", "product_id", "from_uom_id", "to_uom_id", "multiplier", "is_purchase_uom", "is_sales_uom", "is_default", "created_at", "created_by", "updated_at", "updated_by") VALUES (30, 50, 3, 5, 20.000000, TRUE, TRUE, FALSE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+
+-- changeset sameerkhan:1775937591491-23
+INSERT INTO "price_list_item" ("id", "price_list_id", "product_id", "uom_id", "price", "created_at", "created_by", "updated_at", "updated_by") VALUES (45, 91, 41, 4, 1020.00, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "price_list_item" ("id", "price_list_id", "product_id", "uom_id", "price", "created_at", "created_by", "updated_at", "updated_by") VALUES (46, 90, 41, 5, 95.00, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "price_list_item" ("id", "price_list_id", "product_id", "uom_id", "price", "created_at", "created_by", "updated_at", "updated_by") VALUES (47, 90, 45, 9, 55.00, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "price_list_item" ("id", "price_list_id", "product_id", "uom_id", "price", "created_at", "created_by", "updated_at", "updated_by") VALUES (48, 90, 44, 11, 92.00, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "price_list_item" ("id", "price_list_id", "product_id", "uom_id", "price", "created_at", "created_by", "updated_at", "updated_by") VALUES (49, 90, 43, 5, 12800.00, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "price_list_item" ("id", "price_list_id", "product_id", "uom_id", "price", "created_at", "created_by", "updated_at", "updated_by") VALUES (50, 90, 42, 5, 6500.00, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "price_list_item" ("id", "price_list_id", "product_id", "uom_id", "price", "created_at", "created_by", "updated_at", "updated_by") VALUES (51, 95, 50, 3, 780.00, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "price_list_item" ("id", "price_list_id", "product_id", "uom_id", "price", "created_at", "created_by", "updated_at", "updated_by") VALUES (52, 94, 49, 5, 410.00, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "price_list_item" ("id", "price_list_id", "product_id", "uom_id", "price", "created_at", "created_by", "updated_at", "updated_by") VALUES (53, 94, 48, 11, 24.00, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "price_list_item" ("id", "price_list_id", "product_id", "uom_id", "price", "created_at", "created_by", "updated_at", "updated_by") VALUES (54, 94, 47, 5, 2200.00, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "price_list_item" ("id", "price_list_id", "product_id", "uom_id", "price", "created_at", "created_by", "updated_at", "updated_by") VALUES (55, 94, 46, 5, 650.00, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+
+-- changeset sameerkhan:1775937591491-24
+INSERT INTO "inventory_batch" ("id", "organization_id", "product_id", "batch_number", "manufacturer_batch_number", "manufactured_on", "expiry_on", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (19, 33, 45, 'OIL-B-2025-01', 'SERVO-2025-01', '2025-01-01', '2027-01-01', 'ACTIVE', '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "inventory_batch" ("id", "organization_id", "product_id", "batch_number", "manufacturer_batch_number", "manufactured_on", "expiry_on", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (20, 33, 41, 'BULB-B-2025-02', 'PHIL-2025-02', '2025-02-10', NULL, 'ACTIVE', '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "inventory_batch" ("id", "organization_id", "product_id", "batch_number", "manufacturer_batch_number", "manufactured_on", "expiry_on", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (21, 34, 49, 'STRIP-B-2025-03', 'PHIL-2025-03', '2025-03-01', NULL, 'ACTIVE', '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "inventory_batch" ("id", "organization_id", "product_id", "batch_number", "manufacturer_batch_number", "manufactured_on", "expiry_on", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (22, 34, 50, 'SWITCH-B-2025-02', 'HAVL-2025-02', '2025-02-15', NULL, 'ACTIVE', '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "inventory_batch" ("id", "organization_id", "product_id", "batch_number", "manufacturer_batch_number", "manufactured_on", "expiry_on", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (23, 34, 49, 'STRIP-B-2026-01', 'PHIL-2026-01', '2026-01-15', NULL, 'ACTIVE', '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+
+-- changeset sameerkhan:1775937591491-25
+INSERT INTO "serial_number" ("id", "organization_id", "product_id", "batch_id", "serial_number", "manufacturer_serial_number", "status", "current_warehouse_id", "current_customer_id", "warranty_start_date", "warranty_end_date", "created_at", "created_by", "updated_at", "updated_by") VALUES (52, 33, 43, NULL, 'BAT150-0101', 'EXD-BAT150-0101', 'IN_STOCK', 142, NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "serial_number" ("id", "organization_id", "product_id", "batch_id", "serial_number", "manufacturer_serial_number", "status", "current_warehouse_id", "current_customer_id", "warranty_start_date", "warranty_end_date", "created_at", "created_by", "updated_at", "updated_by") VALUES (53, 33, 43, NULL, 'BAT150-0102', 'EXD-BAT150-0102', 'IN_STOCK', 142, NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "serial_number" ("id", "organization_id", "product_id", "batch_id", "serial_number", "manufacturer_serial_number", "status", "current_warehouse_id", "current_customer_id", "warranty_start_date", "warranty_end_date", "created_at", "created_by", "updated_at", "updated_by") VALUES (55, 34, 47, NULL, 'FAN1200-0201', 'HAV-FAN1200-0201', 'IN_STOCK', 148, NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "serial_number" ("id", "organization_id", "product_id", "batch_id", "serial_number", "manufacturer_serial_number", "status", "current_warehouse_id", "current_customer_id", "warranty_start_date", "warranty_end_date", "created_at", "created_by", "updated_at", "updated_by") VALUES (57, 34, 47, NULL, 'FAN1200-0203', 'HAV-FAN1200-0203', 'IN_STOCK', 149, NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "serial_number" ("id", "organization_id", "product_id", "batch_id", "serial_number", "manufacturer_serial_number", "status", "current_warehouse_id", "current_customer_id", "warranty_start_date", "warranty_end_date", "created_at", "created_by", "updated_at", "updated_by") VALUES (58, 33, 42, NULL, 'INV900-1001', 'LUM-INV900-1001', 'IN_STOCK', 142, NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "serial_number" ("id", "organization_id", "product_id", "batch_id", "serial_number", "manufacturer_serial_number", "status", "current_warehouse_id", "current_customer_id", "warranty_start_date", "warranty_end_date", "created_at", "created_by", "updated_at", "updated_by") VALUES (59, 33, 42, NULL, 'INV900-1002', 'LUM-INV900-1002', 'IN_STOCK', 142, NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "serial_number" ("id", "organization_id", "product_id", "batch_id", "serial_number", "manufacturer_serial_number", "status", "current_warehouse_id", "current_customer_id", "warranty_start_date", "warranty_end_date", "created_at", "created_by", "updated_at", "updated_by") VALUES (60, 33, 43, NULL, 'BAT150-1101', 'EXD-BAT150-1101', 'IN_STOCK', 142, NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "serial_number" ("id", "organization_id", "product_id", "batch_id", "serial_number", "manufacturer_serial_number", "status", "current_warehouse_id", "current_customer_id", "warranty_start_date", "warranty_end_date", "created_at", "created_by", "updated_at", "updated_by") VALUES (61, 34, 47, NULL, 'FAN1200-1201', 'HAV-FAN1200-1201', 'IN_STOCK', 148, NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "serial_number" ("id", "organization_id", "product_id", "batch_id", "serial_number", "manufacturer_serial_number", "status", "current_warehouse_id", "current_customer_id", "warranty_start_date", "warranty_end_date", "created_at", "created_by", "updated_at", "updated_by") VALUES (62, 34, 47, NULL, 'FAN1200-1202', 'HAV-FAN1200-1202', 'IN_STOCK', 148, NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "serial_number" ("id", "organization_id", "product_id", "batch_id", "serial_number", "manufacturer_serial_number", "status", "current_warehouse_id", "current_customer_id", "warranty_start_date", "warranty_end_date", "created_at", "created_by", "updated_at", "updated_by") VALUES (63, 34, 47, NULL, 'FAN1200-1203', 'HAV-FAN1200-1203', 'IN_STOCK', 148, NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "serial_number" ("id", "organization_id", "product_id", "batch_id", "serial_number", "manufacturer_serial_number", "status", "current_warehouse_id", "current_customer_id", "warranty_start_date", "warranty_end_date", "created_at", "created_by", "updated_at", "updated_by") VALUES (51, 33, 42, NULL, 'INV900-0003', 'LUM-INV900-0003', 'SOLD', 144, 51, '2026-03-03', '2028-03-03', '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 173);
+INSERT INTO "serial_number" ("id", "organization_id", "product_id", "batch_id", "serial_number", "manufacturer_serial_number", "status", "current_warehouse_id", "current_customer_id", "warranty_start_date", "warranty_end_date", "created_at", "created_by", "updated_at", "updated_by") VALUES (54, 33, 43, NULL, 'BAT150-0103', 'EXD-BAT150-0103', 'SOLD', 144, 51, '2026-03-03', '2028-03-03', '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 173);
+INSERT INTO "serial_number" ("id", "organization_id", "product_id", "batch_id", "serial_number", "manufacturer_serial_number", "status", "current_warehouse_id", "current_customer_id", "warranty_start_date", "warranty_end_date", "created_at", "created_by", "updated_at", "updated_by") VALUES (56, 34, 47, NULL, 'FAN1200-0202', 'HAV-FAN1200-0202', 'SOLD', 149, 55, '2026-03-07', '2028-03-07', '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 181);
+INSERT INTO "serial_number" ("id", "organization_id", "product_id", "batch_id", "serial_number", "manufacturer_serial_number", "status", "current_warehouse_id", "current_customer_id", "warranty_start_date", "warranty_end_date", "created_at", "created_by", "updated_at", "updated_by") VALUES (49, 33, 42, NULL, 'INV900-0001', 'LUM-INV900-0001', 'SOLD', NULL, 53, '2026-03-29', NULL, '2026-03-25 04:32:16.083557', 174, '2026-03-29 20:28:08.326459', 168);
+INSERT INTO "serial_number" ("id", "organization_id", "product_id", "batch_id", "serial_number", "manufacturer_serial_number", "status", "current_warehouse_id", "current_customer_id", "warranty_start_date", "warranty_end_date", "created_at", "created_by", "updated_at", "updated_by") VALUES (50, 33, 42, NULL, 'INV900-0002', 'LUM-INV900-0002', 'SOLD', NULL, 53, '2026-03-29', NULL, '2026-03-25 04:32:16.083557', 174, '2026-03-29 20:31:19.223303', 168);
+
+-- changeset sameerkhan:1775937591491-26
+INSERT INTO "inventory_balance" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "batch_id", "on_hand_base_quantity", "reserved_base_quantity", "available_base_quantity", "avg_cost", "created_at", "created_by", "updated_at", "updated_by") VALUES (54, 33, 72, 144, 42, NULL, 1.000000, 0.000000, 1.000000, 5050.000000, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "inventory_balance" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "batch_id", "on_hand_base_quantity", "reserved_base_quantity", "available_base_quantity", "avg_cost", "created_at", "created_by", "updated_at", "updated_by") VALUES (55, 33, 73, 142, 43, NULL, 2.000000, 0.000000, 2.000000, 9800.000000, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "inventory_balance" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "batch_id", "on_hand_base_quantity", "reserved_base_quantity", "available_base_quantity", "avg_cost", "created_at", "created_by", "updated_at", "updated_by") VALUES (56, 33, 72, 144, 43, NULL, 1.000000, 0.000000, 1.000000, 9900.000000, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "inventory_balance" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "batch_id", "on_hand_base_quantity", "reserved_base_quantity", "available_base_quantity", "avg_cost", "created_at", "created_by", "updated_at", "updated_by") VALUES (59, 33, 72, 144, 41, 20, 240.000000, 0.000000, 240.000000, 60.000000, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "inventory_balance" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "batch_id", "on_hand_base_quantity", "reserved_base_quantity", "available_base_quantity", "avg_cost", "created_at", "created_by", "updated_at", "updated_by") VALUES (60, 34, 75, 148, 47, NULL, 1.000000, 0.000000, 1.000000, 1650.000000, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "inventory_balance" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "batch_id", "on_hand_base_quantity", "reserved_base_quantity", "available_base_quantity", "avg_cost", "created_at", "created_by", "updated_at", "updated_by") VALUES (61, 34, 74, 149, 47, NULL, 2.000000, 0.000000, 2.000000, 1680.000000, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "inventory_balance" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "batch_id", "on_hand_base_quantity", "reserved_base_quantity", "available_base_quantity", "avg_cost", "created_at", "created_by", "updated_at", "updated_by") VALUES (62, 34, 75, 148, 46, NULL, 80.000000, 0.000000, 80.000000, 420.000000, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "inventory_balance" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "batch_id", "on_hand_base_quantity", "reserved_base_quantity", "available_base_quantity", "avg_cost", "created_at", "created_by", "updated_at", "updated_by") VALUES (63, 34, 74, 149, 48, NULL, 900.000000, 0.000000, 900.000000, 15.500000, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "inventory_balance" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "batch_id", "on_hand_base_quantity", "reserved_base_quantity", "available_base_quantity", "avg_cost", "created_at", "created_by", "updated_at", "updated_by") VALUES (64, 34, 75, 148, 49, 21, 70.000000, 0.000000, 70.000000, 250.000000, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "inventory_balance" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "batch_id", "on_hand_base_quantity", "reserved_base_quantity", "available_base_quantity", "avg_cost", "created_at", "created_by", "updated_at", "updated_by") VALUES (65, 34, 74, 149, 50, 22, 600.000000, 0.000000, 600.000000, 22.000000, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "inventory_balance" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "batch_id", "on_hand_base_quantity", "reserved_base_quantity", "available_base_quantity", "avg_cost", "created_at", "created_by", "updated_at", "updated_by") VALUES (67, 34, 75, 148, 52, NULL, 25.000000, 0.000000, 25.000000, 665.000000, '2026-03-29 16:35:13.535523', 178, '2026-03-29 16:35:13.535523', 178);
+INSERT INTO "inventory_balance" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "batch_id", "on_hand_base_quantity", "reserved_base_quantity", "available_base_quantity", "avg_cost", "created_at", "created_by", "updated_at", "updated_by") VALUES (66, 33, 73, 142, 51, NULL, 16.000000, 0.000000, 16.000000, 0.000000, '2026-03-29 16:35:13.535523', 174, '2026-03-29 18:34:01.206794', 168);
+INSERT INTO "inventory_balance" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "batch_id", "on_hand_base_quantity", "reserved_base_quantity", "available_base_quantity", "avg_cost", "created_at", "created_by", "updated_at", "updated_by") VALUES (57, 33, 73, 142, 44, NULL, 488.000000, 0.000000, 488.000000, 0.000000, '2026-03-25 04:32:16.083557', 174, '2026-03-29 18:34:01.206794', 168);
+INSERT INTO "inventory_balance" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "batch_id", "on_hand_base_quantity", "reserved_base_quantity", "available_base_quantity", "avg_cost", "created_at", "created_by", "updated_at", "updated_by") VALUES (68, 33, 71, 142, 51, NULL, 4.000000, 0.000000, 4.000000, 0.000000, '2026-03-29 20:16:14.990859', 168, '2026-03-29 20:16:15.045481', 168);
+INSERT INTO "inventory_balance" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "batch_id", "on_hand_base_quantity", "reserved_base_quantity", "available_base_quantity", "avg_cost", "created_at", "created_by", "updated_at", "updated_by") VALUES (58, 33, 73, 142, 45, 19, 118.000000, 0.000000, 118.000000, 0.000000, '2026-03-25 04:32:16.083557', 174, '2026-03-29 20:28:43.158565', 168);
+INSERT INTO "inventory_balance" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "batch_id", "on_hand_base_quantity", "reserved_base_quantity", "available_base_quantity", "avg_cost", "created_at", "created_by", "updated_at", "updated_by") VALUES (53, 33, 73, 142, 42, NULL, 1.000000, 0.000000, 1.000000, 0.000000, '2026-03-25 04:32:16.083557', 174, '2026-03-29 20:31:19.223303', 168);
+
+-- changeset sameerkhan:1775937591491-27
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (86, 33, 73, 142, 42, 'OPENING_STOCK', 'OPENING', 1, 'OPEN-2025', 'IN', 5, 2.000000, 2.000000, 5000.000000, 10000.000000, '2025-03-01 09:00:00', '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (87, 33, 72, 144, 42, 'OPENING_STOCK', 'OPENING', 1, 'OPEN-2025', 'IN', 5, 1.000000, 1.000000, 5050.000000, 5050.000000, '2025-03-01 09:10:00', '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (88, 33, 73, 142, 43, 'OPENING_STOCK', 'OPENING', 1, 'OPEN-2025', 'IN', 5, 2.000000, 2.000000, 9800.000000, 19600.000000, '2025-03-01 09:15:00', '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (89, 33, 72, 144, 43, 'OPENING_STOCK', 'OPENING', 1, 'OPEN-2025', 'IN', 5, 1.000000, 1.000000, 9900.000000, 9900.000000, '2025-03-01 09:20:00', '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (90, 33, 73, 142, 44, 'OPENING_STOCK', 'OPENING', 1, 'OPEN-2025', 'IN', 11, 500.000000, 500.000000, 70.000000, 35000.000000, '2025-03-01 09:30:00', '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (91, 33, 73, 142, 45, 'OPENING_STOCK', 'OPENING', 1, 'OPEN-2025', 'IN', 9, 120.000000, 120.000000, 35.000000, 4200.000000, '2025-03-01 09:40:00', '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (92, 33, 72, 144, 41, 'OPENING_STOCK', 'OPENING', 1, 'OPEN-2025', 'IN', 5, 240.000000, 240.000000, 60.000000, 14400.000000, '2025-03-01 09:50:00', '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (93, 34, 75, 148, 47, 'OPENING_STOCK', 'OPENING', 1, 'OPEN-2025', 'IN', 5, 1.000000, 1.000000, 1650.000000, 1650.000000, '2025-03-01 10:00:00', '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (94, 34, 74, 149, 47, 'OPENING_STOCK', 'OPENING', 1, 'OPEN-2025', 'IN', 5, 2.000000, 2.000000, 1680.000000, 3360.000000, '2025-03-01 10:10:00', '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (95, 34, 75, 148, 46, 'OPENING_STOCK', 'OPENING', 1, 'OPEN-2025', 'IN', 5, 80.000000, 80.000000, 420.000000, 33600.000000, '2025-03-01 10:20:00', '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (96, 34, 74, 149, 48, 'OPENING_STOCK', 'OPENING', 1, 'OPEN-2025', 'IN', 11, 900.000000, 900.000000, 15.500000, 13950.000000, '2025-03-01 10:30:00', '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (97, 34, 75, 148, 49, 'OPENING_STOCK', 'OPENING', 1, 'OPEN-2025', 'IN', 5, 70.000000, 70.000000, 250.000000, 17500.000000, '2025-03-01 10:40:00', '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (98, 34, 74, 149, 50, 'OPENING_STOCK', 'OPENING', 1, 'OPEN-2025', 'IN', 5, 600.000000, 600.000000, 22.000000, 13200.000000, '2025-03-01 10:50:00', '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (99, 33, 73, 142, 44, 'PURCHASE_RECEIPT', 'PURCHASE_RECEIPT', 7, 'GRN-SPC-00001', 'IN', 11, 100.000000, 100.000000, 64.000000, 6400.000000, '2026-02-28 17:45:00', '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (100, 33, 73, 142, 43, 'PURCHASE_RECEIPT', 'PURCHASE_RECEIPT', 7, 'GRN-SPC-00001', 'IN', 5, 1.000000, 1.000000, 9800.000000, 9800.000000, '2026-02-28 17:45:00', '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (101, 33, 73, 142, 42, 'PURCHASE_RECEIPT', 'PURCHASE_RECEIPT', 7, 'GRN-SPC-00001', 'IN', 5, 2.000000, 2.000000, 4900.000000, 9800.000000, '2026-02-28 17:45:00', '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (102, 34, 75, 148, 47, 'PURCHASE_RECEIPT', 'PURCHASE_RECEIPT', 8, 'GRN-UHL-00001', 'IN', 5, 3.000000, 3.000000, 1650.000000, 4950.000000, '2026-03-01 18:10:00', '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (103, 34, 75, 148, 50, 'PURCHASE_RECEIPT', 'PURCHASE_RECEIPT', 8, 'GRN-UHL-00001', 'IN', 3, 8.000000, 160.000000, 380.000000, 60800.000000, '2026-03-01 18:10:00', '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (104, 34, 75, 148, 49, 'PURCHASE_RECEIPT', 'PURCHASE_RECEIPT', 8, 'GRN-UHL-00001', 'IN', 5, 20.000000, 20.000000, 240.000000, 4800.000000, '2026-03-01 18:10:00', '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (105, 34, 75, 148, 46, 'PURCHASE_RECEIPT', 'PURCHASE_RECEIPT', 8, 'GRN-UHL-00001', 'IN', 5, 50.000000, 50.000000, 410.000000, 20500.000000, '2026-03-01 18:10:00', '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (106, 33, 71, 142, 41, 'SALES_INVOICE', 'SALES_INVOICE', 9, 'INV-SPC-00002', 'OUT', 4, 6.000000, 72.000000, 60.000000, 4320.000000, '2026-03-05 18:20:00', '2026-03-25 04:32:16.083557', 170, '2026-03-25 04:32:16.083557', 170);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (107, 33, 71, 142, 45, 'SALES_INVOICE', 'SALES_INVOICE', 9, 'INV-SPC-00002', 'OUT', 9, 20.000000, 20.000000, 35.000000, 700.000000, '2026-03-05 18:20:00', '2026-03-25 04:32:16.083557', 170, '2026-03-25 04:32:16.083557', 170);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (108, 33, 71, 142, 44, 'SALES_INVOICE', 'SALES_INVOICE', 9, 'INV-SPC-00002', 'OUT', 11, 80.000000, 80.000000, 70.000000, 5600.000000, '2026-03-05 18:20:00', '2026-03-25 04:32:16.083557', 170, '2026-03-25 04:32:16.083557', 170);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (109, 33, 72, 144, 43, 'SALES_INVOICE', 'SALES_INVOICE', 10, 'INV-SPC-00001', 'OUT', 5, 1.000000, 1.000000, 9900.000000, 9900.000000, '2026-03-03 12:55:00', '2026-03-25 04:32:16.083557', 173, '2026-03-25 04:32:16.083557', 173);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (110, 33, 72, 144, 42, 'SALES_INVOICE', 'SALES_INVOICE', 10, 'INV-SPC-00001', 'OUT', 5, 1.000000, 1.000000, 5050.000000, 5050.000000, '2026-03-03 12:55:00', '2026-03-25 04:32:16.083557', 173, '2026-03-25 04:32:16.083557', 173);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (111, 34, 74, 149, 47, 'SALES_INVOICE', 'SALES_INVOICE', 11, 'INV-UHL-00001', 'OUT', 5, 1.000000, 1.000000, 1680.000000, 1680.000000, '2026-03-07 19:55:00', '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (112, 34, 74, 149, 50, 'SALES_INVOICE', 'SALES_INVOICE', 11, 'INV-UHL-00001', 'OUT', 3, 1.000000, 20.000000, 22.000000, 440.000000, '2026-03-07 19:55:00', '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (113, 34, 74, 149, 48, 'SALES_INVOICE', 'SALES_INVOICE', 11, 'INV-UHL-00001', 'OUT', 11, 60.000000, 60.000000, 15.500000, 930.000000, '2026-03-07 19:55:00', '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (114, 34, 74, 149, 46, 'SALES_INVOICE', 'SALES_INVOICE', 11, 'INV-UHL-00001', 'OUT', 5, 4.000000, 4.000000, 420.000000, 1680.000000, '2026-03-07 19:55:00', '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (115, 34, 74, 149, 47, 'RESERVATION', 'SALES_INVOICE', 12, 'INV-UHL-00002', 'OUT', 5, 1.000000, 1.000000, 1680.000000, 1680.000000, '2026-03-25 04:32:16.083557', '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (116, 33, 73, 142, 51, 'OPENING_STOCK', 'OPENING', 1, 'OPEN-DEMO-SHARED', 'IN', 5, 18.000000, 18.000000, 610.000000, 10980.000000, '2026-03-01 11:30:00', '2026-03-29 16:35:13.535523', 174, '2026-03-29 16:35:13.535523', 174);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (117, 34, 75, 148, 52, 'OPENING_STOCK', 'OPENING', 1, 'OPEN-DEMO-SHARED', 'IN', 5, 25.000000, 25.000000, 665.000000, 16625.000000, '2026-03-01 11:30:00', '2026-03-29 16:35:13.535523', 178, '2026-03-29 16:35:13.535523', 178);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (118, 33, 73, 142, 51, 'SALES_INVOICE', 'sales_invoice', 15, 'INV-20260329-1774789091050', 'OUT', 5, 2.000000, 2.000000, 0.000000, 0.000000, '2026-03-29 18:28:11.167873', '2026-03-29 18:28:11.168201', 168, '2026-03-29 18:28:11.168201', 168);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (119, 33, 73, 142, 44, 'SALES_INVOICE', 'sales_invoice', 15, 'INV-20260329-1774789091050', 'OUT', 11, 12.000000, 12.000000, 0.000000, 0.000000, '2026-03-29 18:28:11.226314', '2026-03-29 18:28:11.226364', 168, '2026-03-29 18:28:11.226364', 168);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (120, 33, 71, 142, 51, 'SALES_INVOICE', 'SALES_INVOICE', 16, 'INV-SPC-00003', 'OUT', 5, 2.000000, 2.000000, 610.000000, 1220.000000, '2026-03-14 14:35:00', '2026-03-29 18:34:01.206794', 168, '2026-03-29 18:34:01.206794', 168);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (121, 33, 71, 142, 44, 'SALES_INVOICE', 'SALES_INVOICE', 16, 'INV-SPC-00003', 'OUT', 11, 12.000000, 12.000000, 70.000000, 840.000000, '2026-03-14 14:35:00', '2026-03-29 18:34:01.206794', 168, '2026-03-29 18:34:01.206794', 168);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (122, 33, 71, 142, 51, 'ADJUSTMENT_IN', 'stock_adjustment', 5, 'ADJ-20260329-1774795574973', 'IN', 5, 5.000000, 5.000000, 500.000000, 2500.000000, '2026-03-29 20:16:14.99351', '2026-03-29 20:16:14.993651', 168, '2026-03-29 20:16:14.993651', 168);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (123, 33, 71, 142, 51, 'SALES_INVOICE', 'sales_invoice', 26, 'INV-20260329-1774795575062', 'OUT', 5, 1.000000, 1.000000, 0.000000, 0.000000, '2026-03-29 20:16:15.114753', '2026-03-29 20:16:15.114803', 168, '2026-03-29 20:16:15.114803', 168);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (124, 33, 73, 142, 45, 'SALES_INVOICE', 'sales_invoice', 34, 'INV-20260329-1774796323171', 'OUT', 9, 2.000000, 2.000000, 0.000000, 0.000000, '2026-03-29 20:28:43.201574', '2026-03-29 20:28:43.201875', 168, '2026-03-29 20:28:43.201875', 168);
+INSERT INTO "stock_movement" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "movement_type", "reference_type", "reference_id", "reference_number", "direction", "uom_id", "quantity", "base_quantity", "unit_cost", "total_cost", "movement_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (125, 33, 73, 142, 42, 'SALES_INVOICE', 'sales_invoice', 36, 'INV-20260329-1774796479238', 'OUT', 5, 1.000000, 1.000000, 0.000000, 0.000000, '2026-03-29 20:31:19.309329', '2026-03-29 20:31:19.309532', 168, '2026-03-29 20:31:19.309532', 168);
+
+-- changeset sameerkhan:1775937591491-28
+INSERT INTO "stock_movement_serial" ("id", "stock_movement_id", "serial_number_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (37, 86, 49, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "stock_movement_serial" ("id", "stock_movement_id", "serial_number_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (38, 86, 50, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "stock_movement_serial" ("id", "stock_movement_id", "serial_number_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (39, 87, 51, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "stock_movement_serial" ("id", "stock_movement_id", "serial_number_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (40, 88, 52, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "stock_movement_serial" ("id", "stock_movement_id", "serial_number_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (41, 88, 53, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "stock_movement_serial" ("id", "stock_movement_id", "serial_number_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (42, 89, 54, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "stock_movement_serial" ("id", "stock_movement_id", "serial_number_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (43, 93, 55, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "stock_movement_serial" ("id", "stock_movement_id", "serial_number_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (44, 94, 56, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "stock_movement_serial" ("id", "stock_movement_id", "serial_number_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (45, 94, 57, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+
+-- changeset sameerkhan:1775937591491-29
+INSERT INTO "stock_movement_batch" ("id", "stock_movement_id", "batch_id", "quantity", "base_quantity", "created_at", "created_by", "updated_at", "updated_by") VALUES (17, 91, 19, 120.000000, 120.000000, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "stock_movement_batch" ("id", "stock_movement_id", "batch_id", "quantity", "base_quantity", "created_at", "created_by", "updated_at", "updated_by") VALUES (18, 92, 20, 240.000000, 240.000000, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "stock_movement_batch" ("id", "stock_movement_id", "batch_id", "quantity", "base_quantity", "created_at", "created_by", "updated_at", "updated_by") VALUES (19, 97, 21, 70.000000, 70.000000, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "stock_movement_batch" ("id", "stock_movement_id", "batch_id", "quantity", "base_quantity", "created_at", "created_by", "updated_at", "updated_by") VALUES (20, 98, 22, 600.000000, 600.000000, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+
+-- changeset sameerkhan:1775937591491-30
+INSERT INTO "inventory_reservation" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "source_document_type", "source_document_id", "source_document_line_id", "reserved_base_quantity", "status", "created_at", "created_by", "updated_at", "updated_by", "batch_id", "serial_number_id", "expires_at", "released_at", "release_reason") VALUES (3, 33, 73, 142, 51, 'sales_invoice', 15, 33, 2.000000, 'CONSUMED', '2026-03-29 18:28:11.09539', 168, '2026-03-29 18:28:11.041019', 168, NULL, NULL, '2026-03-29 20:28:11.094933', NULL, NULL);
+INSERT INTO "inventory_reservation" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "source_document_type", "source_document_id", "source_document_line_id", "reserved_base_quantity", "status", "created_at", "created_by", "updated_at", "updated_by", "batch_id", "serial_number_id", "expires_at", "released_at", "release_reason") VALUES (4, 33, 73, 142, 44, 'sales_invoice', 15, 34, 12.000000, 'CONSUMED', '2026-03-29 18:28:11.118751', 168, '2026-03-29 18:28:11.041019', 168, NULL, NULL, '2026-03-29 20:28:11.118574', NULL, NULL);
+INSERT INTO "inventory_reservation" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "source_document_type", "source_document_id", "source_document_line_id", "reserved_base_quantity", "status", "created_at", "created_by", "updated_at", "updated_by", "batch_id", "serial_number_id", "expires_at", "released_at", "release_reason") VALUES (5, 33, 71, 142, 51, 'sales_invoice', 26, 43, 1.000000, 'CONSUMED', '2026-03-29 20:16:15.100892', 168, '2026-03-29 20:16:15.045481', 168, NULL, NULL, '2026-03-29 13:46:15.100683', NULL, NULL);
+INSERT INTO "inventory_reservation" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "source_document_type", "source_document_id", "source_document_line_id", "reserved_base_quantity", "status", "created_at", "created_by", "updated_at", "updated_by", "batch_id", "serial_number_id", "expires_at", "released_at", "release_reason") VALUES (7, 33, 73, 142, 42, 'sales_invoice', 33, 47, 1.000000, 'CONSUMED', '2026-03-29 20:28:08.369567', 168, '2026-03-29 20:28:08.326459', 168, NULL, 49, '2026-03-29 22:28:08.369122', NULL, NULL);
+INSERT INTO "inventory_reservation" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "source_document_type", "source_document_id", "source_document_line_id", "reserved_base_quantity", "status", "created_at", "created_by", "updated_at", "updated_by", "batch_id", "serial_number_id", "expires_at", "released_at", "release_reason") VALUES (8, 33, 73, 142, 45, 'sales_invoice', 34, 48, 2.000000, 'CONSUMED', '2026-03-29 20:28:43.188252', 168, '2026-03-29 20:28:43.158565', 168, 19, NULL, '2026-03-29 22:28:43.188199', NULL, NULL);
+INSERT INTO "inventory_reservation" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "source_document_type", "source_document_id", "source_document_line_id", "reserved_base_quantity", "status", "created_at", "created_by", "updated_at", "updated_by", "batch_id", "serial_number_id", "expires_at", "released_at", "release_reason") VALUES (9, 33, 73, 142, 42, 'sales_invoice', 36, 49, 1.000000, 'CONSUMED', '2026-03-29 20:31:19.263366', 168, '2026-03-29 20:31:19.223303', 168, NULL, 50, '2026-03-29 22:31:19.262955', NULL, NULL);
+INSERT INTO "inventory_reservation" ("id", "organization_id", "branch_id", "warehouse_id", "product_id", "source_document_type", "source_document_id", "source_document_line_id", "reserved_base_quantity", "status", "created_at", "created_by", "updated_at", "updated_by", "batch_id", "serial_number_id", "expires_at", "released_at", "release_reason") VALUES (2, 34, 74, 149, 47, 'SALES_INVOICE', 12, 30, 1.000000, 'RELEASED', '2026-03-25 04:32:16.083557', 181, '2026-03-29 20:38:54.336341', 181, NULL, NULL, '2026-03-25 06:32:16.083557', '2026-03-29 20:38:54.301195', 'EXPIRED_STALE_BALANCE');
+
+-- changeset sameerkhan:1775937591491-31
+INSERT INTO "stock_transfer" ("id", "organization_id", "branch_id", "from_warehouse_id", "to_warehouse_id", "transfer_number", "transfer_date", "status", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 33, 73, 142, 144, 'TRN-SPC-00001', '2026-03-04', 'POSTED', 'Move inverter from HQ to Jamnagar store', '2026-03-25 04:32:16.083557', 170, '2026-03-25 04:32:16.083557', 170);
+
+-- changeset sameerkhan:1775937591491-32
+INSERT INTO "stock_transfer_line" ("id", "stock_transfer_id", "product_id", "uom_id", "quantity", "base_quantity", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 2, 42, 5, 1.000000, 1.000000, '2026-03-25 04:32:16.083557', 170, '2026-03-25 04:32:16.083557', 170);
+
+-- changeset sameerkhan:1775937591491-33
+INSERT INTO "stock_adjustment" ("id", "organization_id", "branch_id", "warehouse_id", "adjustment_number", "adjustment_date", "reason", "status", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 34, 75, 148, 'ADJ-UHL-00001', '2026-03-08', 'Damaged one LED strip during handling', 'POSTED', NULL, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "stock_adjustment" ("id", "organization_id", "branch_id", "warehouse_id", "adjustment_number", "adjustment_date", "reason", "status", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 33, 71, 142, 'ADJ-20260329-1774795574973', '2026-03-29', 'Recurring invoice verification stock', 'POSTED', NULL, '2026-03-29 20:16:14.973779', 168, '2026-03-29 20:16:14.974204', 168);
+
+-- changeset sameerkhan:1775937591491-34
+INSERT INTO "stock_adjustment_line" ("id", "stock_adjustment_id", "product_id", "uom_id", "quantity_delta", "base_quantity_delta", "unit_cost", "line_reason", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 2, 49, 5, -1.000000, -1.000000, 250.000000, 'Physical damage', '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "stock_adjustment_line" ("id", "stock_adjustment_id", "product_id", "uom_id", "quantity_delta", "base_quantity_delta", "unit_cost", "line_reason", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 5, 51, 5, 5.000000, 5.000000, 500.000000, 'Recurring invoice verification stock', '2026-03-29 20:16:14.977146', 168, '2026-03-29 20:16:14.977146', 168);
+
+-- changeset sameerkhan:1775937591491-35
+INSERT INTO "purchase_order" ("id", "organization_id", "branch_id", "supplier_id", "po_number", "po_date", "status", "subtotal", "tax_amount", "total_amount", "remarks", "submitted_at", "submitted_by", "approved_at", "approved_by", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by", "seller_tax_registration_id", "seller_gstin", "supplier_gstin", "place_of_supply_state_code") VALUES (10, 34, 75, 39, 'PO-UHL-00001', '2026-02-27', 'APPROVED', 47000.00, 8460.00, 55460.00, 'Panel and strip procurement', '2026-02-27 10:30:00', 178, '2026-02-27 13:00:00', 176, NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 178, '2026-03-25 21:18:49.460367', 178, 1, '24AAAFU5678R1Z2', '24AACCP8888W1Z5', '24');
+INSERT INTO "purchase_order" ("id", "organization_id", "branch_id", "supplier_id", "po_number", "po_date", "status", "subtotal", "tax_amount", "total_amount", "remarks", "submitted_at", "submitted_by", "approved_at", "approved_by", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by", "seller_tax_registration_id", "seller_gstin", "supplier_gstin", "place_of_supply_state_code") VALUES (9, 33, 73, 37, 'PO-SPC-00001', '2026-02-25', 'APPROVED', 26000.00, 4680.00, 30680.00, 'Monthly inverter and battery replenishment', '2026-02-25 11:00:00', 174, '2026-02-25 15:00:00', 168, NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 174, '2026-03-25 21:18:49.460367', 174, 2, '24AAVCS1234Q1Z5', '24AACCL6666M1ZX', '24');
+
+-- changeset sameerkhan:1775937591491-36
+INSERT INTO "purchase_order_line" ("id", "purchase_order_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "tax_rate", "line_amount", "received_base_quantity", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "supplier_product_id", "product_master_id", "sku_snapshot", "product_name_snapshot", "supplier_product_code_snapshot", "hsn_snapshot") VALUES (22, 9, 44, 11, 100.000000, 100.000000, 64.00, 18.0000, 6400.00, 100.000000, '2026-03-25 04:32:16.083557', 174, '2026-03-29 09:02:32.507694', 174, 6400.00, 9.0000, 576.00, 9.0000, 576.00, 0.0000, 0.00, 0.0000, 0.00, 6, 2, 'WIRE-6SQ', 'Copper Wire 6 Sqmm', NULL, NULL);
+INSERT INTO "purchase_order_line" ("id", "purchase_order_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "tax_rate", "line_amount", "received_base_quantity", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "supplier_product_id", "product_master_id", "sku_snapshot", "product_name_snapshot", "supplier_product_code_snapshot", "hsn_snapshot") VALUES (23, 9, 43, 5, 1.000000, 1.000000, 9800.00, 18.0000, 9800.00, 1.000000, '2026-03-25 04:32:16.083557', 174, '2026-03-29 09:02:32.507694', 174, 9800.00, 9.0000, 882.00, 9.0000, 882.00, 0.0000, 0.00, 0.0000, 0.00, 1, 10, 'BAT-150AH', 'Tubular Battery 150AH', NULL, NULL);
+INSERT INTO "purchase_order_line" ("id", "purchase_order_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "tax_rate", "line_amount", "received_base_quantity", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "supplier_product_id", "product_master_id", "sku_snapshot", "product_name_snapshot", "supplier_product_code_snapshot", "hsn_snapshot") VALUES (24, 9, 42, 5, 2.000000, 2.000000, 4900.00, 18.0000, 9800.00, 2.000000, '2026-03-25 04:32:16.083557', 174, '2026-03-29 09:02:32.507694', 174, 9800.00, 9.0000, 882.00, 9.0000, 882.00, 0.0000, 0.00, 0.0000, 0.00, 3, 3, 'INV-900VA', 'EcoVolt 900VA Inverter', NULL, NULL);
+INSERT INTO "purchase_order_line" ("id", "purchase_order_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "tax_rate", "line_amount", "received_base_quantity", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "supplier_product_id", "product_master_id", "sku_snapshot", "product_name_snapshot", "supplier_product_code_snapshot", "hsn_snapshot") VALUES (25, 10, 47, 5, 3.000000, 3.000000, 1650.00, 18.0000, 4950.00, 3.000000, '2026-03-25 04:32:16.083557', 178, '2026-03-29 09:02:32.507694', 178, 4950.00, 9.0000, 445.50, 9.0000, 445.50, 0.0000, 0.00, 0.0000, 0.00, 4, 1, 'FAN-CLG-1200', 'Ceiling Fan 1200mm', NULL, NULL);
+INSERT INTO "purchase_order_line" ("id", "purchase_order_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "tax_rate", "line_amount", "received_base_quantity", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "supplier_product_id", "product_master_id", "sku_snapshot", "product_name_snapshot", "supplier_product_code_snapshot", "hsn_snapshot") VALUES (26, 10, 50, 3, 10.000000, 200.000000, 380.00, 18.0000, 3800.00, 200.000000, '2026-03-25 04:32:16.083557', 178, '2026-03-29 09:02:32.507694', 178, 3800.00, 9.0000, 342.00, 9.0000, 342.00, 0.0000, 0.00, 0.0000, 0.00, 2, 7, 'SWITCH-6A', 'Modular Switch 6A', NULL, NULL);
+INSERT INTO "purchase_order_line" ("id", "purchase_order_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "tax_rate", "line_amount", "received_base_quantity", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "supplier_product_id", "product_master_id", "sku_snapshot", "product_name_snapshot", "supplier_product_code_snapshot", "hsn_snapshot") VALUES (27, 10, 49, 5, 40.000000, 40.000000, 240.00, 18.0000, 9600.00, 40.000000, '2026-03-25 04:32:16.083557', 178, '2026-03-29 09:02:32.507694', 178, 9600.00, 9.0000, 864.00, 9.0000, 864.00, 0.0000, 0.00, 0.0000, 0.00, 7, 6, 'STRIP-LED5M', 'LED Strip 5M', NULL, NULL);
+INSERT INTO "purchase_order_line" ("id", "purchase_order_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "tax_rate", "line_amount", "received_base_quantity", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "supplier_product_id", "product_master_id", "sku_snapshot", "product_name_snapshot", "supplier_product_code_snapshot", "hsn_snapshot") VALUES (28, 10, 46, 5, 50.000000, 50.000000, 410.00, 18.0000, 20500.00, 50.000000, '2026-03-25 04:32:16.083557', 178, '2026-03-29 09:02:32.507694', 178, 20500.00, 9.0000, 1845.00, 9.0000, 1845.00, 0.0000, 0.00, 0.0000, 0.00, 5, 9, 'LIGHT-PANEL18', 'Slim Panel Light 18W', NULL, NULL);
+
+-- changeset sameerkhan:1775937591491-37
+INSERT INTO "purchase_receipt" ("id", "organization_id", "branch_id", "warehouse_id", "purchase_order_id", "supplier_id", "receipt_number", "receipt_date", "status", "subtotal", "tax_amount", "total_amount", "remarks", "posted_at", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by", "seller_tax_registration_id", "seller_gstin", "supplier_gstin", "place_of_supply_state_code", "due_date") VALUES (8, 34, 75, 148, 10, 39, 'GRN-UHL-00001', '2026-03-01', 'POSTED', 38850.00, 6993.00, 45843.00, 'First inward completed', '2026-03-01 18:10:00', NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 178, '2026-03-26 03:04:16.744226', 178, 1, '24AAAFU5678R1Z2', '24AACCP8888W1Z5', '24', '2026-03-01');
+INSERT INTO "purchase_receipt" ("id", "organization_id", "branch_id", "warehouse_id", "purchase_order_id", "supplier_id", "receipt_number", "receipt_date", "status", "subtotal", "tax_amount", "total_amount", "remarks", "posted_at", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by", "seller_tax_registration_id", "seller_gstin", "supplier_gstin", "place_of_supply_state_code", "due_date") VALUES (7, 33, 73, 142, 9, 37, 'GRN-SPC-00001', '2026-02-28', 'POSTED', 26000.00, 4680.00, 30680.00, 'Goods received complete', '2026-02-28 17:45:00', NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 174, '2026-03-26 03:04:16.744226', 174, 2, '24AAVCS1234Q1Z5', '24AACCL6666M1ZX', '24', '2026-02-28');
+
+-- changeset sameerkhan:1775937591491-38
+INSERT INTO "purchase_receipt_line" ("id", "purchase_receipt_id", "purchase_order_line_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_cost", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "supplier_product_id", "product_master_id", "sku_snapshot", "product_name_snapshot", "supplier_product_code_snapshot", "hsn_snapshot") VALUES (22, 7, 22, 44, 11, 100.000000, 100.000000, 64.00, 18.0000, 6400.00, '2026-03-25 04:32:16.083557', 174, '2026-03-29 09:02:32.507694', 174, 6400.00, 9.0000, 576.00, 9.0000, 576.00, 0.0000, 0.00, 0.0000, 0.00, 6, 2, 'WIRE-6SQ', 'Copper Wire 6 Sqmm', NULL, NULL);
+INSERT INTO "purchase_receipt_line" ("id", "purchase_receipt_id", "purchase_order_line_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_cost", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "supplier_product_id", "product_master_id", "sku_snapshot", "product_name_snapshot", "supplier_product_code_snapshot", "hsn_snapshot") VALUES (23, 7, 23, 43, 5, 1.000000, 1.000000, 9800.00, 18.0000, 9800.00, '2026-03-25 04:32:16.083557', 174, '2026-03-29 09:02:32.507694', 174, 9800.00, 9.0000, 882.00, 9.0000, 882.00, 0.0000, 0.00, 0.0000, 0.00, 1, 10, 'BAT-150AH', 'Tubular Battery 150AH', NULL, NULL);
+INSERT INTO "purchase_receipt_line" ("id", "purchase_receipt_id", "purchase_order_line_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_cost", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "supplier_product_id", "product_master_id", "sku_snapshot", "product_name_snapshot", "supplier_product_code_snapshot", "hsn_snapshot") VALUES (24, 7, 24, 42, 5, 2.000000, 2.000000, 4900.00, 18.0000, 9800.00, '2026-03-25 04:32:16.083557', 174, '2026-03-29 09:02:32.507694', 174, 9800.00, 9.0000, 882.00, 9.0000, 882.00, 0.0000, 0.00, 0.0000, 0.00, 3, 3, 'INV-900VA', 'EcoVolt 900VA Inverter', NULL, NULL);
+INSERT INTO "purchase_receipt_line" ("id", "purchase_receipt_id", "purchase_order_line_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_cost", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "supplier_product_id", "product_master_id", "sku_snapshot", "product_name_snapshot", "supplier_product_code_snapshot", "hsn_snapshot") VALUES (25, 8, 25, 47, 5, 3.000000, 3.000000, 1650.00, 18.0000, 4950.00, '2026-03-25 04:32:16.083557', 178, '2026-03-29 09:02:32.507694', 178, 4950.00, 9.0000, 445.50, 9.0000, 445.50, 0.0000, 0.00, 0.0000, 0.00, 4, 1, 'FAN-CLG-1200', 'Ceiling Fan 1200mm', NULL, NULL);
+INSERT INTO "purchase_receipt_line" ("id", "purchase_receipt_id", "purchase_order_line_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_cost", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "supplier_product_id", "product_master_id", "sku_snapshot", "product_name_snapshot", "supplier_product_code_snapshot", "hsn_snapshot") VALUES (26, 8, 26, 50, 3, 8.000000, 160.000000, 380.00, 18.0000, 3040.00, '2026-03-25 04:32:16.083557', 178, '2026-03-29 09:02:32.507694', 178, 3040.00, 9.0000, 273.60, 9.0000, 273.60, 0.0000, 0.00, 0.0000, 0.00, 2, 7, 'SWITCH-6A', 'Modular Switch 6A', NULL, NULL);
+INSERT INTO "purchase_receipt_line" ("id", "purchase_receipt_id", "purchase_order_line_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_cost", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "supplier_product_id", "product_master_id", "sku_snapshot", "product_name_snapshot", "supplier_product_code_snapshot", "hsn_snapshot") VALUES (27, 8, 27, 49, 5, 20.000000, 20.000000, 240.00, 18.0000, 4800.00, '2026-03-25 04:32:16.083557', 178, '2026-03-29 09:02:32.507694', 178, 4800.00, 9.0000, 432.00, 9.0000, 432.00, 0.0000, 0.00, 0.0000, 0.00, 7, 6, 'STRIP-LED5M', 'LED Strip 5M', NULL, NULL);
+INSERT INTO "purchase_receipt_line" ("id", "purchase_receipt_id", "purchase_order_line_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_cost", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "supplier_product_id", "product_master_id", "sku_snapshot", "product_name_snapshot", "supplier_product_code_snapshot", "hsn_snapshot") VALUES (28, 8, 28, 46, 5, 50.000000, 50.000000, 410.00, 18.0000, 20500.00, '2026-03-25 04:32:16.083557', 178, '2026-03-29 09:02:32.507694', 178, 20500.00, 9.0000, 1845.00, 9.0000, 1845.00, 0.0000, 0.00, 0.0000, 0.00, 5, 9, 'LIGHT-PANEL18', 'Slim Panel Light 18W', NULL, NULL);
+
+-- changeset sameerkhan:1775937591491-39
+INSERT INTO "purchase_receipt_line_serial" ("id", "purchase_receipt_line_id", "serial_number_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (13, 23, 60, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "purchase_receipt_line_serial" ("id", "purchase_receipt_line_id", "serial_number_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (14, 24, 59, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "purchase_receipt_line_serial" ("id", "purchase_receipt_line_id", "serial_number_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (15, 24, 58, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "purchase_receipt_line_serial" ("id", "purchase_receipt_line_id", "serial_number_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (16, 25, 63, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "purchase_receipt_line_serial" ("id", "purchase_receipt_line_id", "serial_number_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (17, 25, 62, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "purchase_receipt_line_serial" ("id", "purchase_receipt_line_id", "serial_number_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (18, 25, 61, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+
+-- changeset sameerkhan:1775937591491-40
+INSERT INTO "purchase_receipt_line_batch" ("id", "purchase_receipt_line_id", "batch_id", "quantity", "base_quantity", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 26, 22, 8.000000, 160.000000, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "purchase_receipt_line_batch" ("id", "purchase_receipt_line_id", "batch_id", "quantity", "base_quantity", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 27, 23, 20.000000, 20.000000, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+
+-- changeset sameerkhan:1775937591491-41
+INSERT INTO "sales_invoice" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "price_list_id", "invoice_number", "invoice_date", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "remarks", "printed_at", "emailed_at", "posted_at", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "due_date", "source_quote_id", "source_order_id") VALUES (26, 33, 71, 142, 50, NULL, 'INV-20260329-1774795575062', '2026-03-29', 'PAID', 890.00, 0.00, 160.20, 1050.20, 'Demo recurring floodlight invoice', NULL, NULL, '2026-03-29 20:16:15.117641', NULL, NULL, NULL, '2026-03-29 20:16:15.06284', 168, '2026-04-04 02:30:12.88236', 168, 2, '24AAVCS1234Q1Z5', '24AABCM1111D1Z0', '24', '2026-04-13', NULL, NULL);
+INSERT INTO "sales_invoice" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "price_list_id", "invoice_number", "invoice_date", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "remarks", "printed_at", "emailed_at", "posted_at", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "due_date", "source_quote_id", "source_order_id") VALUES (36, 33, 73, 142, 53, NULL, 'INV-20260329-1774796479238', '2026-03-29', 'PAID', 6500.00, 0.00, 1170.00, 7670.00, 'Tracked serial aggregate inventory verification', NULL, NULL, '2026-03-29 20:31:19.320091', NULL, NULL, NULL, '2026-03-29 20:31:19.23813', 168, '2026-04-04 02:41:56.180646', 168, 2, '24AAVCS1234Q1Z5', NULL, '24', '2026-03-29', NULL, NULL);
+INSERT INTO "sales_invoice" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "price_list_id", "invoice_number", "invoice_date", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "remarks", "printed_at", "emailed_at", "posted_at", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "due_date", "source_quote_id", "source_order_id") VALUES (11, 34, 74, 149, 55, 94, 'INV-UHL-00001', '2026-03-07', 'PAID', 5348.00, 0.00, 962.64, 6310.64, 'Mixed retail basket', '2026-03-07 20:00:00', NULL, '2026-03-07 19:55:00', NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 181, '2026-03-26 03:04:16.744226', 181, 1, '24AAAFU5678R1Z2', NULL, '24', '2026-03-07', NULL, NULL);
+INSERT INTO "sales_invoice" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "price_list_id", "invoice_number", "invoice_date", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "remarks", "printed_at", "emailed_at", "posted_at", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "due_date", "source_quote_id", "source_order_id") VALUES (10, 33, 72, 144, 51, 90, 'INV-SPC-00001', '2026-03-03', 'PAID', 19295.00, 0.00, 3473.10, 22768.10, 'Counter sale with serial tracked items', '2026-03-03 13:00:00', NULL, '2026-03-03 12:55:00', NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 173, '2026-03-26 03:04:16.744226', 173, 2, '24AAVCS1234Q1Z5', NULL, '24', '2026-03-03', NULL, NULL);
+INSERT INTO "sales_invoice" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "price_list_id", "invoice_number", "invoice_date", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "remarks", "printed_at", "emailed_at", "posted_at", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "due_date", "source_quote_id", "source_order_id") VALUES (12, 34, 74, 149, 56, 94, 'INV-UHL-00002', '2026-03-10', 'CONFIRMED', 2200.00, 0.00, 396.00, 2596.00, 'Confirmed sale awaiting dispatch', NULL, NULL, NULL, NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 181, '2026-03-26 03:04:16.744226', 181, 1, '24AAAFU5678R1Z2', '24AACCV4444N1ZA', '24', '2026-03-10', NULL, NULL);
+INSERT INTO "sales_invoice" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "price_list_id", "invoice_number", "invoice_date", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "remarks", "printed_at", "emailed_at", "posted_at", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "due_date", "source_quote_id", "source_order_id") VALUES (9, 33, 71, 142, 52, 90, 'INV-SPC-00002', '2026-03-05', 'PARTIALLY_PAID', 14740.00, 500.00, 2563.20, 16803.20, 'Credit sale to trade customer', '2026-03-05 18:30:00', '2026-03-05 18:45:00', '2026-03-05 18:20:00', NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 170, '2026-03-26 03:04:16.744226', 170, 2, '24AAVCS1234Q1Z5', '24AACCS2222L1Z8', '24', '2026-03-05', NULL, NULL);
+INSERT INTO "sales_invoice" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "price_list_id", "invoice_number", "invoice_date", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "remarks", "printed_at", "emailed_at", "posted_at", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "due_date", "source_quote_id", "source_order_id") VALUES (15, 33, 73, 142, 53, NULL, 'INV-20260329-1774789091050', '2026-03-29', 'POSTED', 2884.00, 0.00, 519.12, 3403.12, 'Converted stocked order to invoice', NULL, NULL, '2026-03-29 18:28:11.230726', NULL, NULL, NULL, '2026-03-29 18:28:11.050939', 168, '2026-03-29 18:28:11.041019', 168, 2, '24AAVCS1234Q1Z5', NULL, '24', '2026-03-29', NULL, NULL);
+INSERT INTO "sales_invoice" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "price_list_id", "invoice_number", "invoice_date", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "remarks", "printed_at", "emailed_at", "posted_at", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "due_date", "source_quote_id", "source_order_id") VALUES (16, 33, 71, 142, 53, 90, 'INV-SPC-00003', '2026-03-14', 'POSTED', 2884.00, 0.00, 519.12, 3403.12, 'Seeded posted invoice converted from demo sales order', NULL, NULL, '2026-03-14 14:35:00', NULL, NULL, NULL, '2026-03-29 18:34:01.206794', 168, '2026-03-29 18:34:01.206794', 168, NULL, '24AAVCS1234Q1Z5', NULL, '24', '2026-03-14', 4, 3);
+INSERT INTO "sales_invoice" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "price_list_id", "invoice_number", "invoice_date", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "remarks", "printed_at", "emailed_at", "posted_at", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "due_date", "source_quote_id", "source_order_id") VALUES (33, 33, 73, 142, 53, NULL, 'INV-20260329-1774796288341', '2026-03-29', 'POSTED', 6500.00, 0.00, 1170.00, 7670.00, 'Tracked serial conversion verification success', NULL, NULL, '2026-03-29 20:28:08.427399', NULL, NULL, NULL, '2026-03-29 20:28:08.341613', 168, '2026-03-29 20:28:08.326459', 168, 2, '24AAVCS1234Q1Z5', NULL, '24', '2026-03-29', NULL, NULL);
+INSERT INTO "sales_invoice" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "price_list_id", "invoice_number", "invoice_date", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "remarks", "printed_at", "emailed_at", "posted_at", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "due_date", "source_quote_id", "source_order_id") VALUES (34, 33, 73, 142, 53, NULL, 'INV-20260329-1774796323171', '2026-03-29', 'POSTED', 110.00, 0.00, 19.80, 129.80, 'Tracked batch conversion verification success', NULL, NULL, '2026-03-29 20:28:43.207744', NULL, NULL, NULL, '2026-03-29 20:28:43.171163', 168, '2026-03-29 20:28:43.158565', 168, 2, '24AAVCS1234Q1Z5', NULL, '24', '2026-03-29', NULL, NULL);
+
+-- changeset sameerkhan:1775937591491-42
+INSERT INTO "sales_invoice_line" ("id", "sales_invoice_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "discount_amount", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "unit_cost_at_sale", "total_cost_at_sale", "warranty_months", "hsn_snapshot") VALUES (21, 9, 41, 4, 6.000000, 72.000000, 1020.00, 0.00, 18.0000, 6120.00, '2026-03-25 04:32:16.083557', 170, '2026-03-29 16:24:00.092523', 170, 6120.00, 9.0000, 550.80, 9.0000, 550.80, 0.0000, 0.00, 0.0000, 0.00, 0.00, 0.00, 0, NULL);
+INSERT INTO "sales_invoice_line" ("id", "sales_invoice_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "discount_amount", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "unit_cost_at_sale", "total_cost_at_sale", "warranty_months", "hsn_snapshot") VALUES (22, 9, 45, 9, 20.000000, 20.000000, 55.00, 0.00, 18.0000, 1100.00, '2026-03-25 04:32:16.083557', 170, '2026-03-29 16:24:00.092523', 170, 1100.00, 9.0000, 99.00, 9.0000, 99.00, 0.0000, 0.00, 0.0000, 0.00, 0.00, 0.00, 0, NULL);
+INSERT INTO "sales_invoice_line" ("id", "sales_invoice_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "discount_amount", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "unit_cost_at_sale", "total_cost_at_sale", "warranty_months", "hsn_snapshot") VALUES (23, 9, 44, 11, 80.000000, 80.000000, 92.00, 500.00, 18.0000, 6860.00, '2026-03-25 04:32:16.083557', 170, '2026-03-29 16:24:00.092523', 170, 6860.00, 9.0000, 617.40, 9.0000, 617.40, 0.0000, 0.00, 0.0000, 0.00, 0.00, 0.00, 0, NULL);
+INSERT INTO "sales_invoice_line" ("id", "sales_invoice_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "discount_amount", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "unit_cost_at_sale", "total_cost_at_sale", "warranty_months", "hsn_snapshot") VALUES (24, 10, 43, 5, 1.000000, 1.000000, 12800.00, 0.00, 18.0000, 12800.00, '2026-03-25 04:32:16.083557', 173, '2026-03-29 16:24:00.092523', 173, 12800.00, 9.0000, 1152.00, 9.0000, 1152.00, 0.0000, 0.00, 0.0000, 0.00, 0.00, 0.00, 0, NULL);
+INSERT INTO "sales_invoice_line" ("id", "sales_invoice_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "discount_amount", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "unit_cost_at_sale", "total_cost_at_sale", "warranty_months", "hsn_snapshot") VALUES (25, 10, 42, 5, 1.000000, 1.000000, 6500.00, 0.00, 18.0000, 6500.00, '2026-03-25 04:32:16.083557', 173, '2026-03-29 16:24:00.092523', 173, 6500.00, 9.0000, 585.00, 9.0000, 585.00, 0.0000, 0.00, 0.0000, 0.00, 0.00, 0.00, 0, NULL);
+INSERT INTO "sales_invoice_line" ("id", "sales_invoice_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "discount_amount", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "unit_cost_at_sale", "total_cost_at_sale", "warranty_months", "hsn_snapshot") VALUES (26, 11, 47, 5, 1.000000, 1.000000, 2200.00, 0.00, 18.0000, 2200.00, '2026-03-25 04:32:16.083557', 181, '2026-03-29 16:24:00.092523', 181, 2200.00, 9.0000, 198.00, 9.0000, 198.00, 0.0000, 0.00, 0.0000, 0.00, 0.00, 0.00, 0, NULL);
+INSERT INTO "sales_invoice_line" ("id", "sales_invoice_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "discount_amount", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "unit_cost_at_sale", "total_cost_at_sale", "warranty_months", "hsn_snapshot") VALUES (27, 11, 50, 3, 1.000000, 20.000000, 780.00, 0.00, 18.0000, 780.00, '2026-03-25 04:32:16.083557', 181, '2026-03-29 16:24:00.092523', 181, 780.00, 9.0000, 70.20, 9.0000, 70.20, 0.0000, 0.00, 0.0000, 0.00, 0.00, 0.00, 0, NULL);
+INSERT INTO "sales_invoice_line" ("id", "sales_invoice_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "discount_amount", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "unit_cost_at_sale", "total_cost_at_sale", "warranty_months", "hsn_snapshot") VALUES (28, 11, 48, 11, 60.000000, 60.000000, 24.00, 0.00, 18.0000, 1440.00, '2026-03-25 04:32:16.083557', 181, '2026-03-29 16:24:00.092523', 181, 1440.00, 9.0000, 129.60, 9.0000, 129.60, 0.0000, 0.00, 0.0000, 0.00, 0.00, 0.00, 0, NULL);
+INSERT INTO "sales_invoice_line" ("id", "sales_invoice_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "discount_amount", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "unit_cost_at_sale", "total_cost_at_sale", "warranty_months", "hsn_snapshot") VALUES (29, 11, 46, 5, 4.000000, 4.000000, 650.00, 0.00, 18.0000, 2600.00, '2026-03-25 04:32:16.083557', 181, '2026-03-29 16:24:00.092523', 181, 2600.00, 9.0000, 234.00, 9.0000, 234.00, 0.0000, 0.00, 0.0000, 0.00, 0.00, 0.00, 0, NULL);
+INSERT INTO "sales_invoice_line" ("id", "sales_invoice_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "discount_amount", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "unit_cost_at_sale", "total_cost_at_sale", "warranty_months", "hsn_snapshot") VALUES (30, 12, 47, 5, 1.000000, 1.000000, 2200.00, 0.00, 18.0000, 2200.00, '2026-03-25 04:32:16.083557', 181, '2026-03-29 16:24:00.092523', 181, 2200.00, 9.0000, 198.00, 9.0000, 198.00, 0.0000, 0.00, 0.0000, 0.00, 0.00, 0.00, 0, NULL);
+INSERT INTO "sales_invoice_line" ("id", "sales_invoice_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "discount_amount", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "unit_cost_at_sale", "total_cost_at_sale", "warranty_months", "hsn_snapshot") VALUES (33, 15, 51, 5, 2.000000, 2.000000, 890.00, 0.00, 18.0000, 2100.40, '2026-03-29 18:28:11.060296', 168, '2026-03-29 18:28:11.060296', 168, 1780.00, 9.0000, 160.20, 9.0000, 160.20, 0.0000, 0.00, 0.0000, 0.00, 610.00, 1220.00, NULL, '94054090');
+INSERT INTO "sales_invoice_line" ("id", "sales_invoice_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "discount_amount", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "unit_cost_at_sale", "total_cost_at_sale", "warranty_months", "hsn_snapshot") VALUES (34, 15, 44, 11, 12.000000, 12.000000, 92.00, 0.00, 18.0000, 1302.72, '2026-03-29 18:28:11.078555', 168, '2026-03-29 18:28:11.078555', 168, 1104.00, 9.0000, 99.36, 9.0000, 99.36, 0.0000, 0.00, 0.0000, 0.00, 70.00, 840.00, NULL, '85444999');
+INSERT INTO "sales_invoice_line" ("id", "sales_invoice_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "discount_amount", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "unit_cost_at_sale", "total_cost_at_sale", "warranty_months", "hsn_snapshot") VALUES (35, 16, 51, 5, 2.000000, 2.000000, 890.00, 0.00, 18.0000, 2100.40, '2026-03-29 18:34:01.206794', 168, '2026-03-29 18:34:01.206794', 168, 1780.00, 9.0000, 160.20, 9.0000, 160.20, 0.0000, 0.00, 0.0000, 0.00, 610.00, 1220.00, NULL, '94054090');
+INSERT INTO "sales_invoice_line" ("id", "sales_invoice_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "discount_amount", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "unit_cost_at_sale", "total_cost_at_sale", "warranty_months", "hsn_snapshot") VALUES (36, 16, 44, 11, 12.000000, 12.000000, 92.00, 0.00, 18.0000, 1302.72, '2026-03-29 18:34:01.206794', 168, '2026-03-29 18:34:01.206794', 168, 1104.00, 9.0000, 99.36, 9.0000, 99.36, 0.0000, 0.00, 0.0000, 0.00, 70.00, 840.00, NULL, '85444999');
+INSERT INTO "sales_invoice_line" ("id", "sales_invoice_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "discount_amount", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "unit_cost_at_sale", "total_cost_at_sale", "warranty_months", "hsn_snapshot") VALUES (43, 26, 51, 5, 1.000000, 1.000000, 890.00, 0.00, 18.0000, 1050.20, '2026-03-29 20:16:15.092896', 168, '2026-03-29 20:16:15.092896', 168, 890.00, 9.0000, 80.10, 9.0000, 80.10, 0.0000, 0.00, 0.0000, 0.00, 0.00, 0.00, NULL, '94054090');
+INSERT INTO "sales_invoice_line" ("id", "sales_invoice_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "discount_amount", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "unit_cost_at_sale", "total_cost_at_sale", "warranty_months", "hsn_snapshot") VALUES (47, 33, 42, 5, 1.000000, 1.000000, 6500.00, 0.00, 18.0000, 7670.00, '2026-03-29 20:28:08.348669', 168, '2026-03-29 20:28:08.348669', 168, 6500.00, 9.0000, 585.00, 9.0000, 585.00, 0.0000, 0.00, 0.0000, 0.00, 5000.00, 5000.00, NULL, '85044090');
+INSERT INTO "sales_invoice_line" ("id", "sales_invoice_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "discount_amount", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "unit_cost_at_sale", "total_cost_at_sale", "warranty_months", "hsn_snapshot") VALUES (48, 34, 45, 9, 2.000000, 2.000000, 55.00, 0.00, 18.0000, 129.80, '2026-03-29 20:28:43.177522', 168, '2026-03-29 20:28:43.177522', 168, 110.00, 9.0000, 9.90, 9.0000, 9.90, 0.0000, 0.00, 0.0000, 0.00, 35.00, 70.00, NULL, '38200000');
+INSERT INTO "sales_invoice_line" ("id", "sales_invoice_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "discount_amount", "tax_rate", "line_amount", "created_at", "created_by", "updated_at", "updated_by", "taxable_amount", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "unit_cost_at_sale", "total_cost_at_sale", "warranty_months", "hsn_snapshot") VALUES (49, 36, 42, 5, 1.000000, 1.000000, 6500.00, 0.00, 18.0000, 7670.00, '2026-03-29 20:31:19.246317', 168, '2026-03-29 20:31:19.246317', 168, 6500.00, 9.0000, 585.00, 9.0000, 585.00, 0.0000, 0.00, 0.0000, 0.00, 5000.00, 5000.00, NULL, '85044090');
+
+-- changeset sameerkhan:1775937591491-43
+INSERT INTO "sales_line_serial" ("id", "sales_invoice_line_id", "serial_number_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 25, 51, '2026-03-25 04:32:16.083557', 173, '2026-03-25 04:32:16.083557', 173);
+INSERT INTO "sales_line_serial" ("id", "sales_invoice_line_id", "serial_number_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 24, 54, '2026-03-25 04:32:16.083557', 173, '2026-03-25 04:32:16.083557', 173);
+INSERT INTO "sales_line_serial" ("id", "sales_invoice_line_id", "serial_number_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 26, 56, '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181);
+INSERT INTO "sales_line_serial" ("id", "sales_invoice_line_id", "serial_number_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (12, 47, 49, '2026-03-29 20:28:08.354119', 168, '2026-03-29 20:28:08.354119', 168);
+INSERT INTO "sales_line_serial" ("id", "sales_invoice_line_id", "serial_number_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (13, 49, 50, '2026-03-29 20:31:19.251774', 168, '2026-03-29 20:31:19.251774', 168);
+
+-- changeset sameerkhan:1775937591491-44
+INSERT INTO "sales_line_batch" ("id", "sales_invoice_line_id", "batch_id", "quantity", "base_quantity", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 21, 20, 6.000000, 72.000000, '2026-03-25 04:32:16.083557', 170, '2026-03-25 04:32:16.083557', 170);
+INSERT INTO "sales_line_batch" ("id", "sales_invoice_line_id", "batch_id", "quantity", "base_quantity", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 22, 19, 20.000000, 20.000000, '2026-03-25 04:32:16.083557', 170, '2026-03-25 04:32:16.083557', 170);
+INSERT INTO "sales_line_batch" ("id", "sales_invoice_line_id", "batch_id", "quantity", "base_quantity", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 27, 22, 1.000000, 20.000000, '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181);
+INSERT INTO "sales_line_batch" ("id", "sales_invoice_line_id", "batch_id", "quantity", "base_quantity", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, 48, 19, 2.000000, 2.000000, '2026-03-29 20:28:43.18142', 168, '2026-03-29 20:28:43.18142', 168);
+
+-- changeset sameerkhan:1775937591491-45
+INSERT INTO "customer_receipt" ("id", "organization_id", "branch_id", "customer_id", "receipt_number", "receipt_date", "payment_method", "reference_number", "amount", "status", "remarks", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 33, 71, 52, 'RCPT-SPC-00002', '2026-03-06', 'BANK', 'NEFT-9901', 8000.00, 'ALLOCATED', 'Part payment against trade invoice', NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 171, '2026-03-25 04:32:16.083557', 171);
+INSERT INTO "customer_receipt" ("id", "organization_id", "branch_id", "customer_id", "receipt_number", "receipt_date", "payment_method", "reference_number", "amount", "status", "remarks", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 33, 72, 51, 'RCPT-SPC-00001', '2026-03-03', 'UPI', 'UPI-7788', 22768.10, 'ALLOCATED', 'Full counter payment', NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 173, '2026-03-25 04:32:16.083557', 173);
+INSERT INTO "customer_receipt" ("id", "organization_id", "branch_id", "customer_id", "receipt_number", "receipt_date", "payment_method", "reference_number", "amount", "status", "remarks", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 34, 74, 55, 'RCPT-UHL-00001', '2026-03-07', 'CARD', 'POS-5511', 6310.64, 'ALLOCATED', 'Retail card payment', NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181);
+INSERT INTO "customer_receipt" ("id", "organization_id", "branch_id", "customer_id", "receipt_number", "receipt_date", "payment_method", "reference_number", "amount", "status", "remarks", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, 33, 71, 52, 'RCT-20260326-1774474198610', '2026-03-26', 'BANK', 'AUTO-VERIFY-8111', 1000.00, 'ALLOCATED', 'Accounting verification receipt', NULL, NULL, NULL, '2026-03-26 02:59:58.612055', 168, '2026-03-26 02:59:58.704981', 168);
+INSERT INTO "customer_receipt" ("id", "organization_id", "branch_id", "customer_id", "receipt_number", "receipt_date", "payment_method", "reference_number", "amount", "status", "remarks", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by") VALUES (12, 33, 73, 50, 'RCT-20260404-1775250012805', '2026-04-03', 'CASH', NULL, 1050.20, 'ALLOCATED', NULL, NULL, NULL, NULL, '2026-04-04 02:30:12.805961', 168, '2026-04-04 02:30:12.88236', 168);
+INSERT INTO "customer_receipt" ("id", "organization_id", "branch_id", "customer_id", "receipt_number", "receipt_date", "payment_method", "reference_number", "amount", "status", "remarks", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by") VALUES (13, 33, 73, 53, 'RCT-20260404-1775250668660', '2026-04-03', 'CASH', NULL, 5000.00, 'ALLOCATED', NULL, NULL, NULL, NULL, '2026-04-04 02:41:08.660664', 168, '2026-04-04 02:41:08.723646', 168);
+INSERT INTO "customer_receipt" ("id", "organization_id", "branch_id", "customer_id", "receipt_number", "receipt_date", "payment_method", "reference_number", "amount", "status", "remarks", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by") VALUES (14, 33, 73, 53, 'RCT-20260404-1775250716152', '2026-04-03', 'CASH', NULL, 2670.00, 'ALLOCATED', NULL, NULL, NULL, NULL, '2026-04-04 02:41:56.152412', 168, '2026-04-04 02:41:56.180646', 168);
+
+-- changeset sameerkhan:1775937591491-46
+INSERT INTO "customer_receipt_allocation" ("id", "customer_receipt_id", "sales_invoice_id", "allocated_amount", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 7, 9, 8000.00, '2026-03-25 04:32:16.083557', 171, '2026-03-25 04:32:16.083557', 171);
+INSERT INTO "customer_receipt_allocation" ("id", "customer_receipt_id", "sales_invoice_id", "allocated_amount", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 8, 10, 22768.10, '2026-03-25 04:32:16.083557', 173, '2026-03-25 04:32:16.083557', 173);
+INSERT INTO "customer_receipt_allocation" ("id", "customer_receipt_id", "sales_invoice_id", "allocated_amount", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 9, 11, 6310.64, '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181);
+INSERT INTO "customer_receipt_allocation" ("id", "customer_receipt_id", "sales_invoice_id", "allocated_amount", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, 11, 9, 1000.00, '2026-03-26 02:59:58.716607', 168, '2026-03-26 02:59:58.716607', 168);
+INSERT INTO "customer_receipt_allocation" ("id", "customer_receipt_id", "sales_invoice_id", "allocated_amount", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, 12, 26, 1050.20, '2026-04-04 02:30:12.888904', 168, '2026-04-04 02:30:12.888904', 168);
+INSERT INTO "customer_receipt_allocation" ("id", "customer_receipt_id", "sales_invoice_id", "allocated_amount", "created_at", "created_by", "updated_at", "updated_by") VALUES (12, 13, 36, 5000.00, '2026-04-04 02:41:08.73213', 168, '2026-04-04 02:41:08.73213', 168);
+INSERT INTO "customer_receipt_allocation" ("id", "customer_receipt_id", "sales_invoice_id", "allocated_amount", "created_at", "created_by", "updated_at", "updated_by") VALUES (13, 14, 36, 2670.00, '2026-04-04 02:41:56.186366', 168, '2026-04-04 02:41:56.186366', 168);
+
+-- changeset sameerkhan:1775937591491-47
+INSERT INTO "supplier_payment" ("id", "organization_id", "branch_id", "supplier_id", "payment_number", "payment_date", "payment_method", "reference_number", "amount", "status", "remarks", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 33, 73, 37, 'PAY-SPC-00001', '2026-03-02', 'BANK', 'UTR-SPC-001', 15000.00, 'ALLOCATED', 'Part payment against GRN-SPC-00001', NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 171, '2026-03-25 04:32:16.083557', 171);
+INSERT INTO "supplier_payment" ("id", "organization_id", "branch_id", "supplier_id", "payment_number", "payment_date", "payment_method", "reference_number", "amount", "status", "remarks", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 34, 75, 39, 'PAY-UHL-00001', '2026-03-03', 'BANK', 'UTR-UHL-001', 25000.00, 'ALLOCATED', 'Partial supplier settlement', NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 179, '2026-03-25 04:32:16.083557', 179);
+
+-- changeset sameerkhan:1775937591491-48
+INSERT INTO "supplier_payment_allocation" ("id", "supplier_payment_id", "purchase_receipt_id", "allocated_amount", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 5, 7, 15000.00, '2026-03-25 04:32:16.083557', 171, '2026-03-25 04:32:16.083557', 171);
+INSERT INTO "supplier_payment_allocation" ("id", "supplier_payment_id", "purchase_receipt_id", "allocated_amount", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 6, 8, 25000.00, '2026-03-25 04:32:16.083557', 179, '2026-03-25 04:32:16.083557', 179);
+
+-- changeset sameerkhan:1775937591491-49
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (265, 33, 'CASH', 'Cash In Hand', 'ASSET', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (266, 33, 'BANK', 'Bank Account', 'ASSET', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (267, 33, 'AR', 'Accounts Receivable', 'ASSET', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (268, 33, 'INVENTORY', 'Inventory', 'ASSET', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (269, 33, 'AP', 'Accounts Payable', 'LIABILITY', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (270, 33, 'OUTPUT_GST', 'Output GST', 'LIABILITY', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (271, 33, 'INPUT_GST', 'Input GST', 'ASSET', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (272, 33, 'SALES', 'Sales Revenue', 'INCOME', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (273, 33, 'PURCHASES', 'Purchases', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (274, 33, 'EXPENSE_CONTROL', 'Operating Expenses', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (275, 33, 'STOCK_LOSS', 'Stock Adjustment Loss', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (276, 33, 'STOCK_GAIN', 'Stock Adjustment Gain', 'INCOME', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (277, 34, 'CASH', 'Cash In Hand', 'ASSET', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (278, 34, 'BANK', 'Bank Account', 'ASSET', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (279, 34, 'AR', 'Accounts Receivable', 'ASSET', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (280, 34, 'INVENTORY', 'Inventory', 'ASSET', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (281, 34, 'AP', 'Accounts Payable', 'LIABILITY', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (282, 34, 'OUTPUT_GST', 'Output GST', 'LIABILITY', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (283, 34, 'INPUT_GST', 'Input GST', 'ASSET', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (284, 34, 'SALES', 'Sales Revenue', 'INCOME', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (285, 34, 'PURCHASES', 'Purchases', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (286, 34, 'EXPENSE_CONTROL', 'Operating Expenses', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (287, 34, 'STOCK_LOSS', 'Stock Adjustment Loss', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (288, 34, 'STOCK_GAIN', 'Stock Adjustment Gain', 'INCOME', NULL, TRUE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (289, 16, 'CASH', 'Cash In Hand', 'ASSET', NULL, TRUE, TRUE, '2026-03-26 02:54:33.590817', NULL, '2026-03-26 02:54:33.590817', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (290, 16, 'BANK', 'Bank Account', 'ASSET', NULL, TRUE, TRUE, '2026-03-26 02:54:33.590817', NULL, '2026-03-26 02:54:33.590817', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (291, 16, 'AR', 'Accounts Receivable', 'ASSET', NULL, TRUE, TRUE, '2026-03-26 02:54:33.590817', NULL, '2026-03-26 02:54:33.590817', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (292, 16, 'INVENTORY', 'Inventory', 'ASSET', NULL, TRUE, TRUE, '2026-03-26 02:54:33.590817', NULL, '2026-03-26 02:54:33.590817', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (293, 16, 'AP', 'Accounts Payable', 'LIABILITY', NULL, TRUE, TRUE, '2026-03-26 02:54:33.590817', NULL, '2026-03-26 02:54:33.590817', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (294, 16, 'OUTPUT_GST', 'Output GST', 'LIABILITY', NULL, TRUE, TRUE, '2026-03-26 02:54:33.590817', NULL, '2026-03-26 02:54:33.590817', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (295, 16, 'INPUT_GST', 'Input GST', 'ASSET', NULL, TRUE, TRUE, '2026-03-26 02:54:33.590817', NULL, '2026-03-26 02:54:33.590817', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (296, 16, 'SALES', 'Sales Revenue', 'INCOME', NULL, TRUE, TRUE, '2026-03-26 02:54:33.590817', NULL, '2026-03-26 02:54:33.590817', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (297, 16, 'COGS', 'Cost of Goods Sold', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-26 02:54:33.590817', NULL, '2026-03-26 02:54:33.590817', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (298, 16, 'DISCOUNT_ALLOWED', 'Discount Allowed', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-26 02:54:33.590817', NULL, '2026-03-26 02:54:33.590817', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (299, 16, 'PURCHASES', 'Purchases', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-26 02:54:33.590817', NULL, '2026-03-26 02:54:33.590817', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (300, 16, 'EXPENSE_CONTROL', 'Operating Expenses', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-26 02:54:33.590817', NULL, '2026-03-26 02:54:33.590817', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (301, 16, 'STOCK_LOSS', 'Stock Adjustment Loss', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-26 02:54:33.590817', NULL, '2026-03-26 02:54:33.590817', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (302, 16, 'STOCK_GAIN', 'Stock Adjustment Gain', 'INCOME', NULL, TRUE, TRUE, '2026-03-26 02:54:33.590817', NULL, '2026-03-26 02:54:33.590817', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (311, 34, 'COGS', 'Cost of Goods Sold', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-26 02:54:33.590817', NULL, '2026-03-26 02:54:33.590817', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (312, 34, 'DISCOUNT_ALLOWED', 'Discount Allowed', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-26 02:54:33.590817', NULL, '2026-03-26 02:54:33.590817', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (325, 33, 'COGS', 'Cost of Goods Sold', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-26 02:54:33.590817', NULL, '2026-03-26 02:54:33.590817', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (326, 33, 'DISCOUNT_ALLOWED', 'Discount Allowed', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-26 02:54:33.590817', NULL, '2026-03-26 02:54:33.590817', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (331, 16, 'EXPENSE_PAYABLE', 'Expense Payable', 'LIABILITY', NULL, TRUE, TRUE, '2026-03-26 03:11:50.687203', NULL, '2026-03-26 03:11:50.687203', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (332, 34, 'EXPENSE_PAYABLE', 'Expense Payable', 'LIABILITY', NULL, TRUE, TRUE, '2026-03-26 03:11:50.687203', NULL, '2026-03-26 03:11:50.687203', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (333, 33, 'EXPENSE_PAYABLE', 'Expense Payable', 'LIABILITY', NULL, TRUE, TRUE, '2026-03-26 03:11:50.687203', NULL, '2026-03-26 03:11:50.687203', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (334, 16, 'WARRANTY_EXPENSE', 'Warranty Replacement Expense', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-29 14:07:27.631188', NULL, '2026-03-29 14:07:27.631188', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (335, 16, 'GOODWILL_EXPENSE', 'Goodwill Replacement Expense', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-29 14:07:27.631188', NULL, '2026-03-29 14:07:27.631188', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (336, 34, 'WARRANTY_EXPENSE', 'Warranty Replacement Expense', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-29 14:07:27.631188', NULL, '2026-03-29 14:07:27.631188', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (337, 34, 'GOODWILL_EXPENSE', 'Goodwill Replacement Expense', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-29 14:07:27.631188', NULL, '2026-03-29 14:07:27.631188', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (338, 33, 'WARRANTY_EXPENSE', 'Warranty Replacement Expense', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-29 14:07:27.631188', NULL, '2026-03-29 14:07:27.631188', NULL);
+INSERT INTO "account" ("id", "organization_id", "code", "name", "account_type", "parent_account_id", "is_system", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (339, 33, 'GOODWILL_EXPENSE', 'Goodwill Replacement Expense', 'EXPENSE', NULL, TRUE, TRUE, '2026-03-29 14:07:27.631188', NULL, '2026-03-29 14:07:27.631188', NULL);
+
+-- changeset sameerkhan:1775937591491-50
+INSERT INTO "voucher" ("id", "organization_id", "branch_id", "voucher_number", "voucher_date", "voucher_type", "reference_type", "reference_id", "remarks", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 33, 71, 'VCH-INV-SPC-00002', '2026-03-05', 'SALES', 'SALES_INVOICE', 9, 'Auto sales voucher', 'POSTED', '2026-03-25 04:32:16.083557', 170, '2026-03-25 04:32:16.083557', 170);
+INSERT INTO "voucher" ("id", "organization_id", "branch_id", "voucher_number", "voucher_date", "voucher_type", "reference_type", "reference_id", "remarks", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 33, 72, 'VCH-INV-SPC-00001', '2026-03-03', 'SALES', 'SALES_INVOICE', 10, 'Auto sales voucher', 'POSTED', '2026-03-25 04:32:16.083557', 173, '2026-03-25 04:32:16.083557', 173);
+INSERT INTO "voucher" ("id", "organization_id", "branch_id", "voucher_number", "voucher_date", "voucher_type", "reference_type", "reference_id", "remarks", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 34, 74, 'VCH-INV-UHL-00001', '2026-03-07', 'SALES', 'SALES_INVOICE', 11, 'Auto sales voucher', 'POSTED', '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181);
+INSERT INTO "voucher" ("id", "organization_id", "branch_id", "voucher_number", "voucher_date", "voucher_type", "reference_type", "reference_id", "remarks", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 33, 71, 'VCH-RCPT-SPC-00002', '2026-03-06', 'RECEIPT', 'CUSTOMER_RECEIPT', 7, 'Customer receipt voucher', 'POSTED', '2026-03-25 04:32:16.083557', 171, '2026-03-25 04:32:16.083557', 171);
+INSERT INTO "voucher" ("id", "organization_id", "branch_id", "voucher_number", "voucher_date", "voucher_type", "reference_type", "reference_id", "remarks", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 33, 72, 'VCH-RCPT-SPC-00001', '2026-03-03', 'RECEIPT', 'CUSTOMER_RECEIPT', 8, 'Customer receipt voucher', 'POSTED', '2026-03-25 04:32:16.083557', 173, '2026-03-25 04:32:16.083557', 173);
+INSERT INTO "voucher" ("id", "organization_id", "branch_id", "voucher_number", "voucher_date", "voucher_type", "reference_type", "reference_id", "remarks", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 34, 74, 'VCH-RCPT-UHL-00001', '2026-03-07', 'RECEIPT', 'CUSTOMER_RECEIPT', 9, 'Customer receipt voucher', 'POSTED', '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181);
+INSERT INTO "voucher" ("id", "organization_id", "branch_id", "voucher_number", "voucher_date", "voucher_type", "reference_type", "reference_id", "remarks", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 33, 71, 'VCH-RCT-20260326-1774474198610', '2026-03-26', 'RECEIPT', 'CUSTOMER_RECEIPT', 11, 'Customer receipt voucher', 'POSTED', '2026-03-26 02:59:58.622094', 168, '2026-03-26 02:59:58.622094', 168);
+INSERT INTO "voucher" ("id", "organization_id", "branch_id", "voucher_number", "voucher_date", "voucher_type", "reference_type", "reference_id", "remarks", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 33, 71, 'VCH-EXP-20260326-1774474953626-ACR', '2026-03-26', 'EXPENSE', 'EXPENSE_ACCRUAL', 5, 'Expense accrual voucher', 'POSTED', '2026-03-26 03:12:33.633731', 168, '2026-03-26 03:12:33.633731', 168);
+INSERT INTO "voucher" ("id", "organization_id", "branch_id", "voucher_number", "voucher_date", "voucher_type", "reference_type", "reference_id", "remarks", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, 33, 71, 'VCH-EXP-20260326-1774474953626-PAY', '2026-03-26', 'PAYMENT', 'EXPENSE_SETTLEMENT', 5, 'Expense settlement voucher', 'POSTED', '2026-03-26 03:12:33.678403', 168, '2026-03-26 03:12:33.678403', 168);
+INSERT INTO "voucher" ("id", "organization_id", "branch_id", "voucher_number", "voucher_date", "voucher_type", "reference_type", "reference_id", "remarks", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, 33, 71, 'VCH-EXP-20260326-1774474953713', '2026-03-26', 'EXPENSE', 'EXPENSE_PAID', 6, 'Paid expense voucher', 'POSTED', '2026-03-26 03:12:33.717713', 168, '2026-03-26 03:12:33.717713', 168);
+INSERT INTO "voucher" ("id", "organization_id", "branch_id", "voucher_number", "voucher_date", "voucher_type", "reference_type", "reference_id", "remarks", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (12, 33, 73, 'VCH-INV-20260329-1774789091050', '2026-03-29', 'SALES', 'SALES_INVOICE', 15, 'Auto sales voucher', 'POSTED', '2026-03-29 18:28:11.238953', 168, '2026-03-29 18:28:11.238953', 168);
+INSERT INTO "voucher" ("id", "organization_id", "branch_id", "voucher_number", "voucher_date", "voucher_type", "reference_type", "reference_id", "remarks", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (13, 33, 71, 'VCH-INV-SPC-00003', '2026-03-14', 'SALES', 'SALES_INVOICE', 16, 'Seeded sales voucher for quote/order demo', 'POSTED', '2026-03-29 18:34:01.206794', 168, '2026-03-29 18:34:01.206794', 168);
+INSERT INTO "voucher" ("id", "organization_id", "branch_id", "voucher_number", "voucher_date", "voucher_type", "reference_type", "reference_id", "remarks", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (14, 33, 71, 'JOURNAL-33-00011', '2026-03-29', 'JOURNAL', 'recurring_journal', 1, 'Demo recurring journal', 'POSTED', '2026-03-29 20:14:14.271332', 168, '2026-03-29 20:14:14.271332', 168);
+INSERT INTO "voucher" ("id", "organization_id", "branch_id", "voucher_number", "voucher_date", "voucher_type", "reference_type", "reference_id", "remarks", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (15, 33, 71, 'VCH-INV-20260329-1774795575062', '2026-03-29', 'SALES', 'SALES_INVOICE', 26, 'Auto sales voucher', 'POSTED', '2026-03-29 20:16:15.12091', 168, '2026-03-29 20:16:15.12091', 168);
+INSERT INTO "voucher" ("id", "organization_id", "branch_id", "voucher_number", "voucher_date", "voucher_type", "reference_type", "reference_id", "remarks", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (16, 33, 73, 'VCH-INV-20260329-1774796288341', '2026-03-29', 'SALES', 'SALES_INVOICE', 33, 'Auto sales voucher', 'POSTED', '2026-03-29 20:28:08.430958', 168, '2026-03-29 20:28:08.430958', 168);
+INSERT INTO "voucher" ("id", "organization_id", "branch_id", "voucher_number", "voucher_date", "voucher_type", "reference_type", "reference_id", "remarks", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (17, 33, 73, 'VCH-INV-20260329-1774796323171', '2026-03-29', 'SALES', 'SALES_INVOICE', 34, 'Auto sales voucher', 'POSTED', '2026-03-29 20:28:43.209351', 168, '2026-03-29 20:28:43.209351', 168);
+INSERT INTO "voucher" ("id", "organization_id", "branch_id", "voucher_number", "voucher_date", "voucher_type", "reference_type", "reference_id", "remarks", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (18, 33, 73, 'VCH-INV-20260329-1774796479238', '2026-03-29', 'SALES', 'SALES_INVOICE', 36, 'Auto sales voucher', 'POSTED', '2026-03-29 20:31:19.324568', 168, '2026-03-29 20:31:19.324568', 168);
+INSERT INTO "voucher" ("id", "organization_id", "branch_id", "voucher_number", "voucher_date", "voucher_type", "reference_type", "reference_id", "remarks", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (19, 33, 73, 'VCH-RCT-20260404-1775250012805', '2026-04-03', 'RECEIPT', 'CUSTOMER_RECEIPT', 12, 'Customer receipt voucher', 'POSTED', '2026-04-04 02:30:12.818528', 168, '2026-04-04 02:30:12.818528', 168);
+INSERT INTO "voucher" ("id", "organization_id", "branch_id", "voucher_number", "voucher_date", "voucher_type", "reference_type", "reference_id", "remarks", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (20, 33, 73, 'VCH-RCT-20260404-1775250668660', '2026-04-03', 'RECEIPT', 'CUSTOMER_RECEIPT', 13, 'Customer receipt voucher', 'POSTED', '2026-04-04 02:41:08.667071', 168, '2026-04-04 02:41:08.667071', 168);
+INSERT INTO "voucher" ("id", "organization_id", "branch_id", "voucher_number", "voucher_date", "voucher_type", "reference_type", "reference_id", "remarks", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (21, 33, 73, 'VCH-RCT-20260404-1775250716152', '2026-04-03', 'RECEIPT', 'CUSTOMER_RECEIPT', 14, 'Customer receipt voucher', 'POSTED', '2026-04-04 02:41:56.154238', 168, '2026-04-04 02:41:56.154238', 168);
+
+-- changeset sameerkhan:1775937591491-51
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (1, 33, 71, 1, 267, '2026-03-05', 16803.20, 0.00, 'Sales posting', 52, NULL, 9, NULL, '2026-03-25 04:32:16.083557', 170, '2026-03-25 04:32:16.083557', 170, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (2, 33, 72, 2, 267, '2026-03-03', 22768.10, 0.00, 'Sales posting', 51, NULL, 10, NULL, '2026-03-25 04:32:16.083557', 173, '2026-03-25 04:32:16.083557', 173, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (3, 33, 71, 1, 272, '2026-03-05', 0.00, 14240.00, 'Sales posting', 52, NULL, 9, NULL, '2026-03-25 04:32:16.083557', 170, '2026-03-25 04:32:16.083557', 170, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (4, 33, 72, 2, 272, '2026-03-03', 0.00, 19295.00, 'Sales posting', 51, NULL, 10, NULL, '2026-03-25 04:32:16.083557', 173, '2026-03-25 04:32:16.083557', 173, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (5, 34, 74, 3, 279, '2026-03-07', 6310.64, 0.00, 'Sales posting', 55, NULL, 11, NULL, '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (6, 34, 74, 3, 284, '2026-03-07', 0.00, 5348.00, 'Sales posting', 55, NULL, 11, NULL, '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (7, 33, 71, 4, 265, '2026-03-06', 8000.00, 0.00, 'Customer receipt posting', 52, NULL, 9, NULL, '2026-03-25 04:32:16.083557', 171, '2026-03-25 04:32:16.083557', 171, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (8, 33, 71, 4, 267, '2026-03-06', 0.00, 8000.00, 'Customer receipt posting', 52, NULL, 9, NULL, '2026-03-25 04:32:16.083557', 171, '2026-03-25 04:32:16.083557', 171, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (9, 33, 72, 5, 265, '2026-03-03', 22768.10, 0.00, 'Customer receipt posting', 51, NULL, 10, NULL, '2026-03-25 04:32:16.083557', 173, '2026-03-25 04:32:16.083557', 173, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (10, 33, 72, 5, 267, '2026-03-03', 0.00, 22768.10, 'Customer receipt posting', 51, NULL, 10, NULL, '2026-03-25 04:32:16.083557', 173, '2026-03-25 04:32:16.083557', 173, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (11, 34, 74, 6, 277, '2026-03-07', 6310.64, 0.00, 'Customer receipt posting', 55, NULL, 11, NULL, '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (12, 34, 74, 6, 279, '2026-03-07', 0.00, 6310.64, 'Customer receipt posting', 55, NULL, 11, NULL, '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (15, 33, 71, 8, 266, '2026-03-26', 1000.00, 0.00, 'Customer receipt', 52, NULL, NULL, NULL, '2026-03-26 02:59:58.627366', 168, '2026-03-26 02:59:58.627366', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (16, 33, 71, 8, 267, '2026-03-26', 0.00, 1000.00, 'Customer receipt settlement', 52, NULL, NULL, NULL, '2026-03-26 02:59:58.630324', 168, '2026-03-26 02:59:58.630324', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (17, 33, 71, 9, 274, '2026-03-26', 750.00, 0.00, 'Expense accrual', NULL, NULL, NULL, NULL, '2026-03-26 03:12:33.63688', 168, '2026-03-26 03:12:33.63688', 168, 5, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (18, 33, 71, 9, 333, '2026-03-26', 0.00, 750.00, 'Expense payable', NULL, NULL, NULL, NULL, '2026-03-26 03:12:33.640274', 168, '2026-03-26 03:12:33.640274', 168, 5, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (19, 33, 71, 10, 333, '2026-03-26', 750.00, 0.00, 'Expense payable settlement', NULL, NULL, NULL, NULL, '2026-03-26 03:12:33.681369', 168, '2026-03-26 03:12:33.681369', 168, 5, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (20, 33, 71, 10, 266, '2026-03-26', 0.00, 750.00, 'Expense settlement', NULL, NULL, NULL, NULL, '2026-03-26 03:12:33.682835', 168, '2026-03-26 03:12:33.682835', 168, 5, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (21, 33, 71, 11, 274, '2026-03-26', 420.00, 0.00, 'Expense posting', NULL, NULL, NULL, NULL, '2026-03-26 03:12:33.720397', 168, '2026-03-26 03:12:33.720397', 168, 6, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (22, 33, 71, 11, 265, '2026-03-26', 0.00, 420.00, 'Expense payment', NULL, NULL, NULL, NULL, '2026-03-26 03:12:33.72163', 168, '2026-03-26 03:12:33.72163', 168, 6, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (23, 33, 73, 12, 267, '2026-03-29', 3403.12, 0.00, 'Sales receivable', 53, NULL, 15, NULL, '2026-03-29 18:28:11.252648', 168, '2026-03-29 18:28:11.252648', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (24, 33, 73, 12, 272, '2026-03-29', 0.00, 2884.00, 'Sales revenue', 53, NULL, 15, NULL, '2026-03-29 18:28:11.259702', 168, '2026-03-29 18:28:11.259702', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (25, 33, 73, 12, 270, '2026-03-29', 0.00, 519.12, 'Output GST', 53, NULL, 15, NULL, '2026-03-29 18:28:11.260809', 168, '2026-03-29 18:28:11.260809', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (26, 33, 73, 12, 325, '2026-03-29', 2060.00, 0.00, 'Cost of goods sold', 53, NULL, 15, NULL, '2026-03-29 18:28:11.261578', 168, '2026-03-29 18:28:11.261578', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (27, 33, 73, 12, 268, '2026-03-29', 0.00, 2060.00, 'Inventory reduction on sale', 53, NULL, 15, NULL, '2026-03-29 18:28:11.262289', 168, '2026-03-29 18:28:11.262289', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (28, 33, 71, 13, 267, '2026-03-14', 3403.12, 0.00, 'Seeded quote-order-invoice demo posting', 53, NULL, 16, NULL, '2026-03-29 18:34:01.206794', 168, '2026-03-29 18:34:01.206794', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (29, 33, 71, 13, 272, '2026-03-14', 0.00, 2884.00, 'Seeded quote-order-invoice demo posting', 53, NULL, 16, NULL, '2026-03-29 18:34:01.206794', 168, '2026-03-29 18:34:01.206794', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (30, 33, 71, 14, 265, '2026-03-29', 1000.00, 0.00, 'Monthly accrual reversal', NULL, NULL, NULL, NULL, '2026-03-29 20:14:14.274308', 168, '2026-03-29 20:14:14.274308', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (31, 33, 71, 14, 272, '2026-03-29', 0.00, 1000.00, 'Monthly accrual reversal', NULL, NULL, NULL, NULL, '2026-03-29 20:14:14.278151', 168, '2026-03-29 20:14:14.278151', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (32, 33, 71, 15, 267, '2026-03-29', 1050.20, 0.00, 'Sales receivable', 50, NULL, 26, NULL, '2026-03-29 20:16:15.128713', 168, '2026-03-29 20:16:15.128713', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (33, 33, 71, 15, 272, '2026-03-29', 0.00, 890.00, 'Sales revenue', 50, NULL, 26, NULL, '2026-03-29 20:16:15.131256', 168, '2026-03-29 20:16:15.131256', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (34, 33, 71, 15, 270, '2026-03-29', 0.00, 160.20, 'Output GST', 50, NULL, 26, NULL, '2026-03-29 20:16:15.132281', 168, '2026-03-29 20:16:15.132281', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (35, 33, 73, 16, 267, '2026-03-29', 7670.00, 0.00, 'Sales receivable', 53, NULL, 33, NULL, '2026-03-29 20:28:08.440108', 168, '2026-03-29 20:28:08.440108', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (36, 33, 73, 16, 272, '2026-03-29', 0.00, 6500.00, 'Sales revenue', 53, NULL, 33, NULL, '2026-03-29 20:28:08.444255', 168, '2026-03-29 20:28:08.444255', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (37, 33, 73, 16, 270, '2026-03-29', 0.00, 1170.00, 'Output GST', 53, NULL, 33, NULL, '2026-03-29 20:28:08.446686', 168, '2026-03-29 20:28:08.446686', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (38, 33, 73, 16, 325, '2026-03-29', 5000.00, 0.00, 'Cost of goods sold', 53, NULL, 33, NULL, '2026-03-29 20:28:08.44765', 168, '2026-03-29 20:28:08.44765', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (39, 33, 73, 16, 268, '2026-03-29', 0.00, 5000.00, 'Inventory reduction on sale', 53, NULL, 33, NULL, '2026-03-29 20:28:08.449114', 168, '2026-03-29 20:28:08.449114', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (40, 33, 73, 17, 267, '2026-03-29', 129.80, 0.00, 'Sales receivable', 53, NULL, 34, NULL, '2026-03-29 20:28:43.216263', 168, '2026-03-29 20:28:43.216263', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (41, 33, 73, 17, 272, '2026-03-29', 0.00, 110.00, 'Sales revenue', 53, NULL, 34, NULL, '2026-03-29 20:28:43.217798', 168, '2026-03-29 20:28:43.217798', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (42, 33, 73, 17, 270, '2026-03-29', 0.00, 19.80, 'Output GST', 53, NULL, 34, NULL, '2026-03-29 20:28:43.218608', 168, '2026-03-29 20:28:43.218608', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (43, 33, 73, 17, 325, '2026-03-29', 70.00, 0.00, 'Cost of goods sold', 53, NULL, 34, NULL, '2026-03-29 20:28:43.219239', 168, '2026-03-29 20:28:43.219239', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (44, 33, 73, 17, 268, '2026-03-29', 0.00, 70.00, 'Inventory reduction on sale', 53, NULL, 34, NULL, '2026-03-29 20:28:43.219828', 168, '2026-03-29 20:28:43.219828', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (45, 33, 73, 18, 267, '2026-03-29', 7670.00, 0.00, 'Sales receivable', 53, NULL, 36, NULL, '2026-03-29 20:31:19.332348', 168, '2026-03-29 20:31:19.332348', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (46, 33, 73, 18, 272, '2026-03-29', 0.00, 6500.00, 'Sales revenue', 53, NULL, 36, NULL, '2026-03-29 20:31:19.335539', 168, '2026-03-29 20:31:19.335539', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (47, 33, 73, 18, 270, '2026-03-29', 0.00, 1170.00, 'Output GST', 53, NULL, 36, NULL, '2026-03-29 20:31:19.337066', 168, '2026-03-29 20:31:19.337066', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (48, 33, 73, 18, 325, '2026-03-29', 5000.00, 0.00, 'Cost of goods sold', 53, NULL, 36, NULL, '2026-03-29 20:31:19.338438', 168, '2026-03-29 20:31:19.338438', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (49, 33, 73, 18, 268, '2026-03-29', 0.00, 5000.00, 'Inventory reduction on sale', 53, NULL, 36, NULL, '2026-03-29 20:31:19.339938', 168, '2026-03-29 20:31:19.339938', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (50, 33, 73, 19, 265, '2026-04-03', 1050.20, 0.00, 'Customer receipt', 50, NULL, NULL, NULL, '2026-04-04 02:30:12.825906', 168, '2026-04-04 02:30:12.825906', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (51, 33, 73, 19, 267, '2026-04-03', 0.00, 1050.20, 'Customer receipt settlement', 50, NULL, NULL, NULL, '2026-04-04 02:30:12.837344', 168, '2026-04-04 02:30:12.837344', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (52, 33, 73, 20, 265, '2026-04-03', 5000.00, 0.00, 'Customer receipt', 53, NULL, NULL, NULL, '2026-04-04 02:41:08.672486', 168, '2026-04-04 02:41:08.672486', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (53, 33, 73, 20, 267, '2026-04-03', 0.00, 5000.00, 'Customer receipt settlement', 53, NULL, NULL, NULL, '2026-04-04 02:41:08.676907', 168, '2026-04-04 02:41:08.676907', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (54, 33, 73, 21, 265, '2026-04-03', 2670.00, 0.00, 'Customer receipt', 53, NULL, NULL, NULL, '2026-04-04 02:41:56.157266', 168, '2026-04-04 02:41:56.157266', 168, NULL, NULL);
+INSERT INTO "ledger_entry" ("id", "organization_id", "branch_id", "voucher_id", "account_id", "entry_date", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "sales_invoice_id", "purchase_receipt_id", "created_at", "created_by", "updated_at", "updated_by", "expense_id", "service_replacement_id") VALUES (55, 33, 73, 21, 267, '2026-04-03', 0.00, 2670.00, 'Customer receipt settlement', 53, NULL, NULL, NULL, '2026-04-04 02:41:56.15864', 168, '2026-04-04 02:41:56.15864', 168, NULL, NULL);
+
+-- changeset sameerkhan:1775937591491-52
+INSERT INTO "product_ownership" ("id", "organization_id", "customer_id", "product_id", "serial_number_id", "sales_invoice_id", "sales_invoice_line_id", "ownership_start_date", "warranty_start_date", "warranty_end_date", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 33, 51, 43, 54, 10, 24, '2026-03-03', '2026-03-03', '2028-03-03', 'ACTIVE', '2026-03-25 04:32:16.083557', 173, '2026-03-25 04:32:16.083557', 173);
+INSERT INTO "product_ownership" ("id", "organization_id", "customer_id", "product_id", "serial_number_id", "sales_invoice_id", "sales_invoice_line_id", "ownership_start_date", "warranty_start_date", "warranty_end_date", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 33, 51, 42, 51, 10, 25, '2026-03-03', '2026-03-03', '2028-03-03', 'ACTIVE', '2026-03-25 04:32:16.083557', 173, '2026-03-25 04:32:16.083557', 173);
+INSERT INTO "product_ownership" ("id", "organization_id", "customer_id", "product_id", "serial_number_id", "sales_invoice_id", "sales_invoice_line_id", "ownership_start_date", "warranty_start_date", "warranty_end_date", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 34, 55, 47, 56, 11, 26, '2026-03-07', '2026-03-07', '2028-03-07', 'ACTIVE', '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181);
+INSERT INTO "product_ownership" ("id", "organization_id", "customer_id", "product_id", "serial_number_id", "sales_invoice_id", "sales_invoice_line_id", "ownership_start_date", "warranty_start_date", "warranty_end_date", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 33, 53, 42, 49, 33, 47, '2026-03-29', '2026-03-29', NULL, 'ACTIVE', '2026-03-29 20:28:08.424557', 168, '2026-03-29 20:28:08.424557', 168);
+INSERT INTO "product_ownership" ("id", "organization_id", "customer_id", "product_id", "serial_number_id", "sales_invoice_id", "sales_invoice_line_id", "ownership_start_date", "warranty_start_date", "warranty_end_date", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 33, 53, 42, 50, 36, 49, '2026-03-29', '2026-03-29', NULL, 'ACTIVE', '2026-03-29 20:31:19.298368', 168, '2026-03-29 20:31:19.298368', 168);
+
+-- changeset sameerkhan:1775937591491-53
+INSERT INTO "service_ticket" ("id", "organization_id", "branch_id", "customer_id", "sales_invoice_id", "ticket_number", "source_type", "priority", "status", "complaint_summary", "issue_description", "reported_on", "assigned_to_user_id", "created_at", "created_by", "updated_at", "updated_by", "sales_return_id") VALUES (2, 33, 72, 51, 10, 'SVC-SPC-00001', 'INVOICE', 'HIGH', 'IN_PROGRESS', 'Battery backup issue', 'Customer reported low backup and repeated cut-off after installation.', '2026-03-20', 175, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168, NULL);
+
+-- changeset sameerkhan:1775937591491-54
+INSERT INTO "service_ticket_item" ("id", "service_ticket_id", "product_id", "serial_number_id", "product_ownership_id", "symptom_notes", "diagnosis_notes", "resolution_status", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 2, 43, 54, 4, 'Battery discharges quickly', 'Likely cell issue, claim with supplier', 'PENDING', '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+
+-- changeset sameerkhan:1775937591491-55
+INSERT INTO "service_visit" ("id", "organization_id", "branch_id", "service_ticket_id", "technician_user_id", "scheduled_at", "started_at", "completed_at", "visit_status", "visit_notes", "parts_used_json", "customer_feedback", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 33, 72, 2, 175, '2026-03-21 10:00:00', '2026-03-21 10:20:00', '2026-03-21 11:10:00', 'COMPLETED', 'Voltage measured below threshold. Logged warranty case.', '[{"qty": 1, "part": "Terminal Kit"}]', 'Please resolve under warranty', '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+
+-- changeset sameerkhan:1775937591491-56
+INSERT INTO "warranty_claim" ("id", "organization_id", "branch_id", "service_ticket_id", "customer_id", "product_id", "serial_number_id", "supplier_id", "distributor_id", "claim_number", "claim_type", "status", "claim_date", "approved_on", "claim_notes", "created_at", "created_by", "updated_at", "updated_by", "product_ownership_id", "sales_invoice_id", "sales_return_id", "warranty_start_date", "warranty_end_date", "upstream_route_type", "upstream_company_name", "upstream_reference_number", "upstream_status", "routed_on") VALUES (1, 33, 72, 2, 51, 43, 54, 36, 15, 'WCL-SPC-00001', 'REPLACEMENT', 'SUBMITTED', '2026-03-21', NULL, 'Battery serial submitted for replacement under warranty.', '2026-03-25 04:32:16.083557', 168, '2026-03-29 13:52:24.542801', 168, 4, 10, NULL, '2026-03-03', '2028-03-03', NULL, NULL, NULL, NULL, NULL);
+
+-- changeset sameerkhan:1775937591491-57
+INSERT INTO "expense_category" ("id", "organization_id", "code", "name", "is_active", "created_at", "created_by", "updated_at", "updated_by", "expense_account_id") VALUES (155, 33, 'RENT', 'Rent', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-26 03:11:50.687203', 168, 274);
+INSERT INTO "expense_category" ("id", "organization_id", "code", "name", "is_active", "created_at", "created_by", "updated_at", "updated_by", "expense_account_id") VALUES (156, 33, 'SALARY', 'Salary', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-26 03:11:50.687203', 168, 274);
+INSERT INTO "expense_category" ("id", "organization_id", "code", "name", "is_active", "created_at", "created_by", "updated_at", "updated_by", "expense_account_id") VALUES (157, 33, 'ELECTRICITY', 'Electricity', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-26 03:11:50.687203', 168, 274);
+INSERT INTO "expense_category" ("id", "organization_id", "code", "name", "is_active", "created_at", "created_by", "updated_at", "updated_by", "expense_account_id") VALUES (158, 33, 'TRANSPORT', 'Transport', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-26 03:11:50.687203', 168, 274);
+INSERT INTO "expense_category" ("id", "organization_id", "code", "name", "is_active", "created_at", "created_by", "updated_at", "updated_by", "expense_account_id") VALUES (159, 33, 'MAINTENANCE', 'Maintenance', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-26 03:11:50.687203', 168, 274);
+INSERT INTO "expense_category" ("id", "organization_id", "code", "name", "is_active", "created_at", "created_by", "updated_at", "updated_by", "expense_account_id") VALUES (160, 33, 'OFFICE', 'Office Expense', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-26 03:11:50.687203', 168, 274);
+INSERT INTO "expense_category" ("id", "organization_id", "code", "name", "is_active", "created_at", "created_by", "updated_at", "updated_by", "expense_account_id") VALUES (161, 33, 'MISC', 'Miscellaneous', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-26 03:11:50.687203', 168, 274);
+INSERT INTO "expense_category" ("id", "organization_id", "code", "name", "is_active", "created_at", "created_by", "updated_at", "updated_by", "expense_account_id") VALUES (162, 34, 'RENT', 'Rent', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-26 03:11:50.687203', 176, 286);
+INSERT INTO "expense_category" ("id", "organization_id", "code", "name", "is_active", "created_at", "created_by", "updated_at", "updated_by", "expense_account_id") VALUES (163, 34, 'SALARY', 'Salary', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-26 03:11:50.687203', 176, 286);
+INSERT INTO "expense_category" ("id", "organization_id", "code", "name", "is_active", "created_at", "created_by", "updated_at", "updated_by", "expense_account_id") VALUES (164, 34, 'ELECTRICITY', 'Electricity', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-26 03:11:50.687203', 176, 286);
+INSERT INTO "expense_category" ("id", "organization_id", "code", "name", "is_active", "created_at", "created_by", "updated_at", "updated_by", "expense_account_id") VALUES (165, 34, 'TRANSPORT', 'Transport', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-26 03:11:50.687203', 176, 286);
+INSERT INTO "expense_category" ("id", "organization_id", "code", "name", "is_active", "created_at", "created_by", "updated_at", "updated_by", "expense_account_id") VALUES (166, 34, 'MAINTENANCE', 'Maintenance', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-26 03:11:50.687203', 176, 286);
+INSERT INTO "expense_category" ("id", "organization_id", "code", "name", "is_active", "created_at", "created_by", "updated_at", "updated_by", "expense_account_id") VALUES (167, 34, 'OFFICE', 'Office Expense', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-26 03:11:50.687203', 176, 286);
+INSERT INTO "expense_category" ("id", "organization_id", "code", "name", "is_active", "created_at", "created_by", "updated_at", "updated_by", "expense_account_id") VALUES (168, 34, 'MISC', 'Miscellaneous', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-26 03:11:50.687203', 176, 286);
+INSERT INTO "expense_category" ("id", "organization_id", "code", "name", "is_active", "created_at", "created_by", "updated_at", "updated_by", "expense_account_id") VALUES (169, 33, 'OFFICE_AUTO', 'Office Auto Verify', TRUE, '2026-03-26 03:12:33.567333', 168, '2026-03-26 03:12:33.567333', 168, 274);
+
+-- changeset sameerkhan:1775937591491-58
+INSERT INTO "expense" ("id", "organization_id", "branch_id", "expense_category_id", "expense_number", "expense_date", "amount", "status", "receipt_url", "remarks", "submitted_at", "submitted_by", "approved_at", "approved_by", "paid_at", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by", "due_date", "payment_method") VALUES (4, 34, 74, 166, 'EXP-UHL-00001', '2026-03-08', 2400.00, 'SUBMITTED', 'https://example.test/exp/uhl-1.jpg', 'Showroom electrical repair pending approval', '2026-03-08 19:00:00', 180, NULL, NULL, NULL, NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 180, '2026-03-26 03:11:50.687203', 180, '2026-03-08', NULL);
+INSERT INTO "expense" ("id", "organization_id", "branch_id", "expense_category_id", "expense_number", "expense_date", "amount", "status", "receipt_url", "remarks", "submitted_at", "submitted_by", "approved_at", "approved_by", "paid_at", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by", "due_date", "payment_method") VALUES (3, 33, 72, 158, 'EXP-SPC-00001', '2026-03-03', 1800.00, 'PAID', 'https://example.test/exp/spc-1.jpg', 'Local transport charges', '2026-03-03 20:00:00', 172, '2026-03-03 20:30:00', 169, '2026-03-03 20:45:00', NULL, NULL, NULL, '2026-03-25 04:32:16.083557', 172, '2026-03-26 03:11:50.687203', 172, '2026-03-03', 'CASH');
+INSERT INTO "expense" ("id", "organization_id", "branch_id", "expense_category_id", "expense_number", "expense_date", "amount", "status", "receipt_url", "remarks", "submitted_at", "submitted_by", "approved_at", "approved_by", "paid_at", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by", "due_date", "payment_method") VALUES (5, 33, 71, 169, 'EXP-20260326-1774474953626', '2026-03-26', 750.00, 'PAID', NULL, 'Paying accrued expense', NULL, NULL, '2026-03-26 03:12:33.627208', 168, '2026-03-26 00:00:00', NULL, NULL, NULL, '2026-03-26 03:12:33.627409', 168, '2026-03-26 03:12:33.670259', 168, '2026-03-31', 'BANK');
+INSERT INTO "expense" ("id", "organization_id", "branch_id", "expense_category_id", "expense_number", "expense_date", "amount", "status", "receipt_url", "remarks", "submitted_at", "submitted_by", "approved_at", "approved_by", "paid_at", "cancelled_at", "cancelled_by", "cancel_reason", "created_at", "created_by", "updated_at", "updated_by", "due_date", "payment_method") VALUES (6, 33, 71, 169, 'EXP-20260326-1774474953713', '2026-03-26', 420.00, 'PAID', NULL, 'Paid office expense verification', NULL, NULL, '2026-03-26 03:12:33.71395', 168, '2026-03-26 03:12:33.71396', NULL, NULL, NULL, '2026-03-26 03:12:33.714051', 168, '2026-03-26 03:12:33.714051', 168, '2026-03-26', 'CASH');
+
+-- changeset sameerkhan:1775937591491-59
+INSERT INTO "recurring_expense" ("id", "organization_id", "branch_id", "expense_category_id", "recurring_number", "frequency", "amount", "start_date", "next_run_date", "is_active", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 33, 73, 155, 'REXP-SPC-00001', 'MONTHLY', 35000.00, '2026-01-01', '2026-04-01', TRUE, 'HQ rent', '2026-03-25 04:32:16.083557', 171, '2026-03-25 04:32:16.083557', 171);
+INSERT INTO "recurring_expense" ("id", "organization_id", "branch_id", "expense_category_id", "recurring_number", "frequency", "amount", "start_date", "next_run_date", "is_active", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 34, 75, 164, 'REXP-UHL-00001', 'MONTHLY', 12000.00, '2026-01-01', '2026-04-01', TRUE, 'Ahmedabad showroom utility', '2026-03-25 04:32:16.083557', 179, '2026-03-25 04:32:16.083557', 179);
+
+-- changeset sameerkhan:1775937591491-60
+INSERT INTO "notification_template" ("id", "organization_id", "template_code", "channel", "subject", "body", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 33, 'PAYMENT_REMINDER', 'WHATSAPP', 'Payment Reminder', 'Dear {{customer_name}}, your payment of {{amount}} is due for invoice {{invoice_number}}.', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "notification_template" ("id", "organization_id", "template_code", "channel", "subject", "body", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 33, 'SERVICE_UPDATE', 'SMS', 'Service Update', 'Your service ticket {{ticket_number}} is now {{status}}.', TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "notification_template" ("id", "organization_id", "template_code", "channel", "subject", "body", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 34, 'PAYMENT_REMINDER', 'WHATSAPP', 'Payment Reminder', 'Dear {{customer_name}}, kindly clear due invoice {{invoice_number}}.', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "notification_template" ("id", "organization_id", "template_code", "channel", "subject", "body", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 34, 'LOW_STOCK_ALERT', 'EMAIL', 'Low Stock Alert', 'The item {{sku}} is below reorder level at {{branch_name}}.', TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+
+-- changeset sameerkhan:1775937591491-61
+INSERT INTO "notification" ("id", "organization_id", "user_id", "customer_id", "supplier_id", "template_id", "channel", "status", "reference_type", "reference_id", "scheduled_at", "sent_at", "read_at", "payload_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 33, 173, 52, NULL, 1, 'WHATSAPP', 'SENT', 'SALES_INVOICE', 9, '2026-03-05 18:20:00', '2026-03-05 18:25:00', NULL, '{"amount": 16803.20, "customer_name": "Shiv Enterprise", "invoice_number": "INV-SPC-00002"}', '2026-03-25 04:32:16.083557', 170, '2026-03-25 04:32:16.083557', 170);
+INSERT INTO "notification" ("id", "organization_id", "user_id", "customer_id", "supplier_id", "template_id", "channel", "status", "reference_type", "reference_id", "scheduled_at", "sent_at", "read_at", "payload_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 34, 181, 56, NULL, 3, 'WHATSAPP', 'SENT', 'SALES_INVOICE', 12, NULL, NULL, NULL, '{"amount": 2596.00, "customer_name": "Vijay Traders", "invoice_number": "INV-UHL-00002"}', '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181);
+
+-- changeset sameerkhan:1775937591491-62
+INSERT INTO "report_schedule" ("id", "organization_id", "user_id", "schedule_code", "report_type", "frequency", "delivery_channel", "is_active", "next_run_at", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 33, 168, 'RPT-SPC-DAILY', 'DAILY_SALES_SUMMARY', 'DAILY', 'EMAIL', TRUE, '2026-03-26 07:00:00', '{"scope": "organization"}', '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "report_schedule" ("id", "organization_id", "user_id", "schedule_code", "report_type", "frequency", "delivery_channel", "is_active", "next_run_at", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 34, 176, 'RPT-UHL-LOWSTOCK', 'LOW_STOCK_SUMMARY', 'WEEKLY', 'APP', TRUE, '2026-03-27 09:00:00', '{"scope": "organization"}', '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176);
+INSERT INTO "report_schedule" ("id", "organization_id", "user_id", "schedule_code", "report_type", "frequency", "delivery_channel", "is_active", "next_run_at", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 33, 170, 'SCH-734292-8B7553', 'SALES_SUMMARY', 'DAILY', 'EMAIL', TRUE, '2026-04-06 00:00:00.297562', '{"format": "PDF", "parameters": {"organizationId": "33"}, "recipients": "demo@example.com", "failureCount": 0, "scheduleName": "Daily Sales Digest", "successCount": 0}', '2026-04-05 00:38:54.307068', NULL, '2026-04-05 00:38:54.307068', NULL);
+
+-- changeset sameerkhan:1775937591491-63
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 33, 71, 'SALE_POSTED', 'SALES_INVOICE', 9, 'INV-SPC-00002', 'POSTED', 170, 'Ritesh Patel', 'Administrator', 142, 52, NULL, '2026-03-05 18:20:00', 'Sales invoice posted with line snapshot', '{"lines": [{"id": 21, "uom_id": 4, "quantity": 6.000000, "tax_rate": 18.0000, "created_at": "2026-03-25T04:32:16.083557+05:30", "created_by": 170, "product_id": 41, "unit_price": 1020.00, "updated_at": "2026-03-25T04:32:16.083557+05:30", "updated_by": 170, "line_amount": 6120.00, "base_quantity": 72.000000, "discount_amount": 0.00, "sales_invoice_id": 9}, {"id": 22, "uom_id": 9, "quantity": 20.000000, "tax_rate": 18.0000, "created_at": "2026-03-25T04:32:16.083557+05:30", "created_by": 170, "product_id": 45, "unit_price": 55.00, "updated_at": "2026-03-25T04:32:16.083557+05:30", "updated_by": 170, "line_amount": 1100.00, "base_quantity": 20.000000, "discount_amount": 0.00, "sales_invoice_id": 9}, {"id": 23, "uom_id": 11, "quantity": 80.000000, "tax_rate": 18.0000, "created_at": "2026-03-25T04:32:16.083557+05:30", "created_by": 170, "product_id": 44, "unit_price": 92.00, "updated_at": "2026-03-25T04:32:16.083557+05:30", "updated_by": 170, "line_amount": 6860.00, "base_quantity": 80.000000, "discount_amount": 500.00, "sales_invoice_id": 9}], "batches": [{"line_id": 21, "batch_id": 20, "base_quantity": 72.000000}, {"line_id": 22, "batch_id": 19, "base_quantity": 20.000000}], "invoice": {"id": 9, "status": "PARTIALLY_PAID", "remarks": "Credit sale to trade customer", "subtotal": 14740.00, "branch_id": 71, "posted_at": "2026-03-05T18:20:00+05:30", "created_at": "2026-03-25T04:32:16.083557+05:30", "created_by": 170, "emailed_at": "2026-03-05T18:45:00+05:30", "printed_at": "2026-03-05T18:30:00+05:30", "tax_amount": 2563.20, "updated_at": "2026-03-25T04:32:16.083557+05:30", "updated_by": 170, "customer_id": 52, "cancelled_at": null, "cancelled_by": null, "invoice_date": "2026-03-05", "total_amount": 16803.20, "warehouse_id": 142, "cancel_reason": null, "price_list_id": 90, "invoice_number": "INV-SPC-00002", "discount_amount": 500.00, "organization_id": 33}, "serials": null, "customer": {"id": 52, "email": "accounts@shiventerprise.test", "gstin": "24AACCS2222L1Z8", "notes": "Credit customer", "phone": "+91-9811100003", "status": "ACTIVE", "branch_id": 71, "full_name": "Shiv Enterprise", "created_at": "2026-03-25T04:32:16.083557+05:30", "created_by": 170, "updated_at": "2026-03-25T04:32:16.083557+05:30", "updated_by": 170, "credit_limit": 150000.00, "customer_code": "CUST-SPC-003", "organization_id": 33}}', 'POS-71', '1.0.0-demo', '10.10.10.10', '2026-03-25 04:32:16.083557', 170, '2026-03-25 04:32:16.083557', 170);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 33, 72, 'SALE_POSTED', 'SALES_INVOICE', 10, 'INV-SPC-00001', 'POSTED', 173, 'Neha Parmar', 'Cashier', 144, 51, NULL, '2026-03-03 12:55:00', 'Sales invoice posted with line snapshot', '{"lines": [{"id": 24, "uom_id": 5, "quantity": 1.000000, "tax_rate": 18.0000, "created_at": "2026-03-25T04:32:16.083557+05:30", "created_by": 173, "product_id": 43, "unit_price": 12800.00, "updated_at": "2026-03-25T04:32:16.083557+05:30", "updated_by": 173, "line_amount": 12800.00, "base_quantity": 1.000000, "discount_amount": 0.00, "sales_invoice_id": 10}, {"id": 25, "uom_id": 5, "quantity": 1.000000, "tax_rate": 18.0000, "created_at": "2026-03-25T04:32:16.083557+05:30", "created_by": 173, "product_id": 42, "unit_price": 6500.00, "updated_at": "2026-03-25T04:32:16.083557+05:30", "updated_by": 173, "line_amount": 6500.00, "base_quantity": 1.000000, "discount_amount": 0.00, "sales_invoice_id": 10}], "batches": null, "invoice": {"id": 10, "status": "PAID", "remarks": "Counter sale with serial tracked items", "subtotal": 19295.00, "branch_id": 72, "posted_at": "2026-03-03T12:55:00+05:30", "created_at": "2026-03-25T04:32:16.083557+05:30", "created_by": 173, "emailed_at": null, "printed_at": "2026-03-03T13:00:00+05:30", "tax_amount": 3473.10, "updated_at": "2026-03-25T04:32:16.083557+05:30", "updated_by": 173, "customer_id": 51, "cancelled_at": null, "cancelled_by": null, "invoice_date": "2026-03-03", "total_amount": 22768.10, "warehouse_id": 144, "cancel_reason": null, "price_list_id": 90, "invoice_number": "INV-SPC-00001", "discount_amount": 0.00, "organization_id": 33}, "serials": [{"line_id": 25, "serial_number": "INV900-0003"}, {"line_id": 24, "serial_number": "BAT150-0103"}], "customer": {"id": 51, "email": "owner@jayambe.test", "gstin": null, "notes": "Retail repeat customer", "phone": "+91-9811100002", "status": "ACTIVE", "branch_id": 72, "full_name": "Jay Ambe Cold Drinks", "created_at": "2026-03-25T04:32:16.083557+05:30", "created_by": 173, "updated_at": "2026-03-25T04:32:16.083557+05:30", "updated_by": 173, "credit_limit": 50000.00, "customer_code": "CUST-SPC-002", "organization_id": 33}}', 'POS-72', '1.0.0-demo', '10.10.10.10', '2026-03-25 04:32:16.083557', 173, '2026-03-25 04:32:16.083557', 173);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 34, 74, 'SALE_POSTED', 'SALES_INVOICE', 11, 'INV-UHL-00001', 'POSTED', 181, 'Arjun Rana', 'Cashier', 149, 55, NULL, '2026-03-07 19:55:00', 'Sales invoice posted with line snapshot', '{"lines": [{"id": 26, "uom_id": 5, "quantity": 1.000000, "tax_rate": 18.0000, "created_at": "2026-03-25T04:32:16.083557+05:30", "created_by": 181, "product_id": 47, "unit_price": 2200.00, "updated_at": "2026-03-25T04:32:16.083557+05:30", "updated_by": 181, "line_amount": 2200.00, "base_quantity": 1.000000, "discount_amount": 0.00, "sales_invoice_id": 11}, {"id": 27, "uom_id": 3, "quantity": 1.000000, "tax_rate": 18.0000, "created_at": "2026-03-25T04:32:16.083557+05:30", "created_by": 181, "product_id": 50, "unit_price": 780.00, "updated_at": "2026-03-25T04:32:16.083557+05:30", "updated_by": 181, "line_amount": 780.00, "base_quantity": 20.000000, "discount_amount": 0.00, "sales_invoice_id": 11}, {"id": 28, "uom_id": 11, "quantity": 60.000000, "tax_rate": 18.0000, "created_at": "2026-03-25T04:32:16.083557+05:30", "created_by": 181, "product_id": 48, "unit_price": 24.00, "updated_at": "2026-03-25T04:32:16.083557+05:30", "updated_by": 181, "line_amount": 1440.00, "base_quantity": 60.000000, "discount_amount": 0.00, "sales_invoice_id": 11}, {"id": 29, "uom_id": 5, "quantity": 4.000000, "tax_rate": 18.0000, "created_at": "2026-03-25T04:32:16.083557+05:30", "created_by": 181, "product_id": 46, "unit_price": 650.00, "updated_at": "2026-03-25T04:32:16.083557+05:30", "updated_by": 181, "line_amount": 2600.00, "base_quantity": 4.000000, "discount_amount": 0.00, "sales_invoice_id": 11}], "batches": [{"line_id": 27, "batch_id": 22, "base_quantity": 20.000000}], "invoice": {"id": 11, "status": "PAID", "remarks": "Mixed retail basket", "subtotal": 5348.00, "branch_id": 74, "posted_at": "2026-03-07T19:55:00+05:30", "created_at": "2026-03-25T04:32:16.083557+05:30", "created_by": 181, "emailed_at": null, "printed_at": "2026-03-07T20:00:00+05:30", "tax_amount": 962.64, "updated_at": "2026-03-25T04:32:16.083557+05:30", "updated_by": 181, "customer_id": 55, "cancelled_at": null, "cancelled_by": null, "invoice_date": "2026-03-07", "total_amount": 6310.64, "warehouse_id": 149, "cancel_reason": null, "price_list_id": 94, "invoice_number": "INV-UHL-00001", "discount_amount": 0.00, "organization_id": 34}, "serials": [{"line_id": 26, "serial_number": "FAN1200-0202"}], "customer": {"id": 55, "email": "purchase@lumenmart.test", "gstin": null, "notes": "Retail chain counter", "phone": "+91-9822200002", "status": "ACTIVE", "branch_id": 74, "full_name": "Lumen Mart", "created_at": "2026-03-25T04:32:16.083557+05:30", "created_by": 180, "updated_at": "2026-03-25T04:32:16.083557+05:30", "updated_by": 180, "credit_limit": 75000.00, "customer_code": "CUST-UHL-002", "organization_id": 34}}', 'POS-74', '1.0.0-demo', '10.10.10.10', '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 33, 72, 'SERVICE_PROGRESS', 'SERVICE_TICKET', 2, 'SVC-SPC-00001', 'UPDATED', 168, 'Sameer Khan', 'Owner', NULL, 51, NULL, '2026-03-25 04:32:16.083557', 'Service ticket updated and warranty path created', '{"items": [{"id": 2, "created_at": "2026-03-25T04:32:16.083557+05:30", "created_by": 168, "product_id": 43, "updated_at": "2026-03-25T04:32:16.083557+05:30", "updated_by": 168, "symptom_notes": "Battery discharges quickly", "diagnosis_notes": "Likely cell issue, claim with supplier", "serial_number_id": 54, "resolution_status": "PENDING", "service_ticket_id": 2, "product_ownership_id": 4}], "ticket": {"id": 2, "status": "IN_PROGRESS", "priority": "HIGH", "branch_id": 72, "created_at": "2026-03-25T04:32:16.083557+05:30", "created_by": 168, "updated_at": "2026-03-25T04:32:16.083557+05:30", "updated_by": 168, "customer_id": 51, "reported_on": "2026-03-20", "source_type": "INVOICE", "ticket_number": "SVC-SPC-00001", "organization_id": 33, "sales_invoice_id": 10, "complaint_summary": "Battery backup issue", "issue_description": "Customer reported low backup and repeated cut-off after installation.", "assigned_to_user_id": 175}, "visits": [{"id": 1, "branch_id": 72, "created_at": "2026-03-25T04:32:16.083557+05:30", "created_by": 168, "started_at": "2026-03-21T10:20:00+05:30", "updated_at": "2026-03-25T04:32:16.083557+05:30", "updated_by": 168, "visit_notes": "Voltage measured below threshold. Logged warranty case.", "completed_at": "2026-03-21T11:10:00+05:30", "scheduled_at": "2026-03-21T10:00:00+05:30", "visit_status": "COMPLETED", "organization_id": 33, "parts_used_json": [{"qty": 1, "part": "Terminal Kit"}], "customer_feedback": "Please resolve under warranty", "service_ticket_id": 2, "technician_user_id": 175}], "warranty_claim": {"id": 1, "status": "SUBMITTED", "branch_id": 72, "claim_date": "2026-03-21", "claim_type": "REPLACEMENT", "created_at": "2026-03-25T04:32:16.083557+05:30", "created_by": 168, "product_id": 43, "updated_at": "2026-03-25T04:32:16.083557+05:30", "updated_by": 168, "approved_on": null, "claim_notes": "Battery serial submitted for replacement under warranty.", "customer_id": 51, "supplier_id": 36, "claim_number": "WCL-SPC-00001", "distributor_id": 15, "organization_id": 33, "serial_number_id": 54, "service_ticket_id": 2}}', 'SERVICE-APP-01', '1.0.0-demo', '10.10.20.10', '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 33, 71, 'CUSTOMER_RECEIPT_POSTED', 'customer_receipt', 11, 'RCT-20260326-1774474198610', 'POST', 168, 'SPC-OWN-01', 'ERP_USER', NULL, 52, NULL, '2026-03-26 02:59:58.631676', 'Customer receipt posted', '{"amount": 1000.0, "receiptNumber": "RCT-20260326-1774474198610"}', NULL, NULL, NULL, '2026-03-26 02:59:58.634103', 168, '2026-03-26 02:59:58.634103', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 33, 71, 'CUSTOMER_RECEIPT_ALLOCATED', 'customer_receipt', 11, 'RCT-20260326-1774474198610', 'ALLOCATE', 168, 'SPC-OWN-01', 'ERP_USER', NULL, 52, NULL, '2026-03-26 02:59:58.722037', 'Customer receipt allocated', '{"allocated": 1000.0, "receiptNumber": "RCT-20260326-1774474198610"}', NULL, NULL, NULL, '2026-03-26 02:59:58.722175', 168, '2026-03-26 02:59:58.722175', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 33, NULL, 'EXPENSE_CATEGORY_CREATED', 'expense_category', 169, 'OFFICE_AUTO', 'CREATE', 168, 'SPC-OWN-01', 'ERP_USER', NULL, NULL, NULL, '2026-03-26 03:12:33.577801', 'Expense category created', '{"code": "OFFICE_AUTO", "name": "Office Auto Verify"}', NULL, NULL, NULL, '2026-03-26 03:12:33.579931', 168, '2026-03-26 03:12:33.579931', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 33, 71, 'EXPENSE_CREATED', 'expense', 5, 'EXP-20260326-1774474953626', 'CREATE', 168, 'SPC-OWN-01', 'ERP_USER', NULL, NULL, NULL, '2026-03-26 03:12:33.641255', 'Expense created', '{"amount": 750.0, "status": "APPROVED", "expenseNumber": "EXP-20260326-1774474953626"}', NULL, NULL, NULL, '2026-03-26 03:12:33.641861', 168, '2026-03-26 03:12:33.641861', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 33, 71, 'EXPENSE_PAID', 'expense', 5, 'EXP-20260326-1774474953626', 'PAY', 168, 'SPC-OWN-01', 'ERP_USER', NULL, NULL, NULL, '2026-03-26 03:12:33.684055', 'Expense paid', '{"amount": 750.0, "expenseNumber": "EXP-20260326-1774474953626", "paymentMethod": "BANK"}', NULL, NULL, NULL, '2026-03-26 03:12:33.684183', 168, '2026-03-26 03:12:33.684183', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, 33, 71, 'EXPENSE_CREATED', 'expense', 6, 'EXP-20260326-1774474953713', 'CREATE', 168, 'SPC-OWN-01', 'ERP_USER', NULL, NULL, NULL, '2026-03-26 03:12:33.722724', 'Expense created', '{"amount": 420.0, "status": "PAID", "expenseNumber": "EXP-20260326-1774474953713"}', NULL, NULL, NULL, '2026-03-26 03:12:33.722828', 168, '2026-03-26 03:12:33.722828', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, 33, 73, 'INVENTORY_MOVEMENT', 'stock_movement', 118, 'INV-20260329-1774789091050', 'OUT_SALES_INVOICE', 168, 'SPC-OWN-01', 'ERP_USER', 142, NULL, NULL, '2026-03-29 18:28:11.17234', 'Inventory movement posted', '{"mode": "STANDARD", "lineId": 33, "invoiceId": 15, "productId": 51, "invoiceNumber": "INV-20260329-1774789091050"}', NULL, NULL, NULL, '2026-03-29 18:28:11.20313', 168, '2026-03-29 18:28:11.20313', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (12, 33, 73, 'INVENTORY_MOVEMENT', 'stock_movement', 119, 'INV-20260329-1774789091050', 'OUT_SALES_INVOICE', 168, 'SPC-OWN-01', 'ERP_USER', 142, NULL, NULL, '2026-03-29 18:28:11.227439', 'Inventory movement posted', '{"mode": "STANDARD", "lineId": 34, "invoiceId": 15, "productId": 44, "invoiceNumber": "INV-20260329-1774789091050"}', NULL, NULL, NULL, '2026-03-29 18:28:11.227574', 168, '2026-03-29 18:28:11.227574', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (13, 33, 73, 'SALES_INVOICE_POSTED', 'sales_invoice', 15, 'INV-20260329-1774789091050', 'POST', 168, 'SPC-OWN-01', 'ERP_USER', 142, 53, NULL, '2026-03-29 18:28:11.262928', 'Sales invoice posted', '{"total": 3403.12, "invoiceId": 15, "serialCount": 0, "invoiceNumber": "INV-20260329-1774789091050"}', NULL, NULL, NULL, '2026-03-29 18:28:11.263722', 168, '2026-03-29 18:28:11.263722', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (14, 33, 71, 'FINANCE_VOUCHER', 'voucher', 14, 'JOURNAL-33-00011', 'POST', 168, 'SPC-OWN-01', 'ERP_USER', NULL, NULL, NULL, '2026-03-29 20:14:14.279165', 'Finance voucher posted', '{"totalDebit": "1000.00", "totalCredit": "1000.00", "voucherType": "JOURNAL"}', NULL, NULL, NULL, '2026-03-29 20:14:14.281531', 168, '2026-03-29 20:14:14.281531', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (15, 33, 71, 'INVENTORY_MOVEMENT', 'stock_movement', 122, 'ADJ-20260329-1774795574973', 'IN_ADJUSTMENT_IN', 168, 'SPC-OWN-01', 'ERP_USER', 142, NULL, NULL, '2026-03-29 20:16:14.995943', 'Inventory movement posted', '{"reason": "Recurring invoice verification stock", "adjustmentNumber": "ADJ-20260329-1774795574973"}', NULL, NULL, NULL, '2026-03-29 20:16:14.998214', 168, '2026-03-29 20:16:14.998214', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (16, 33, 71, 'INVENTORY_MOVEMENT', 'stock_movement', 123, 'INV-20260329-1774795575062', 'OUT_SALES_INVOICE', 168, 'SPC-OWN-01', 'ERP_USER', 142, NULL, NULL, '2026-03-29 20:16:15.115861', 'Inventory movement posted', '{"mode": "STANDARD", "lineId": 43, "invoiceId": 26, "productId": 51, "invoiceNumber": "INV-20260329-1774795575062"}', NULL, NULL, NULL, '2026-03-29 20:16:15.116122', 168, '2026-03-29 20:16:15.116122', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (17, 33, 71, 'SALES_INVOICE_POSTED', 'sales_invoice', 26, 'INV-20260329-1774795575062', 'POST', 168, 'SPC-OWN-01', 'ERP_USER', 142, 50, NULL, '2026-03-29 20:16:15.133328', 'Sales invoice posted', '{"total": 1050.2, "invoiceId": 26, "serialCount": 0, "invoiceNumber": "INV-20260329-1774795575062"}', NULL, NULL, NULL, '2026-03-29 20:16:15.133901', 168, '2026-03-29 20:16:15.133901', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (18, 33, 73, 'SALES_INVOICE_POSTED', 'sales_invoice', 33, 'INV-20260329-1774796288341', 'POST', 168, 'SPC-OWN-01', 'ERP_USER', 142, 53, NULL, '2026-03-29 20:28:08.451368', 'Sales invoice posted', '{"total": 7670.0, "invoiceId": 33, "serialCount": 1, "invoiceNumber": "INV-20260329-1774796288341"}', NULL, NULL, NULL, '2026-03-29 20:28:08.455024', 168, '2026-03-29 20:28:08.455024', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (19, 33, 73, 'INVENTORY_MOVEMENT', 'stock_movement', 124, 'INV-20260329-1774796323171', 'OUT_SALES_INVOICE', 168, 'SPC-OWN-01', 'ERP_USER', 142, NULL, NULL, '2026-03-29 20:28:43.206235', 'Inventory movement posted', '{"mode": "BATCH", "lineId": 48, "invoiceId": 34, "productId": 45, "invoiceNumber": "INV-20260329-1774796323171"}', NULL, NULL, NULL, '2026-03-29 20:28:43.20641', 168, '2026-03-29 20:28:43.20641', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (20, 33, 73, 'SALES_INVOICE_POSTED', 'sales_invoice', 34, 'INV-20260329-1774796323171', 'POST', 168, 'SPC-OWN-01', 'ERP_USER', 142, 53, NULL, '2026-03-29 20:28:43.2204', 'Sales invoice posted', '{"total": 129.8, "invoiceId": 34, "serialCount": 0, "invoiceNumber": "INV-20260329-1774796323171"}', NULL, NULL, NULL, '2026-03-29 20:28:43.220557', 168, '2026-03-29 20:28:43.220557', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (21, 33, 73, 'INVENTORY_MOVEMENT', 'stock_movement', 125, 'INV-20260329-1774796479238', 'OUT_SALES_INVOICE', 168, 'SPC-OWN-01', 'ERP_USER', 142, NULL, NULL, '2026-03-29 20:31:19.312399', 'Inventory movement posted', '{"mode": "SERIAL", "lineId": 49, "invoiceId": 36, "productId": 42, "invoiceNumber": "INV-20260329-1774796479238"}', NULL, NULL, NULL, '2026-03-29 20:31:19.315484', 168, '2026-03-29 20:31:19.315484', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (22, 33, 73, 'SALES_INVOICE_POSTED', 'sales_invoice', 36, 'INV-20260329-1774796479238', 'POST', 168, 'SPC-OWN-01', 'ERP_USER', 142, 53, NULL, '2026-03-29 20:31:19.340983', 'Sales invoice posted', '{"total": 7670.0, "invoiceId": 36, "serialCount": 1, "invoiceNumber": "INV-20260329-1774796479238"}', NULL, NULL, NULL, '2026-03-29 20:31:19.341859', 168, '2026-03-29 20:31:19.341859', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (23, 33, 73, 'CUSTOMER_RECEIPT_POSTED', 'customer_receipt', 12, 'RCT-20260404-1775250012805', 'POST', 168, 'SPC-OWN-01', 'ERP_USER', NULL, 50, NULL, '2026-04-04 02:30:12.839523', 'Customer receipt posted', '{"amount": 1050.2, "receiptNumber": "RCT-20260404-1775250012805"}', NULL, NULL, NULL, '2026-04-04 02:30:12.842734', 168, '2026-04-04 02:30:12.842734', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (24, 33, 73, 'CUSTOMER_RECEIPT_ALLOCATED', 'customer_receipt', 12, 'RCT-20260404-1775250012805', 'ALLOCATE', 168, 'SPC-OWN-01', 'ERP_USER', NULL, 50, NULL, '2026-04-04 02:30:12.893137', 'Customer receipt allocated', '{"allocated": 1050.2, "receiptNumber": "RCT-20260404-1775250012805"}', NULL, NULL, NULL, '2026-04-04 02:30:12.893238', 168, '2026-04-04 02:30:12.893238', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (25, 33, 73, 'CUSTOMER_RECEIPT_POSTED', 'customer_receipt', 13, 'RCT-20260404-1775250668660', 'POST', 168, 'SPC-OWN-01', 'ERP_USER', NULL, 53, NULL, '2026-04-04 02:41:08.682318', 'Customer receipt posted', '{"amount": 5000, "receiptNumber": "RCT-20260404-1775250668660"}', NULL, NULL, NULL, '2026-04-04 02:41:08.684919', 168, '2026-04-04 02:41:08.684919', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (26, 33, 73, 'CUSTOMER_RECEIPT_ALLOCATED', 'customer_receipt', 13, 'RCT-20260404-1775250668660', 'ALLOCATE', 168, 'SPC-OWN-01', 'ERP_USER', NULL, 53, NULL, '2026-04-04 02:41:08.735715', 'Customer receipt allocated', '{"allocated": 5000, "receiptNumber": "RCT-20260404-1775250668660"}', NULL, NULL, NULL, '2026-04-04 02:41:08.735834', 168, '2026-04-04 02:41:08.735834', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (27, 33, 73, 'CUSTOMER_RECEIPT_POSTED', 'customer_receipt', 14, 'RCT-20260404-1775250716152', 'POST', 168, 'SPC-OWN-01', 'ERP_USER', NULL, 53, NULL, '2026-04-04 02:41:56.15989', 'Customer receipt posted', '{"amount": 2670, "receiptNumber": "RCT-20260404-1775250716152"}', NULL, NULL, NULL, '2026-04-04 02:41:56.159995', 168, '2026-04-04 02:41:56.159995', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (28, 33, 73, 'CUSTOMER_RECEIPT_ALLOCATED', 'customer_receipt', 14, 'RCT-20260404-1775250716152', 'ALLOCATE', 168, 'SPC-OWN-01', 'ERP_USER', NULL, 53, NULL, '2026-04-04 02:41:56.188164', 'Customer receipt allocated', '{"allocated": 2670, "receiptNumber": "RCT-20260404-1775250716152"}', NULL, NULL, NULL, '2026-04-04 02:41:56.188286', 168, '2026-04-04 02:41:56.188286', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (29, 33, 72, 'WARRANTY_EXTENSION_CREATED', 'warranty_extension', 1, 'EXT-DEMO-0001', 'CREATE', 168, 'SPC-OWN-01', 'ERP_USER', NULL, 51, NULL, '2026-04-04 20:33:54.870375', 'Warranty extension created', '{"endDate": "2029-03-03", "monthsAdded": 12, "extensionType": "PAID_EXTENDED", "productOwnershipId": 4}', NULL, NULL, NULL, '2026-04-04 20:33:54.870742', 168, '2026-04-04 20:33:54.870742', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (30, 33, 73, 'SALES_ORDER_CANCELLED', 'sales_order', 4, 'SO-20260404-1775326978275', 'CANCEL', 168, 'SPC-OWN-01', 'ERP_USER', 142, 53, NULL, '2026-04-04 23:53:23.161113', 'Sales order cancelled', '{"reason": "Customer rescheduled purchase during UI test"}', NULL, NULL, NULL, '2026-04-04 23:53:23.164918', 168, '2026-04-04 23:53:23.164918', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (31, 33, 73, 'SALES_QUOTE_CANCELLED', 'sales_quote', 10, 'QTN-20260404-1775326979058', 'CANCEL', 168, 'SPC-OWN-01', 'ERP_USER', 142, 53, NULL, '2026-04-04 23:53:23.804843', 'Sales quote cancelled', '{"reason": "Customer changed mind during UI test"}', NULL, NULL, NULL, '2026-04-04 23:53:23.804997', 168, '2026-04-04 23:53:23.804997', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (32, 33, NULL, 'FINANCE_ACCOUNT', 'account', 340, 'MISC_TEST_001', 'CREATE', 168, 'SPC-OWN-01', 'ERP_USER', NULL, NULL, NULL, '2026-04-05 01:05:11.245529', 'Finance account created', '{"code": "MISC_TEST_001", "name": "Misc Test Account"}', NULL, NULL, NULL, '2026-04-05 01:05:11.249287', 168, '2026-04-05 01:05:11.249287', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (33, 33, NULL, 'FINANCE_ACCOUNT', 'account', 340, 'MISC_TEST_001', 'UPDATE', 168, 'SPC-OWN-01', 'ERP_USER', NULL, NULL, NULL, '2026-04-05 01:05:39.957722', 'Finance account updated', '{"code": "MISC_TEST_001", "name": "Misc Test Account Updated", "active": false}', NULL, NULL, NULL, '2026-04-05 01:05:39.957908', 168, '2026-04-05 01:05:39.957908', 168);
+INSERT INTO "audit_event" ("id", "organization_id", "branch_id", "event_type", "entity_type", "entity_id", "entity_number", "action", "actor_user_id", "actor_name_snapshot", "actor_role_snapshot", "warehouse_id", "customer_id", "supplier_id", "occurred_at", "summary", "payload_json", "device_id", "app_version", "ip_address", "created_at", "created_by", "updated_at", "updated_by") VALUES (34, 33, NULL, 'FINANCE_ACCOUNT', 'account', 340, 'MISC_TEST_001', 'DELETE', 168, 'SPC-OWN-01', 'ERP_USER', NULL, NULL, NULL, '2026-04-05 01:05:40.030992', 'Finance account deleted', '{"code": "MISC_TEST_001", "name": "Misc Test Account Updated"}', NULL, NULL, NULL, '2026-04-05 01:05:40.031139', 168, '2026-04-05 01:05:40.031139', 168);
+
+-- changeset sameerkhan:1775937591491-64
+INSERT INTO "product" ("id", "name", "description", "category_name", "brand_name", "base_uom_id", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "hsn_code") VALUES (1, 'Ceiling Fan 1200mm', 'Fan with serial tracking', 'Lighting', 'HAVELLS', 5, 'SERIALIZED', TRUE, FALSE, FALSE, FALSE, FALSE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176, '84145120');
+INSERT INTO "product" ("id", "name", "description", "category_name", "brand_name", "base_uom_id", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "hsn_code") VALUES (2, 'Copper Wire 6 Sqmm', 'Wire sold by metre', 'Wires & Cables', 'POLYCAB', 11, 'FRACTIONAL', FALSE, FALSE, FALSE, TRUE, FALSE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168, '85444999');
+INSERT INTO "product" ("id", "name", "description", "category_name", "brand_name", "base_uom_id", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "hsn_code") VALUES (3, 'EcoVolt 900VA Inverter', 'Home inverter with serial tracking', 'Power Solutions', 'LUMINOUS', 5, 'SERIALIZED', TRUE, FALSE, FALSE, FALSE, FALSE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168, '85044090');
+INSERT INTO "product" ("id", "name", "description", "category_name", "brand_name", "base_uom_id", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "hsn_code") VALUES (4, 'House Wire 1.5 Sqmm', 'Electrical wire sold by metre', 'Wires & Cables', 'HAVELLS', 11, 'FRACTIONAL', FALSE, FALSE, FALSE, TRUE, FALSE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176, '85444999');
+INSERT INTO "product" ("id", "name", "description", "category_name", "brand_name", "base_uom_id", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "hsn_code") VALUES (5, 'LED Bulb 9W', 'Bulb sold in piece/dozen/carton', 'Lighting', 'PHILIPS', 5, 'MIXED_UOM', FALSE, TRUE, FALSE, FALSE, FALSE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168, '85395000');
+INSERT INTO "product" ("id", "name", "description", "category_name", "brand_name", "base_uom_id", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "hsn_code") VALUES (6, 'LED Strip 5M', 'Strip lighting with batch control', 'Lighting', 'PHILIPS', 5, 'BATCHED', FALSE, TRUE, FALSE, FALSE, FALSE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176, '94054090');
+INSERT INTO "product" ("id", "name", "description", "category_name", "brand_name", "base_uom_id", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "hsn_code") VALUES (7, 'Modular Switch 6A', 'Switch sold in box/carton', 'Lighting', 'HAVELLS', 5, 'MIXED_UOM', FALSE, TRUE, FALSE, FALSE, FALSE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176, '85365090');
+INSERT INTO "product" ("id", "name", "description", "category_name", "brand_name", "base_uom_id", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "hsn_code") VALUES (8, 'Servo Battery Distilled Water 1L', 'Consumable sold by bottle / carton', 'Lubricants', 'SERVO', 9, 'BATCHED', FALSE, TRUE, FALSE, TRUE, FALSE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168, '38200000');
+INSERT INTO "product" ("id", "name", "description", "category_name", "brand_name", "base_uom_id", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "hsn_code") VALUES (9, 'Slim Panel Light 18W', 'Ceiling panel light', 'Lighting', 'PHILIPS', 5, 'SIMPLE', FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, '2026-03-25 04:32:16.083557', 176, '2026-03-25 04:32:16.083557', 176, '94054090');
+INSERT INTO "product" ("id", "name", "description", "category_name", "brand_name", "base_uom_id", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "hsn_code") VALUES (10, 'Tubular Battery 150AH', 'Battery with serial tracking and warranty', 'Battery', 'EXIDE', 5, 'SERIALIZED', TRUE, FALSE, FALSE, FALSE, FALSE, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168, '85072000');
+INSERT INTO "product" ("id", "name", "description", "category_name", "brand_name", "base_uom_id", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "hsn_code") VALUES (11, 'LED Flood Light 50W', 'Shared flood light demo product sold by both organizations', 'Lighting', 'PHILIPS', 5, 'SIMPLE', FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, '2026-03-29 16:35:13.535523', NULL, '2026-03-29 16:35:13.535523', NULL, '94054090');
+INSERT INTO "product" ("id", "name", "description", "category_name", "brand_name", "base_uom_id", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "hsn_code") VALUES (14, 'Exide Dynamic Attribute Demo Battery', 'Live verification item for dynamic product attributes', 'Battery', 'EXIDE', 5, 'SERIALIZED', TRUE, FALSE, FALSE, FALSE, FALSE, TRUE, '2026-04-04 18:51:35.70822', 168, '2026-04-04 18:51:35.70822', 168, NULL);
+INSERT INTO "product" ("id", "name", "description", "category_name", "brand_name", "base_uom_id", "inventory_tracking_mode", "serial_tracking_enabled", "batch_tracking_enabled", "expiry_tracking_enabled", "fractional_quantity_allowed", "is_service_item", "is_active", "created_at", "created_by", "updated_at", "updated_by", "hsn_code") VALUES (16, 'Luminous power inverter 1500 VA', NULL, 'Power Solutions', 'LUMINOUS', 5, 'SERIALIZED', TRUE, FALSE, FALSE, FALSE, FALSE, TRUE, '2026-04-04 19:36:02.59581', 168, '2026-04-04 19:36:02.59581', 168, NULL);
+
+-- changeset sameerkhan:1775937591491-65
+INSERT INTO "subscription_feature" ("id", "code", "name", "module_code", "description", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 'dashboard', 'Dashboard', 'DASHBOARD', 'Access business dashboards', TRUE, '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_feature" ("id", "code", "name", "module_code", "description", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 'masters', 'Masters', 'MASTERS', 'Manage core masters and settings data', TRUE, '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_feature" ("id", "code", "name", "module_code", "description", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 'catalog', 'Catalog', 'CATALOG', 'Manage shared and store product catalog', TRUE, '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_feature" ("id", "code", "name", "module_code", "description", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 'inventory', 'Inventory', 'INVENTORY', 'Track stock, serials, and batches', TRUE, '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_feature" ("id", "code", "name", "module_code", "description", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 'purchases', 'Purchases', 'PURCHASES', 'Create purchase orders and receipts', TRUE, '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_feature" ("id", "code", "name", "module_code", "description", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 'sales', 'Sales', 'SALES', 'Create sales invoices and receipts', TRUE, '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_feature" ("id", "code", "name", "module_code", "description", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 'payments', 'Payments', 'PAYMENTS', 'Manage customer and supplier payments', TRUE, '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_feature" ("id", "code", "name", "module_code", "description", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 'reports', 'Reports', 'REPORTS', 'View operational and financial reports', TRUE, '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_feature" ("id", "code", "name", "module_code", "description", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 'expenses', 'Expenses', 'EXPENSES', 'Record and manage expenses', TRUE, '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_feature" ("id", "code", "name", "module_code", "description", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, 'service', 'Service', 'SERVICE', 'Manage service tickets and warranty claims', TRUE, '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_feature" ("id", "code", "name", "module_code", "description", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, 'settings', 'Settings', 'SETTINGS', 'Manage organization and application settings', TRUE, '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_feature" ("id", "code", "name", "module_code", "description", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (12, 'users', 'Users', 'USERS', 'Manage users and branch access', TRUE, '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_feature" ("id", "code", "name", "module_code", "description", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (13, 'multi_branch', 'Multi Branch', 'SETTINGS', 'Operate multiple counters/branches', TRUE, '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_feature" ("id", "code", "name", "module_code", "description", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (14, 'approvals', 'Approvals', 'APPROVALS', 'Use configurable approval workflows', TRUE, '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+
+-- changeset sameerkhan:1775937591491-66
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 1, 12, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 1, 11, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 1, 8, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 1, 7, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 1, 6, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 1, 5, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 1, 4, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 1, 3, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 1, 2, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, 1, 1, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, 2, 13, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (12, 2, 12, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (13, 2, 11, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (14, 2, 10, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (15, 2, 9, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (16, 2, 8, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (17, 2, 7, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (18, 2, 6, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (19, 2, 5, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (20, 2, 4, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (21, 2, 3, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (22, 2, 2, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (23, 2, 1, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (24, 3, 14, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (25, 3, 13, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (26, 3, 12, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (27, 3, 11, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (28, 3, 10, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (29, 3, 9, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (30, 3, 8, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (31, 3, 7, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (32, 3, 6, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (33, 3, 5, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (34, 3, 4, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (35, 3, 3, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (36, 3, 2, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (37, 3, 1, TRUE, NULL, '{}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "subscription_plan_feature" ("id", "subscription_plan_id", "subscription_feature_id", "is_enabled", "feature_limit", "config_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (38, 4, 1, TRUE, NULL, '{}', '2026-04-05 04:40:01.14344', 195, '2026-04-05 04:40:01.14344', 195);
+
+-- changeset sameerkhan:1775937591491-67
+INSERT INTO "organization_subscription" ("id", "organization_id", "subscription_plan_id", "status", "starts_on", "ends_on", "auto_renew", "purchased_at", "grace_until", "notes", "metadata_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 34, 2, 'ACTIVE', '2026-03-25', NULL, FALSE, '2026-03-25 06:47:22.620421', NULL, 'Backfilled default subscription during subscription schema migration', '{"source": "migration-006"}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "organization_subscription" ("id", "organization_id", "subscription_plan_id", "status", "starts_on", "ends_on", "auto_renew", "purchased_at", "grace_until", "notes", "metadata_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 16, 2, 'ACTIVE', '2026-03-25', NULL, FALSE, '2026-03-25 06:47:22.620421', NULL, 'Backfilled default subscription during subscription schema migration', '{"source": "migration-006"}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:47:22.620421', NULL);
+INSERT INTO "organization_subscription" ("id", "organization_id", "subscription_plan_id", "status", "starts_on", "ends_on", "auto_renew", "purchased_at", "grace_until", "notes", "metadata_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 33, 2, 'ACTIVE', '2026-03-25', NULL, FALSE, '2026-03-25 06:51:58.006659', NULL, NULL, '{}', '2026-03-25 06:51:58.00648', 168, '2026-03-25 06:51:58.00648', 168);
+INSERT INTO "organization_subscription" ("id", "organization_id", "subscription_plan_id", "status", "starts_on", "ends_on", "auto_renew", "purchased_at", "grace_until", "notes", "metadata_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 33, 2, 'CANCELLED', '2026-03-25', '2026-03-24', FALSE, '2026-03-25 06:47:22.620421', NULL, 'Backfilled default subscription during subscription schema migration', '{"source": "migration-006"}', '2026-03-25 06:47:22.620421', NULL, '2026-03-25 06:51:58.021488', 168);
+
+-- changeset sameerkhan:1775937591491-68
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 'Sameer Khan', '+91-9990000001', 'sameer@shaktipower.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 'Aisha Khan', '+91-9990000002', 'aisha@shaktipower.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 'Ritesh Patel', '+91-9990000003', 'ritesh@shaktipower.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 'Kiran Shah', '+91-9990000004', 'kiran@shaktipower.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 'Bhavesh Jadeja', '+91-9990000005', 'bhavesh@shaktipower.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 'Neha Parmar', '+91-9990000006', 'neha@shaktipower.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 'Manoj Solanki', '+91-9990000007', 'manoj@shaktipower.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 'Ravi Makwana', '+91-9990000008', 'ravi@shaktipower.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 'Priya Mehta', '+91-9990000011', 'priya@urbanlights.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, 'Nirav Mehta', '+91-9990000012', 'nirav@urbanlights.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, 'Jinesh Vora', '+91-9990000013', 'jinesh@urbanlights.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (12, 'Pooja Shah', '+91-9990000014', 'pooja@urbanlights.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (13, 'Hetal Desai', '+91-9990000015', 'hetal@urbanlights.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (14, 'Arjun Rana', '+91-9990000016', 'arjun@urbanlights.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (15, 'Mitesh Soni', '+91-9990000017', 'mitesh@urbanlights.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (16, 'ERP Verify', NULL, 'erpverify06@example.com', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:19:25.139886', NULL, '2026-03-25 04:19:25.139886', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (17, 'sameer khan', '8109698905', 'reza_sameer200@yahoo.com', FALSE, FALSE, 'ACTIVE', '2026-03-25 05:19:34.398817', NULL, '2026-03-25 05:19:34.398817', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (18, 'Maa Electronics', '+91-9811100001', 'procurement@maaelectronics.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', 172, '2026-03-25 04:32:16.083557', 172);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (19, 'Jay Ambe Cold Drinks', '+91-9811100002', 'owner@jayambe.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', 173, '2026-03-25 04:32:16.083557', 173);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (20, 'Shiv Enterprise', '+91-9811100003', 'accounts@shiventerprise.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', 170, '2026-03-25 04:32:16.083557', 170);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (21, 'Ocean Residency Society', '+91-9811100004', 'admin@oceanresidency.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (22, 'Bright Homes', '+91-9822200001', 'hello@brighthomes.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (23, 'Lumen Mart', '+91-9822200002', 'purchase@lumenmart.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', 180, '2026-03-25 04:32:16.083557', 180);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (24, 'Vijay Traders', '+91-9822200003', 'vijay@traders.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (25, 'Exide Industrial Supplies', '+91-9833300001', 'sales@exide.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (26, 'Luminous Power Tech', '+91-9833300002', 'partner@luminous.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (27, 'Polycab Distribution', '+91-9833300003', 'wire@polycab.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (28, 'Philips Lighting India', '+91-9844400001', 'b2b@philips.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (29, 'Havells Trade Channel', '+91-9844400002', 'trade@havells.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (30, 'Gujarat Energy Distribution', '+91-9855500001', 'warranty@ged.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', 170, '2026-03-25 04:32:16.083557', 170);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (31, 'West India Electrical Distributors', '+91-9855500002', 'claims@wied.test', FALSE, FALSE, 'ACTIVE', '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (34, 'Identity Check', NULL, 'identitycheck03@example.com', FALSE, FALSE, 'ACTIVE', '2026-03-25 12:39:41.510758', NULL, '2026-03-25 12:39:41.510758', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (36, 'Guard Check', NULL, 'guardcheck02@example.com', FALSE, FALSE, 'ACTIVE', '2026-03-25 19:15:27.823172', NULL, '2026-03-25 19:15:27.823172', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (37, 'Guard Check', NULL, 'guardcheck03@example.com', FALSE, FALSE, 'ACTIVE', '2026-03-25 19:17:24.923567', NULL, '2026-03-25 19:17:24.923567', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (38, 'Admin Demo Employee', '9999990001', 'demo.employee@spc.local', FALSE, FALSE, 'ACTIVE', '2026-03-29 23:34:45.203011', NULL, '2026-03-29 23:34:45.203011', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (39, 'Admin Demo Employee Two', '9999990002', 'demo.employee2@spc.local', FALSE, FALSE, 'ACTIVE', '2026-03-29 23:36:46.669984', NULL, '2026-03-29 23:36:46.669984', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (40, 'Auto Code Employee', '9999900033', 'autocode.employee@example.com', FALSE, FALSE, 'ACTIVE', '2026-04-05 01:37:14.919159', NULL, '2026-04-05 01:37:14.919159', NULL);
+INSERT INTO "person" ("id", "legal_name", "primary_phone", "primary_email", "phone_verified", "email_verified", "status", "created_at", "created_by", "updated_at", "updated_by") VALUES (41, 'Retail Platform Admin', '+91-9990000099', 'platform-admin@retailmanagement.test', TRUE, TRUE, 'ACTIVE', '2026-04-05 02:11:19.371302', NULL, '2026-04-05 02:11:19.371302', NULL);
+
+-- changeset sameerkhan:1775937591491-69
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 4, 'SPC-ACC-01', '{noop}secret123', TRUE, FALSE, NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 5, 'SPC-MGR-01', '{noop}secret123', TRUE, FALSE, NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 6, 'SPC-CAS-01', '{noop}secret123', TRUE, FALSE, NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 7, 'SPC-PUR-01', '{noop}secret123', TRUE, FALSE, NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 8, 'SPC-TEC-01', '{noop}secret123', TRUE, FALSE, NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, 10, 'UHL-OWN-02', '{noop}secret123', TRUE, FALSE, NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, 11, 'UHL-ADM-01', '{noop}secret123', TRUE, FALSE, NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (12, 12, 'UHL-ACC-01', '{noop}secret123', TRUE, FALSE, NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (13, 13, 'UHL-MGR-01', '{noop}secret123', TRUE, FALSE, NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (14, 14, 'UHL-CAS-01', '{noop}secret123', TRUE, FALSE, NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (15, 15, 'UHL-TEC-01', '{noop}secret123', TRUE, FALSE, NULL, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (16, 16, 'erpverify06', '{bcrypt}$2a$10$KyQpG8d/2F8wtQxc4fbAYOzC4BKAvaLNEkYQPuHJ3h5hT/0srFhva', TRUE, FALSE, NULL, '2026-03-25 04:19:25.139886', NULL, '2026-03-25 04:19:25.139886', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (20, 34, 'identitycheck03', '{bcrypt}$2a$10$uBqUbDieu1y3I1WHzuND3.Asv4OHEBk9MkKwQipFK1IPUt3u9bjY.', TRUE, FALSE, '2026-03-25 12:40:12.288238', '2026-03-25 12:39:41.524162', NULL, '2026-03-25 12:40:12.289573', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (22, 36, 'guardcheck02', '{bcrypt}$2a$10$ig8UaT3m1VOR0vesH4V56ebRrWTfe0d0UqKzzi0QyxvZ133VllwVK', TRUE, FALSE, NULL, '2026-03-25 19:15:27.837133', NULL, '2026-03-25 19:15:27.837133', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (23, 37, 'guardcheck03', '{bcrypt}$2a$10$oVypFHkUqk9hpR/9EzncyuMf3TFEtQLMJqewRc4L3Py.6q5HTEc8G', TRUE, FALSE, NULL, '2026-03-25 19:17:24.937662', NULL, '2026-03-25 19:17:24.937662', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 3, 'SPC-ADM-01', '{noop}secret123', TRUE, FALSE, '2026-04-05 00:57:49.84428', '2026-03-25 04:32:16.083557', NULL, '2026-04-05 00:57:49.845569', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (26, 40, 'spc-emp-auto-03', '{bcrypt}$2a$10$4g2ezRHVHugG0Q.DZHouue/tvdCMDBBi12dg3KDsxbk8eZNsjcOlG', TRUE, FALSE, NULL, '2026-04-05 01:37:15.0188', NULL, '2026-04-05 01:37:15.0188', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (25, 39, 'SPC-EMP-ADM-02', '{bcrypt}$2a$10$Fn83nkKfW3YN4qg4F4vTA.WkKevgdmLuCnhuqvzgjZwUSaRCwgswK', TRUE, FALSE, NULL, '2026-03-29 23:36:46.811887', NULL, '2026-04-05 04:40:01.686837', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (24, 38, 'SPC-EMP-ADM-01', '{bcrypt}$2a$10$FAdCrVVBwP/EUxkEG0aJL.gj32LBgiFI1ZqEg.LQxG7KTMYPPvhcy', TRUE, FALSE, NULL, '2026-03-29 23:34:45.295338', NULL, '2026-03-29 23:34:45.295338', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (17, 17, 'sameer.khan', '{bcrypt}$2a$10$YQ97Si0LPRMgMJ0QdPYH.e8oCQMqig9igjQFT8Aa/i72LdHM1v0Fi', TRUE, FALSE, '2026-03-31 17:38:38.643923', '2026-03-25 05:19:34.398817', NULL, '2026-03-31 17:38:38.644193', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (27, 41, 'PLAT-ADM-01', '{noop}secret123', TRUE, FALSE, '2026-04-10 17:01:14.509027', '2026-04-05 02:11:19.371302', NULL, '2026-04-10 17:01:14.510004', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 9, 'UHL-OWN-01', '{noop}secret123', TRUE, FALSE, '2026-04-10 19:47:36.799598', '2026-03-25 04:32:16.083557', NULL, '2026-04-10 19:47:36.804142', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 2, 'SPC-OWN-02', '{noop}secret123', TRUE, FALSE, '2026-04-11 16:49:05.765164', '2026-03-25 04:32:16.083557', NULL, '2026-04-11 16:49:05.769585', NULL);
+INSERT INTO "auth_account" ("id", "person_id", "login_identifier", "password_hash", "is_active", "is_locked", "last_login_at", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 1, 'SPC-OWN-01', '{noop}secret123', TRUE, FALSE, '2026-04-11 16:50:01.301022', '2026-03-25 04:32:16.083557', NULL, '2026-04-11 16:50:01.301455', NULL);
+
+-- changeset sameerkhan:1775937591491-70
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 33, 1, 'Sameer Khan', '+91-9990000001', 'sameer@shaktipower.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 33, 2, 'Aisha Khan', '+91-9990000002', 'aisha@shaktipower.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 33, 3, 'Ritesh Patel', '+91-9990000003', 'ritesh@shaktipower.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 33, 4, 'Kiran Shah', '+91-9990000004', 'kiran@shaktipower.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 33, 5, 'Bhavesh Jadeja', '+91-9990000005', 'bhavesh@shaktipower.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 33, 6, 'Neha Parmar', '+91-9990000006', 'neha@shaktipower.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 33, 7, 'Manoj Solanki', '+91-9990000007', 'manoj@shaktipower.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 33, 8, 'Ravi Makwana', '+91-9990000008', 'ravi@shaktipower.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 34, 9, 'Priya Mehta', '+91-9990000011', 'priya@urbanlights.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, 34, 10, 'Nirav Mehta', '+91-9990000012', 'nirav@urbanlights.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, 34, 11, 'Jinesh Vora', '+91-9990000013', 'jinesh@urbanlights.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (12, 34, 12, 'Pooja Shah', '+91-9990000014', 'pooja@urbanlights.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (13, 34, 13, 'Hetal Desai', '+91-9990000015', 'hetal@urbanlights.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (14, 34, 14, 'Arjun Rana', '+91-9990000016', 'arjun@urbanlights.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (15, 34, 15, 'Mitesh Soni', '+91-9990000017', 'mitesh@urbanlights.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', NULL, '2026-03-25 04:32:16.083557', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (16, 16, 16, 'ERP Verify', NULL, 'erpverify06@example.com', NULL, '[]', NULL, TRUE, '2026-03-25 04:19:25.139886', NULL, '2026-03-25 04:19:25.139886', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (17, 16, 17, 'sameer khan', '8109698905', 'reza_sameer200@yahoo.com', NULL, '[]', NULL, TRUE, '2026-03-25 05:19:34.398817', NULL, '2026-03-25 05:19:34.398817', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (18, 33, 18, 'Maa Electronics', '+91-9811100001', 'procurement@maaelectronics.test', 'Dealer customer', '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', 172, '2026-03-25 04:32:16.083557', 172);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (19, 33, 19, 'Jay Ambe Cold Drinks', '+91-9811100002', 'owner@jayambe.test', 'Retail repeat customer', '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', 173, '2026-03-25 04:32:16.083557', 173);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (20, 33, 20, 'Shiv Enterprise', '+91-9811100003', 'accounts@shiventerprise.test', 'Credit customer', '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', 170, '2026-03-25 04:32:16.083557', 170);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (21, 33, 21, 'Ocean Residency Society', '+91-9811100004', 'admin@oceanresidency.test', 'AMC / service customer', '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', 168, '2026-03-25 04:32:16.083557', 168);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (22, 34, 22, 'Bright Homes', '+91-9822200001', 'hello@brighthomes.test', 'Interior partner', '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (23, 34, 23, 'Lumen Mart', '+91-9822200002', 'purchase@lumenmart.test', 'Retail chain counter', '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', 180, '2026-03-25 04:32:16.083557', 180);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (24, 34, 24, 'Vijay Traders', '+91-9822200003', 'vijay@traders.test', 'Wholesale lighting buyer', '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', 181, '2026-03-25 04:32:16.083557', 181);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (25, 33, 25, 'Exide Industrial Supplies', '+91-9833300001', 'sales@exide.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (26, 33, 26, 'Luminous Power Tech', '+91-9833300002', 'partner@luminous.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (27, 33, 27, 'Polycab Distribution', '+91-9833300003', 'wire@polycab.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', 174, '2026-03-25 04:32:16.083557', 174);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (28, 34, 28, 'Philips Lighting India', '+91-9844400001', 'b2b@philips.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (29, 34, 29, 'Havells Trade Channel', '+91-9844400002', 'trade@havells.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (30, 33, 30, 'Gujarat Energy Distribution', '+91-9855500001', 'warranty@ged.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', 170, '2026-03-25 04:32:16.083557', 170);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (31, 34, 31, 'West India Electrical Distributors', '+91-9855500002', 'claims@wied.test', NULL, '[]', NULL, TRUE, '2026-03-25 04:32:16.083557', 178, '2026-03-25 04:32:16.083557', 178);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (34, 16, 34, 'Identity Check', NULL, 'identitycheck03@example.com', NULL, '[]', NULL, TRUE, '2026-03-25 12:39:41.52672', NULL, '2026-03-25 12:39:41.526732', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (36, 16, 36, 'Guard Check', NULL, 'guardcheck02@example.com', NULL, '[]', NULL, TRUE, '2026-03-25 19:15:27.839391', NULL, '2026-03-25 19:15:27.839401', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (37, 16, 37, 'Guard Check', NULL, 'guardcheck03@example.com', NULL, '[]', NULL, TRUE, '2026-03-25 19:17:24.93998', NULL, '2026-03-25 19:17:24.939991', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (38, 35, 1, 'Sameer Khan', '+91-9990000001', 'sameer@shaktipower.test', NULL, '[]', NULL, TRUE, '2026-03-29 21:44:01.458673', NULL, '2026-03-29 21:44:01.458692', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (39, 36, 1, 'Sameer Khan', '+91-9990000001', 'sameer@shaktipower.test', NULL, '[]', NULL, TRUE, '2026-03-29 21:44:09.635635', NULL, '2026-03-29 21:44:09.635641', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (40, 33, 38, 'Admin Demo Employee', '9999990001', 'demo.employee@spc.local', NULL, '[]', NULL, TRUE, '2026-03-29 23:34:45.297131', NULL, '2026-03-29 23:34:45.297146', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (41, 33, 39, 'Admin Demo Employee Two', '9999990002', 'demo.employee2@spc.local', NULL, '[]', NULL, TRUE, '2026-03-29 23:36:46.814546', NULL, '2026-03-29 23:36:46.814563', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (42, 33, 40, 'Auto Code Employee', '9999900033', 'autocode.employee@example.com', NULL, '[]', NULL, TRUE, '2026-04-05 01:37:15.020636', NULL, '2026-04-05 01:37:15.020656', NULL);
+INSERT INTO "organization_person_profile" ("id", "organization_id", "person_id", "display_name", "phone_for_org", "email_for_org", "notes", "tags", "preferred_language", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (43, 37, 41, 'Retail Platform Admin', '+91-9990000099', 'platform-admin@retailmanagement.test', NULL, '[]', NULL, TRUE, '2026-04-05 02:11:19.371302', NULL, '2026-04-05 02:11:19.371302', NULL);
+
+-- changeset sameerkhan:1775937591491-71
+INSERT INTO "tax_registration" ("id", "organization_id", "branch_id", "registration_type", "registration_name", "legal_name", "gstin", "registration_state_code", "registration_state_name", "effective_from", "effective_to", "is_default", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 34, NULL, 'GST', 'Urban Home Lights', 'Urban Home Lights LLP', '24AAAFU5678R1Z2', '24', NULL, '2026-03-25', NULL, TRUE, TRUE, '2026-03-25 20:26:26.070128', NULL, '2026-03-25 20:26:26.070128', NULL);
+INSERT INTO "tax_registration" ("id", "organization_id", "branch_id", "registration_type", "registration_name", "legal_name", "gstin", "registration_state_code", "registration_state_name", "effective_from", "effective_to", "is_default", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 33, NULL, 'GST', 'Shakti Power Centre', 'Shakti Power Centre Private Limited', '24AAVCS1234Q1Z5', '24', NULL, '2026-03-25', NULL, TRUE, TRUE, '2026-03-25 20:26:26.070128', NULL, '2026-03-25 20:26:26.070128', NULL);
+
+-- changeset sameerkhan:1775937591491-72
+INSERT INTO "supplier_product" ("id", "organization_id", "supplier_id", "product_id", "supplier_product_code", "supplier_product_name", "priority", "is_preferred", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 33, 37, 10, NULL, 'Tubular Battery 150AH', 1, FALSE, TRUE, '2026-03-29 09:02:32.507694', NULL, '2026-03-29 09:02:32.507694', NULL);
+INSERT INTO "supplier_product" ("id", "organization_id", "supplier_id", "product_id", "supplier_product_code", "supplier_product_name", "priority", "is_preferred", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 34, 39, 7, NULL, 'Modular Switch 6A', 1, FALSE, TRUE, '2026-03-29 09:02:32.507694', NULL, '2026-03-29 09:02:32.507694', NULL);
+INSERT INTO "supplier_product" ("id", "organization_id", "supplier_id", "product_id", "supplier_product_code", "supplier_product_name", "priority", "is_preferred", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 33, 37, 3, NULL, 'EcoVolt 900VA Inverter', 1, FALSE, TRUE, '2026-03-29 09:02:32.507694', NULL, '2026-03-29 09:02:32.507694', NULL);
+INSERT INTO "supplier_product" ("id", "organization_id", "supplier_id", "product_id", "supplier_product_code", "supplier_product_name", "priority", "is_preferred", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 34, 39, 1, NULL, 'Ceiling Fan 1200mm', 1, FALSE, TRUE, '2026-03-29 09:02:32.507694', NULL, '2026-03-29 09:02:32.507694', NULL);
+INSERT INTO "supplier_product" ("id", "organization_id", "supplier_id", "product_id", "supplier_product_code", "supplier_product_name", "priority", "is_preferred", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 34, 39, 9, NULL, 'Slim Panel Light 18W', 1, FALSE, TRUE, '2026-03-29 09:02:32.507694', NULL, '2026-03-29 09:02:32.507694', NULL);
+INSERT INTO "supplier_product" ("id", "organization_id", "supplier_id", "product_id", "supplier_product_code", "supplier_product_name", "priority", "is_preferred", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 33, 37, 2, NULL, 'Copper Wire 6 Sqmm', 1, FALSE, TRUE, '2026-03-29 09:02:32.507694', NULL, '2026-03-29 09:02:32.507694', NULL);
+INSERT INTO "supplier_product" ("id", "organization_id", "supplier_id", "product_id", "supplier_product_code", "supplier_product_name", "priority", "is_preferred", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 34, 39, 6, NULL, 'LED Strip 5M', 1, FALSE, TRUE, '2026-03-29 09:02:32.507694', NULL, '2026-03-29 09:02:32.507694', NULL);
+INSERT INTO "supplier_product" ("id", "organization_id", "supplier_id", "product_id", "supplier_product_code", "supplier_product_name", "priority", "is_preferred", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (15, 33, 41, 11, 'PHIL-FLOOD-50W', 'LED Flood Light 50W', 1, TRUE, TRUE, '2026-03-29 16:35:13.535523', 174, '2026-03-29 16:35:13.535523', 174);
+INSERT INTO "supplier_product" ("id", "organization_id", "supplier_id", "product_id", "supplier_product_code", "supplier_product_name", "priority", "is_preferred", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (16, 33, 41, 5, 'PHIL-BULB-9W', 'LED Bulb 9W', 1, TRUE, TRUE, '2026-03-29 16:35:13.535523', 174, '2026-03-29 16:35:13.535523', 174);
+INSERT INTO "supplier_product" ("id", "organization_id", "supplier_id", "product_id", "supplier_product_code", "supplier_product_name", "priority", "is_preferred", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (17, 33, 38, 2, 'POLY-6SQ', 'Copper Wire 6 Sqmm', 1, TRUE, TRUE, '2026-03-29 16:35:13.535523', 174, '2026-03-29 16:35:13.535523', 174);
+INSERT INTO "supplier_product" ("id", "organization_id", "supplier_id", "product_id", "supplier_product_code", "supplier_product_name", "priority", "is_preferred", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (18, 33, 36, 10, 'EXD-BAT-150AH', 'Tubular Battery 150AH', 1, TRUE, TRUE, '2026-03-29 16:35:13.535523', 174, '2026-03-29 16:35:13.535523', 174);
+INSERT INTO "supplier_product" ("id", "organization_id", "supplier_id", "product_id", "supplier_product_code", "supplier_product_name", "priority", "is_preferred", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (19, 34, 40, 7, 'HAV-SWITCH-6A', 'Modular Switch 6A', 1, TRUE, TRUE, '2026-03-29 16:35:13.535523', 178, '2026-03-29 16:35:13.535523', 178);
+INSERT INTO "supplier_product" ("id", "organization_id", "supplier_id", "product_id", "supplier_product_code", "supplier_product_name", "priority", "is_preferred", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (20, 34, 40, 4, 'HAV-WIRE-1.5SQ', 'House Wire 1.5 Sqmm', 1, TRUE, TRUE, '2026-03-29 16:35:13.535523', 178, '2026-03-29 16:35:13.535523', 178);
+INSERT INTO "supplier_product" ("id", "organization_id", "supplier_id", "product_id", "supplier_product_code", "supplier_product_name", "priority", "is_preferred", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (21, 34, 40, 1, 'HAV-FAN-1200', 'Ceiling Fan 1200mm', 1, TRUE, TRUE, '2026-03-29 16:35:13.535523', 178, '2026-03-29 16:35:13.535523', 178);
+INSERT INTO "supplier_product" ("id", "organization_id", "supplier_id", "product_id", "supplier_product_code", "supplier_product_name", "priority", "is_preferred", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (22, 34, 39, 11, 'PHIL-FLOOD-50W', 'LED Flood Light 50W', 1, TRUE, TRUE, '2026-03-29 16:35:13.535523', 178, '2026-03-29 16:35:13.535523', 178);
+
+-- changeset sameerkhan:1775937591491-73
+INSERT INTO "store_supplier_terms" ("id", "organization_id", "supplier_id", "payment_terms", "credit_limit", "credit_days", "is_preferred", "is_active", "contract_start", "contract_end", "order_via_email", "order_via_whatsapp", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 33, 36, '30 DAYS', 250000.00, 30, TRUE, TRUE, NULL, NULL, TRUE, TRUE, 'Battery supplier', '2026-03-29 09:02:32.507694', NULL, '2026-03-29 09:02:32.507694', NULL);
+INSERT INTO "store_supplier_terms" ("id", "organization_id", "supplier_id", "payment_terms", "credit_limit", "credit_days", "is_preferred", "is_active", "contract_start", "contract_end", "order_via_email", "order_via_whatsapp", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 33, 37, '30 DAYS', 250000.00, 30, TRUE, TRUE, NULL, NULL, TRUE, TRUE, 'Inverter supplier', '2026-03-29 09:02:32.507694', NULL, '2026-03-29 09:02:32.507694', NULL);
+INSERT INTO "store_supplier_terms" ("id", "organization_id", "supplier_id", "payment_terms", "credit_limit", "credit_days", "is_preferred", "is_active", "contract_start", "contract_end", "order_via_email", "order_via_whatsapp", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 33, 38, '15 DAYS', 0.00, 15, TRUE, TRUE, NULL, NULL, TRUE, TRUE, 'Wire and cable supplier', '2026-03-29 09:02:32.507694', NULL, '2026-03-29 09:02:32.507694', NULL);
+INSERT INTO "store_supplier_terms" ("id", "organization_id", "supplier_id", "payment_terms", "credit_limit", "credit_days", "is_preferred", "is_active", "contract_start", "contract_end", "order_via_email", "order_via_whatsapp", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 34, 39, '30 DAYS', 300000.00, 30, TRUE, TRUE, NULL, NULL, TRUE, TRUE, 'Lighting supplier', '2026-03-29 09:02:32.507694', NULL, '2026-03-29 09:02:32.507694', NULL);
+INSERT INTO "store_supplier_terms" ("id", "organization_id", "supplier_id", "payment_terms", "credit_limit", "credit_days", "is_preferred", "is_active", "contract_start", "contract_end", "order_via_email", "order_via_whatsapp", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 34, 40, '15 DAYS', 180000.00, 15, TRUE, TRUE, NULL, NULL, TRUE, TRUE, 'Electrical goods supplier', '2026-03-29 09:02:32.507694', NULL, '2026-03-29 09:02:32.507694', NULL);
+
+-- changeset sameerkhan:1775937591491-74
+INSERT INTO "store_customer_terms" ("id", "organization_id", "customer_id", "customer_segment", "credit_limit", "credit_days", "loyalty_enabled", "loyalty_points_balance", "price_tier", "discount_policy", "is_preferred", "is_active", "contract_start", "contract_end", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 33, 50, 'DEALER', 250000.00, 30, FALSE, 0.00, 'DEALER', 'Dealer slab discount', TRUE, TRUE, NULL, NULL, 'Dealer customer', '2026-03-25 04:32:16.083557', 172, '2026-03-29 09:13:26.254023', 172);
+INSERT INTO "store_customer_terms" ("id", "organization_id", "customer_id", "customer_segment", "credit_limit", "credit_days", "loyalty_enabled", "loyalty_points_balance", "price_tier", "discount_policy", "is_preferred", "is_active", "contract_start", "contract_end", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 33, 51, 'RETAIL', 50000.00, NULL, TRUE, 120.00, 'RETAIL', NULL, FALSE, TRUE, NULL, NULL, 'Retail repeat customer', '2026-03-25 04:32:16.083557', 173, '2026-03-29 09:13:26.254023', 173);
+INSERT INTO "store_customer_terms" ("id", "organization_id", "customer_id", "customer_segment", "credit_limit", "credit_days", "loyalty_enabled", "loyalty_points_balance", "price_tier", "discount_policy", "is_preferred", "is_active", "contract_start", "contract_end", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 33, 52, 'B2B', 175000.00, 21, FALSE, 0.00, 'B2B', NULL, TRUE, TRUE, NULL, NULL, 'Credit customer', '2026-03-25 04:32:16.083557', 170, '2026-03-29 09:13:26.254023', 170);
+INSERT INTO "store_customer_terms" ("id", "organization_id", "customer_id", "customer_segment", "credit_limit", "credit_days", "loyalty_enabled", "loyalty_points_balance", "price_tier", "discount_policy", "is_preferred", "is_active", "contract_start", "contract_end", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 33, 53, 'RETAIL', 300000.00, NULL, FALSE, 0.00, 'RETAIL', NULL, FALSE, TRUE, NULL, NULL, 'AMC / service customer', '2026-03-25 04:32:16.083557', 168, '2026-03-29 09:13:26.254023', 168);
+INSERT INTO "store_customer_terms" ("id", "organization_id", "customer_id", "customer_segment", "credit_limit", "credit_days", "loyalty_enabled", "loyalty_points_balance", "price_tier", "discount_policy", "is_preferred", "is_active", "contract_start", "contract_end", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 34, 54, 'B2B', 125000.00, 21, FALSE, 0.00, 'B2B', NULL, TRUE, TRUE, NULL, NULL, 'Interior partner', '2026-03-25 04:32:16.083557', 178, '2026-03-29 09:13:26.254023', 178);
+INSERT INTO "store_customer_terms" ("id", "organization_id", "customer_id", "customer_segment", "credit_limit", "credit_days", "loyalty_enabled", "loyalty_points_balance", "price_tier", "discount_policy", "is_preferred", "is_active", "contract_start", "contract_end", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 34, 55, 'RETAIL', 75000.00, NULL, TRUE, 85.00, 'RETAIL', NULL, FALSE, TRUE, NULL, NULL, 'Retail chain counter', '2026-03-25 04:32:16.083557', 180, '2026-03-29 09:13:26.254023', 180);
+INSERT INTO "store_customer_terms" ("id", "organization_id", "customer_id", "customer_segment", "credit_limit", "credit_days", "loyalty_enabled", "loyalty_points_balance", "price_tier", "discount_policy", "is_preferred", "is_active", "contract_start", "contract_end", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 34, 56, 'WHOLESALE', 150000.00, 14, FALSE, 0.00, 'WHOLESALE', 'Wholesale counter discount', TRUE, TRUE, NULL, NULL, 'Wholesale lighting buyer', '2026-03-25 04:32:16.083557', 181, '2026-03-29 09:13:26.254023', 181);
+INSERT INTO "store_customer_terms" ("id", "organization_id", "customer_id", "customer_segment", "credit_limit", "credit_days", "loyalty_enabled", "loyalty_points_balance", "price_tier", "discount_policy", "is_preferred", "is_active", "contract_start", "contract_end", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 33, 57, 'RETAIL', 5000.00, NULL, FALSE, 0.00, NULL, NULL, FALSE, TRUE, NULL, NULL, NULL, '2026-04-05 01:37:14.799938', 168, '2026-04-05 01:37:14.799938', 168);
+
+-- changeset sameerkhan:1775937591491-75
+INSERT INTO "store_product_price" ("id", "organization_id", "store_product_id", "price_type", "customer_segment", "price", "min_quantity", "effective_from", "effective_to", "is_default", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 34, 52, 'SELLING', 'B2B', 905.00, 6.000000, '2026-01-01', NULL, FALSE, TRUE, '2026-03-29 16:35:13.535523', 176, '2026-03-29 16:35:13.535523', 176);
+INSERT INTO "store_product_price" ("id", "organization_id", "store_product_id", "price_type", "customer_segment", "price", "min_quantity", "effective_from", "effective_to", "is_default", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 34, 52, 'SELLING', 'RETAIL', 950.00, NULL, '2026-01-01', NULL, TRUE, TRUE, '2026-03-29 16:35:13.535523', 176, '2026-03-29 16:35:13.535523', 176);
+INSERT INTO "store_product_price" ("id", "organization_id", "store_product_id", "price_type", "customer_segment", "price", "min_quantity", "effective_from", "effective_to", "is_default", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 34, 50, 'SELLING', 'WHOLESALE', 39.00, 20.000000, '2026-01-01', NULL, FALSE, TRUE, '2026-03-29 16:35:13.535523', 176, '2026-03-29 16:35:13.535523', 176);
+INSERT INTO "store_product_price" ("id", "organization_id", "store_product_id", "price_type", "customer_segment", "price", "min_quantity", "effective_from", "effective_to", "is_default", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 34, 50, 'SELLING', 'RETAIL', 45.00, NULL, '2026-01-01', NULL, TRUE, TRUE, '2026-03-29 16:35:13.535523', 176, '2026-03-29 16:35:13.535523', 176);
+INSERT INTO "store_product_price" ("id", "organization_id", "store_product_id", "price_type", "customer_segment", "price", "min_quantity", "effective_from", "effective_to", "is_default", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 34, 47, 'SELLING', 'WHOLESALE', 2100.00, 2.000000, '2026-01-01', NULL, FALSE, TRUE, '2026-03-29 16:35:13.535523', 176, '2026-03-29 16:35:13.535523', 176);
+INSERT INTO "store_product_price" ("id", "organization_id", "store_product_id", "price_type", "customer_segment", "price", "min_quantity", "effective_from", "effective_to", "is_default", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 34, 47, 'SELLING', 'RETAIL', 2200.00, NULL, '2026-01-01', NULL, TRUE, TRUE, '2026-03-29 16:35:13.535523', 176, '2026-03-29 16:35:13.535523', 176);
+INSERT INTO "store_product_price" ("id", "organization_id", "store_product_id", "price_type", "customer_segment", "price", "min_quantity", "effective_from", "effective_to", "is_default", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 34, 46, 'SELLING', 'B2B', 610.00, 10.000000, '2026-01-01', NULL, FALSE, TRUE, '2026-03-29 16:35:13.535523', 176, '2026-03-29 16:35:13.535523', 176);
+INSERT INTO "store_product_price" ("id", "organization_id", "store_product_id", "price_type", "customer_segment", "price", "min_quantity", "effective_from", "effective_to", "is_default", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 34, 46, 'SELLING', 'RETAIL', 650.00, NULL, '2026-01-01', NULL, TRUE, TRUE, '2026-03-29 16:35:13.535523', 176, '2026-03-29 16:35:13.535523', 176);
+INSERT INTO "store_product_price" ("id", "organization_id", "store_product_id", "price_type", "customer_segment", "price", "min_quantity", "effective_from", "effective_to", "is_default", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 33, 51, 'SELLING', 'DEALER', 835.00, 5.000000, '2026-01-01', NULL, FALSE, TRUE, '2026-03-29 16:35:13.535523', 168, '2026-03-29 16:35:13.535523', 168);
+INSERT INTO "store_product_price" ("id", "organization_id", "store_product_id", "price_type", "customer_segment", "price", "min_quantity", "effective_from", "effective_to", "is_default", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, 33, 51, 'SELLING', 'RETAIL', 890.00, NULL, '2026-01-01', NULL, TRUE, TRUE, '2026-03-29 16:35:13.535523', 168, '2026-03-29 16:35:13.535523', 168);
+INSERT INTO "store_product_price" ("id", "organization_id", "store_product_id", "price_type", "customer_segment", "price", "min_quantity", "effective_from", "effective_to", "is_default", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, 33, 41, 'SELLING', 'WHOLESALE', 85.00, 24.000000, '2026-01-01', NULL, FALSE, TRUE, '2026-03-29 16:35:13.535523', 168, '2026-03-29 16:35:13.535523', 168);
+INSERT INTO "store_product_price" ("id", "organization_id", "store_product_id", "price_type", "customer_segment", "price", "min_quantity", "effective_from", "effective_to", "is_default", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (12, 33, 41, 'SELLING', 'RETAIL', 95.00, NULL, '2026-01-01', NULL, TRUE, TRUE, '2026-03-29 16:35:13.535523', 168, '2026-03-29 16:35:13.535523', 168);
+INSERT INTO "store_product_price" ("id", "organization_id", "store_product_id", "price_type", "customer_segment", "price", "min_quantity", "effective_from", "effective_to", "is_default", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (13, 33, 44, 'SELLING', 'B2B', 88.00, 50.000000, '2026-01-01', NULL, FALSE, TRUE, '2026-03-29 16:35:13.535523', 168, '2026-03-29 16:35:13.535523', 168);
+INSERT INTO "store_product_price" ("id", "organization_id", "store_product_id", "price_type", "customer_segment", "price", "min_quantity", "effective_from", "effective_to", "is_default", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (14, 33, 44, 'SELLING', 'RETAIL', 92.00, NULL, '2026-01-01', NULL, TRUE, TRUE, '2026-03-29 16:35:13.535523', 168, '2026-03-29 16:35:13.535523', 168);
+INSERT INTO "store_product_price" ("id", "organization_id", "store_product_id", "price_type", "customer_segment", "price", "min_quantity", "effective_from", "effective_to", "is_default", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (15, 33, 43, 'SELLING', 'B2B', 12350.00, NULL, '2026-01-01', NULL, FALSE, TRUE, '2026-03-29 16:35:13.535523', 168, '2026-03-29 16:35:13.535523', 168);
+INSERT INTO "store_product_price" ("id", "organization_id", "store_product_id", "price_type", "customer_segment", "price", "min_quantity", "effective_from", "effective_to", "is_default", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (16, 33, 43, 'SELLING', 'RETAIL', 12800.00, NULL, '2026-01-01', NULL, TRUE, TRUE, '2026-03-29 16:35:13.535523', 168, '2026-03-29 16:35:13.535523', 168);
+INSERT INTO "store_product_price" ("id", "organization_id", "store_product_id", "price_type", "customer_segment", "price", "min_quantity", "effective_from", "effective_to", "is_default", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (17, 33, 42, 'SELLING', 'DEALER', 6200.00, NULL, '2026-01-01', NULL, FALSE, TRUE, '2026-03-29 16:35:13.535523', 168, '2026-03-29 16:35:13.535523', 168);
+INSERT INTO "store_product_price" ("id", "organization_id", "store_product_id", "price_type", "customer_segment", "price", "min_quantity", "effective_from", "effective_to", "is_default", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (18, 33, 42, 'SELLING', 'RETAIL', 6500.00, NULL, '2026-01-01', NULL, TRUE, TRUE, '2026-03-29 16:35:13.535523', 168, '2026-03-29 16:35:13.535523', 168);
+
+-- changeset sameerkhan:1775937591491-76
+INSERT INTO "sales_quote" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "quote_type", "quote_number", "quote_date", "valid_until", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "converted_sales_order_id", "converted_sales_invoice_id", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 33, 72, 144, 51, 'QUOTATION', 'QTN-20260329-1774788665800', '2026-03-29', '2026-04-05', 2, '24AAVCS1234Q1Z5', NULL, '24', 'ORDERED', 3160.00, 0.00, 568.80, 3728.80, 1, NULL, 'Demo quotation for invoice conversion', '2026-03-29 18:21:05.803464', 168, '2026-03-29 18:21:26.014952', 168);
+INSERT INTO "sales_quote" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "quote_type", "quote_number", "quote_date", "valid_until", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "converted_sales_order_id", "converted_sales_invoice_id", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 33, 72, 144, 51, 'ESTIMATE', 'EST-20260329-1774788835395', '2026-03-29', '2026-04-10', 2, '24AAVCS1234Q1Z5', NULL, '24', 'SUBMITTED', 1810.00, 0.00, 325.80, 2135.80, NULL, NULL, 'Second demo estimate', '2026-03-29 18:23:55.396744', 168, '2026-03-29 18:23:55.443633', 168);
+INSERT INTO "sales_quote" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "quote_type", "quote_number", "quote_date", "valid_until", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "converted_sales_order_id", "converted_sales_invoice_id", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 33, 73, 142, 53, 'QUOTATION', 'QTN-20260329-1774789057388', '2026-03-29', '2026-04-12', 2, '24AAVCS1234Q1Z5', NULL, '24', 'INVOICED', 2884.00, 0.00, 519.12, 3403.12, 2, 15, 'Warehouse-backed quote demo', '2026-03-29 18:27:37.389762', 168, '2026-03-29 18:28:11.27437', 168);
+INSERT INTO "sales_quote" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "quote_type", "quote_number", "quote_date", "valid_until", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "converted_sales_order_id", "converted_sales_invoice_id", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 33, 71, 142, 53, 'QUOTATION', 'QTN-SPC-DEMO-00001', '2026-03-12', '2026-03-20', NULL, '24AAVCS1234Q1Z5', NULL, '24', 'INVOICED', 2884.00, 0.00, 519.12, 3403.12, 3, 16, 'Seeded quotation demo converted to order and invoice', '2026-03-29 18:34:01.206794', 168, '2026-03-29 18:34:01.206794', 168);
+INSERT INTO "sales_quote" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "quote_type", "quote_number", "quote_date", "valid_until", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "converted_sales_order_id", "converted_sales_invoice_id", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 33, 71, 142, 52, 'QUOTATION', 'QTN-20260329-1774796091192', '2026-03-29', '2026-04-05', 2, '24AAVCS1234Q1Z5', '24AACCS2222L1Z8', '24', 'SUBMITTED', 6500.00, 0.00, 1170.00, 7670.00, NULL, NULL, 'Tracked serial quote verification', '2026-03-29 20:24:51.193302', 168, '2026-03-29 20:24:51.215911', 168);
+INSERT INTO "sales_quote" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "quote_type", "quote_number", "quote_date", "valid_until", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "converted_sales_order_id", "converted_sales_invoice_id", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 33, 73, 142, 53, 'QUOTATION', 'QTN-20260329-1774796167346', '2026-03-29', '2026-04-05', 2, '24AAVCS1234Q1Z5', NULL, '24', 'SUBMITTED', 190.00, 0.00, 22.80, 212.80, NULL, NULL, 'Tracked batch quote verification', '2026-03-29 20:26:07.346599', 168, '2026-03-29 20:26:07.357327', 168);
+INSERT INTO "sales_quote" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "quote_type", "quote_number", "quote_date", "valid_until", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "converted_sales_order_id", "converted_sales_invoice_id", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 33, 73, 142, 53, 'QUOTATION', 'QTN-20260329-1774796148369', '2026-03-29', '2026-04-05', 2, '24AAVCS1234Q1Z5', NULL, '24', 'INVOICED', 6500.00, 0.00, 1170.00, 7670.00, NULL, 33, 'Tracked serial quote verification success path', '2026-03-29 20:25:48.369644', 168, '2026-03-29 20:28:08.468724', 168);
+INSERT INTO "sales_quote" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "quote_type", "quote_number", "quote_date", "valid_until", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "converted_sales_order_id", "converted_sales_invoice_id", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 33, 73, 142, 53, 'QUOTATION', 'QTN-20260329-1774796286862', '2026-03-29', '2026-04-05', 2, '24AAVCS1234Q1Z5', NULL, '24', 'INVOICED', 110.00, 0.00, 19.80, 129.80, NULL, 34, 'Tracked batch quote verification success path', '2026-03-29 20:28:06.863429', 168, '2026-03-29 20:28:43.225409', 168);
+INSERT INTO "sales_quote" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "quote_type", "quote_number", "quote_date", "valid_until", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "converted_sales_order_id", "converted_sales_invoice_id", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 33, 73, 142, 53, 'QUOTATION', 'QTN-20260329-1774796452894', '2026-03-29', '2026-04-05', 2, '24AAVCS1234Q1Z5', NULL, '24', 'INVOICED', 6500.00, 0.00, 1170.00, 7670.00, NULL, 36, 'Tracked serial aggregate inventory verification', '2026-03-29 20:30:52.895144', 168, '2026-03-29 20:31:19.348826', 168);
+INSERT INTO "sales_quote" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "quote_type", "quote_number", "quote_date", "valid_until", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "converted_sales_order_id", "converted_sales_invoice_id", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, 33, 73, 142, 53, 'QUOTATION', 'QTN-20260404-1775326979058', '2026-04-04', NULL, 2, '24AAVCS1234Q1Z5', NULL, '24', 'CANCELLED', 2400.00, 0.00, 432.00, 2832.00, NULL, NULL, 'Disposable cancel-flow quote | Cancelled: Customer changed mind during UI test', '2026-04-04 23:52:59.060673', 168, '2026-04-04 23:53:23.807801', 168);
+
+-- changeset sameerkhan:1775937591491-77
+INSERT INTO "sales_quote_line" ("id", "sales_quote_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 1, 51, 5, '94054090', 2.000000, 2.000000, 890.00, 0.00, 1780.00, 18.0000, 9.0000, 160.20, 9.0000, 160.20, 0.0000, 0.00, 0.0000, 0.00, 2100.40, NULL, '2026-03-29 18:21:05.859759', 168, '2026-03-29 18:21:05.859759', 168);
+INSERT INTO "sales_quote_line" ("id", "sales_quote_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 1, 44, 11, '85444999', 15.000000, 15.000000, 92.00, 0.00, 1380.00, 18.0000, 9.0000, 124.20, 9.0000, 124.20, 0.0000, 0.00, 0.0000, 0.00, 1628.40, NULL, '2026-03-29 18:21:05.869081', 168, '2026-03-29 18:21:05.869081', 168);
+INSERT INTO "sales_quote_line" ("id", "sales_quote_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 2, 51, 5, '94054090', 1.000000, 1.000000, 890.00, 0.00, 890.00, 18.0000, 9.0000, 80.10, 9.0000, 80.10, 0.0000, 0.00, 0.0000, 0.00, 1050.20, NULL, '2026-03-29 18:23:55.431163', 168, '2026-03-29 18:23:55.431163', 168);
+INSERT INTO "sales_quote_line" ("id", "sales_quote_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 2, 44, 11, '85444999', 10.000000, 10.000000, 92.00, 0.00, 920.00, 18.0000, 9.0000, 82.80, 9.0000, 82.80, 0.0000, 0.00, 0.0000, 0.00, 1085.60, NULL, '2026-03-29 18:23:55.439459', 168, '2026-03-29 18:23:55.439459', 168);
+INSERT INTO "sales_quote_line" ("id", "sales_quote_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 3, 51, 5, '94054090', 2.000000, 2.000000, 890.00, 0.00, 1780.00, 18.0000, 9.0000, 160.20, 9.0000, 160.20, 0.0000, 0.00, 0.0000, 0.00, 2100.40, NULL, '2026-03-29 18:27:37.410173', 168, '2026-03-29 18:27:37.410173', 168);
+INSERT INTO "sales_quote_line" ("id", "sales_quote_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 3, 44, 11, '85444999', 12.000000, 12.000000, 92.00, 0.00, 1104.00, 18.0000, 9.0000, 99.36, 9.0000, 99.36, 0.0000, 0.00, 0.0000, 0.00, 1302.72, NULL, '2026-03-29 18:27:37.417445', 168, '2026-03-29 18:27:37.417445', 168);
+INSERT INTO "sales_quote_line" ("id", "sales_quote_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 4, 51, 5, '94054090', 2.000000, 2.000000, 890.00, 0.00, 1780.00, 18.0000, 9.0000, 160.20, 9.0000, 160.20, 0.0000, 0.00, 0.0000, 0.00, 2100.40, NULL, '2026-03-29 18:34:01.206794', 168, '2026-03-29 18:34:01.206794', 168);
+INSERT INTO "sales_quote_line" ("id", "sales_quote_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 4, 44, 11, '85444999', 12.000000, 12.000000, 92.00, 0.00, 1104.00, 18.0000, 9.0000, 99.36, 9.0000, 99.36, 0.0000, 0.00, 0.0000, 0.00, 1302.72, NULL, '2026-03-29 18:34:01.206794', 168, '2026-03-29 18:34:01.206794', 168);
+INSERT INTO "sales_quote_line" ("id", "sales_quote_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 5, 42, 5, '85044090', 1.000000, 1.000000, 6500.00, 0.00, 6500.00, 18.0000, 9.0000, 585.00, 9.0000, 585.00, 0.0000, 0.00, 0.0000, 0.00, 7670.00, 'Serial tracked inverter', '2026-03-29 20:24:51.211575', 168, '2026-03-29 20:24:51.211575', 168);
+INSERT INTO "sales_quote_line" ("id", "sales_quote_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, 6, 42, 5, '85044090', 1.000000, 1.000000, 6500.00, 0.00, 6500.00, 18.0000, 9.0000, 585.00, 9.0000, 585.00, 0.0000, 0.00, 0.0000, 0.00, 7670.00, 'Serial tracked inverter', '2026-03-29 20:25:48.379731', 168, '2026-03-29 20:25:48.379731', 168);
+INSERT INTO "sales_quote_line" ("id", "sales_quote_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, 7, 41, 5, '85395000', 2.000000, 2.000000, 95.00, 0.00, 190.00, 12.0000, 6.0000, 11.40, 6.0000, 11.40, 0.0000, 0.00, 0.0000, 0.00, 212.80, 'Batch tracked bulbs', '2026-03-29 20:26:07.354493', 168, '2026-03-29 20:26:07.354493', 168);
+INSERT INTO "sales_quote_line" ("id", "sales_quote_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (12, 8, 45, 9, '38200000', 2.000000, 2.000000, 55.00, 0.00, 110.00, 18.0000, 9.0000, 9.90, 9.0000, 9.90, 0.0000, 0.00, 0.0000, 0.00, 129.80, 'Batch tracked consumable', '2026-03-29 20:28:06.883876', 168, '2026-03-29 20:28:06.883876', 168);
+INSERT INTO "sales_quote_line" ("id", "sales_quote_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (13, 9, 42, 5, '85044090', 1.000000, 1.000000, 6500.00, 0.00, 6500.00, 18.0000, 9.0000, 585.00, 9.0000, 585.00, 0.0000, 0.00, 0.0000, 0.00, 7670.00, 'Serial tracked inverter second pass', '2026-03-29 20:30:52.921209', 168, '2026-03-29 20:30:52.921209', 168);
+INSERT INTO "sales_quote_line" ("id", "sales_quote_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (14, 10, 44, 5, '85444999', 2.000000, 2.000000, 1200.00, 0.00, 2400.00, 18.0000, 9.0000, 216.00, 9.0000, 216.00, 0.0000, 0.00, 0.0000, 0.00, 2832.00, 'Cancel flow test', '2026-04-04 23:52:59.075595', 168, '2026-04-04 23:52:59.075595', 168);
+
+-- changeset sameerkhan:1775937591491-78
+INSERT INTO "sales_order" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "source_quote_id", "order_number", "order_date", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "converted_sales_invoice_id", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 33, 72, 144, 51, 1, 'SO-20260329-1774788685989', '2026-03-29', 2, '24AAVCS1234Q1Z5', NULL, '24', 'SUBMITTED', 3160.00, 0.00, 568.80, 3728.80, NULL, 'Converted from demo quote', '2026-03-29 18:21:25.990469', 168, '2026-03-29 18:21:26.015189', 168);
+INSERT INTO "sales_order" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "source_quote_id", "order_number", "order_date", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "converted_sales_invoice_id", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 33, 73, 142, 53, 3, 'SO-20260329-1774789080276', '2026-03-29', 2, '24AAVCS1234Q1Z5', NULL, '24', 'INVOICED', 2884.00, 0.00, 519.12, 3403.12, 15, 'Converted stocked quote to order', '2026-03-29 18:28:00.27718', 168, '2026-03-29 18:28:11.268951', 168);
+INSERT INTO "sales_order" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "source_quote_id", "order_number", "order_date", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "converted_sales_invoice_id", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 33, 71, 142, 53, 4, 'SO-SPC-DEMO-00001', '2026-03-13', NULL, '24AAVCS1234Q1Z5', NULL, '24', 'INVOICED', 2884.00, 0.00, 519.12, 3403.12, 16, 'Seeded sales order converted from demo quotation', '2026-03-29 18:34:01.206794', 168, '2026-03-29 18:34:01.206794', 168);
+INSERT INTO "sales_order" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "source_quote_id", "order_number", "order_date", "seller_tax_registration_id", "seller_gstin", "customer_gstin", "place_of_supply_state_code", "status", "subtotal", "discount_amount", "tax_amount", "total_amount", "converted_sales_invoice_id", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 33, 73, 142, 53, NULL, 'SO-20260404-1775326978275', '2026-04-04', 2, '24AAVCS1234Q1Z5', NULL, '24', 'CANCELLED', 1200.00, 0.00, 216.00, 1416.00, NULL, 'Disposable cancel-flow order | Cancelled: Customer rescheduled purchase during UI test', '2026-04-04 23:52:58.275626', 168, '2026-04-04 23:53:23.181076', 168);
+
+-- changeset sameerkhan:1775937591491-79
+INSERT INTO "sales_order_line" ("id", "sales_order_id", "source_quote_line_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 1, 1, 51, 5, '94054090', 2.000000, 2.000000, 890.00, 0.00, 1780.00, 18.0000, 9.0000, 160.20, 9.0000, 160.20, 0.0000, 0.00, 0.0000, 0.00, 2100.40, NULL, '2026-03-29 18:21:26.002149', 168, '2026-03-29 18:21:26.002149', 168);
+INSERT INTO "sales_order_line" ("id", "sales_order_id", "source_quote_line_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 1, 2, 44, 11, '85444999', 15.000000, 15.000000, 92.00, 0.00, 1380.00, 18.0000, 9.0000, 124.20, 9.0000, 124.20, 0.0000, 0.00, 0.0000, 0.00, 1628.40, NULL, '2026-03-29 18:21:26.01088', 168, '2026-03-29 18:21:26.01088', 168);
+INSERT INTO "sales_order_line" ("id", "sales_order_id", "source_quote_line_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 2, 5, 51, 5, '94054090', 2.000000, 2.000000, 890.00, 0.00, 1780.00, 18.0000, 9.0000, 160.20, 9.0000, 160.20, 0.0000, 0.00, 0.0000, 0.00, 2100.40, NULL, '2026-03-29 18:28:00.284786', 168, '2026-03-29 18:28:00.284786', 168);
+INSERT INTO "sales_order_line" ("id", "sales_order_id", "source_quote_line_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 2, 6, 44, 11, '85444999', 12.000000, 12.000000, 92.00, 0.00, 1104.00, 18.0000, 9.0000, 99.36, 9.0000, 99.36, 0.0000, 0.00, 0.0000, 0.00, 1302.72, NULL, '2026-03-29 18:28:00.291481', 168, '2026-03-29 18:28:00.291481', 168);
+INSERT INTO "sales_order_line" ("id", "sales_order_id", "source_quote_line_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 3, 8, 44, 11, '85444999', 12.000000, 12.000000, 92.00, 0.00, 1104.00, 18.0000, 9.0000, 99.36, 9.0000, 99.36, 0.0000, 0.00, 0.0000, 0.00, 1302.72, NULL, '2026-03-29 18:34:01.206794', 168, '2026-03-29 18:34:01.206794', 168);
+INSERT INTO "sales_order_line" ("id", "sales_order_id", "source_quote_line_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 3, 7, 51, 5, '94054090', 2.000000, 2.000000, 890.00, 0.00, 1780.00, 18.0000, 9.0000, 160.20, 9.0000, 160.20, 0.0000, 0.00, 0.0000, 0.00, 2100.40, NULL, '2026-03-29 18:34:01.206794', 168, '2026-03-29 18:34:01.206794', 168);
+INSERT INTO "sales_order_line" ("id", "sales_order_id", "source_quote_line_id", "product_id", "uom_id", "hsn_snapshot", "quantity", "base_quantity", "unit_price", "discount_amount", "taxable_amount", "tax_rate", "cgst_rate", "cgst_amount", "sgst_rate", "sgst_amount", "igst_rate", "igst_amount", "cess_rate", "cess_amount", "line_amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 4, NULL, 44, 5, '85444999', 1.000000, 1.000000, 1200.00, 0.00, 1200.00, 18.0000, 9.0000, 108.00, 9.0000, 108.00, 0.0000, 0.00, 0.0000, 0.00, 1416.00, 'Cancel flow test', '2026-04-04 23:52:58.306886', 168, '2026-04-04 23:52:58.306886', 168);
+
+-- changeset sameerkhan:1775937591491-80
+INSERT INTO "recurring_sales_invoice" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "price_list_id", "template_number", "frequency", "start_date", "next_run_date", "end_date", "due_days", "place_of_supply_state_code", "remarks", "is_active", "last_run_at", "last_sales_invoice_id", "created_at", "updated_at", "created_by", "updated_by") VALUES (1, 33, 71, 142, 50, NULL, 'RSI-20260329-1774795307838', 'MONTHLY', '2026-03-29', '2026-03-29', NULL, 15, '24', 'Demo recurring invoice', TRUE, NULL, NULL, '2026-03-29 20:11:47.840775', '2026-03-29 20:11:47.840775', 168, 168);
+INSERT INTO "recurring_sales_invoice" ("id", "organization_id", "branch_id", "warehouse_id", "customer_id", "price_list_id", "template_number", "frequency", "start_date", "next_run_date", "end_date", "due_days", "place_of_supply_state_code", "remarks", "is_active", "last_run_at", "last_sales_invoice_id", "created_at", "updated_at", "created_by", "updated_by") VALUES (2, 33, 71, 142, 50, NULL, 'RSI-20260329-1774795454054', 'MONTHLY', '2026-03-29', '2026-04-29', NULL, 15, '24', 'Demo recurring floodlight invoice', TRUE, '2026-03-29 11:46:15.139328', 26, '2026-03-29 11:44:14.055083', '2026-03-29 11:46:15.140142', 168, 168);
+
+-- changeset sameerkhan:1775937591491-81
+INSERT INTO "recurring_sales_invoice_line" ("id", "recurring_sales_invoice_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "discount_amount", "warranty_months", "remarks", "created_at", "updated_at", "created_by", "updated_by") VALUES (1, 1, 44, 11, 5.000, 5.000, NULL, 0.00, NULL, NULL, '2026-03-29 20:11:47.864083', '2026-03-29 20:11:47.864083', 168, 168);
+INSERT INTO "recurring_sales_invoice_line" ("id", "recurring_sales_invoice_id", "product_id", "uom_id", "quantity", "base_quantity", "unit_price", "discount_amount", "warranty_months", "remarks", "created_at", "updated_at", "created_by", "updated_by") VALUES (2, 2, 51, 5, 1.000, 1.000, NULL, 0.00, NULL, NULL, '2026-03-29 11:44:14.064558', '2026-03-29 11:44:14.064558', 168, 168);
+
+-- changeset sameerkhan:1775937591491-82
+INSERT INTO "recurring_journal" ("id", "organization_id", "branch_id", "template_number", "voucher_type", "frequency", "start_date", "next_run_date", "end_date", "remarks", "is_active", "last_run_at", "last_voucher_id", "created_at", "updated_at", "created_by", "updated_by") VALUES (1, 33, 71, 'RJ-20260329-1774795454208', 'JOURNAL', 'MONTHLY', '2026-03-29', '2026-04-29', NULL, 'Demo recurring journal', TRUE, '2026-03-29 11:44:14.286683', 14, '2026-03-29 11:44:14.209135', '2026-03-29 11:44:14.287211', 168, 168);
+
+-- changeset sameerkhan:1775937591491-83
+INSERT INTO "recurring_journal_line" ("id", "recurring_journal_id", "account_id", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "created_at", "updated_at", "created_by", "updated_by") VALUES (1, 1, 265, 1000.00, 0.00, 'Monthly accrual reversal', NULL, NULL, '2026-03-29 11:44:14.216713', '2026-03-29 11:44:14.216713', 168, 168);
+INSERT INTO "recurring_journal_line" ("id", "recurring_journal_id", "account_id", "debit_amount", "credit_amount", "narrative", "customer_id", "supplier_id", "created_at", "updated_at", "created_by", "updated_by") VALUES (2, 1, 272, 0.00, 1000.00, 'Monthly accrual reversal', NULL, NULL, '2026-03-29 11:44:14.22477', '2026-03-29 11:44:14.22477', 168, 168);
+
+-- changeset sameerkhan:1775937591491-84
+INSERT INTO "bank_statement_entry" ("id", "organization_id", "branch_id", "account_id", "entry_date", "value_date", "reference_number", "description", "debit_amount", "credit_amount", "status", "matched_ledger_entry_id", "matched_on", "matched_by", "remarks", "created_at", "updated_at", "created_by", "updated_by") VALUES (1, 33, 71, 266, '2026-03-26', '2026-03-26', 'BANK-STMT-001', 'Customer receipt bank credit', 1000.00, 0.00, 'RECONCILED', 15, '2026-03-29 11:50:22.379814', 168, 'Matched to bank receipt ledger', '2026-03-29 11:50:22.263059', '2026-03-29 11:50:22.379975', 168, 168);
+
+-- changeset sameerkhan:1775937591491-85
+INSERT INTO "account_subscription" ("id", "account_id", "subscription_plan_id", "status", "starts_on", "ends_on", "auto_renew", "purchased_at", "grace_until", "notes", "metadata_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 16, 2, 'ACTIVE', '2026-03-25', NULL, FALSE, '2026-03-25 06:47:22.620421', NULL, 'Backfilled default subscription during subscription schema migration', '{"source": "migration-043"}', '2026-03-29 21:43:03.901681', NULL, '2026-03-29 21:43:03.901681', NULL);
+INSERT INTO "account_subscription" ("id", "account_id", "subscription_plan_id", "status", "starts_on", "ends_on", "auto_renew", "purchased_at", "grace_until", "notes", "metadata_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 1, 2, 'ACTIVE', '2026-03-25', NULL, FALSE, '2026-03-25 06:51:58.006659', NULL, 'Backfilled from organization subscription', '{"source": "migration-043"}', '2026-03-29 21:43:03.901681', 168, '2026-03-29 21:43:03.901681', 168);
+INSERT INTO "account_subscription" ("id", "account_id", "subscription_plan_id", "status", "starts_on", "ends_on", "auto_renew", "purchased_at", "grace_until", "notes", "metadata_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 9, 2, 'ACTIVE', '2026-03-25', NULL, FALSE, '2026-03-25 06:47:22.620421', NULL, 'Backfilled default subscription during subscription schema migration', '{"source": "migration-043"}', '2026-03-29 21:43:03.901681', NULL, '2026-03-29 21:43:03.901681', NULL);
+
+-- changeset sameerkhan:1775937591491-86
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 35, 'battery_type', 'Battery Type', 'Battery fitment / maintenance type', 'OPTION', 'SELECT', TRUE, TRUE, NULL, 'Select battery type', 'Used to distinguish RMF / LMF / tubular types', 10, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 36, 'battery_type', 'Battery Type', 'Battery fitment / maintenance type', 'OPTION', 'SELECT', TRUE, TRUE, NULL, 'Select battery type', 'Used to distinguish RMF / LMF / tubular types', 10, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 34, 'battery_type', 'Battery Type', 'Battery fitment / maintenance type', 'OPTION', 'SELECT', TRUE, TRUE, NULL, 'Select battery type', 'Used to distinguish RMF / LMF / tubular types', 10, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 35, 'capacity_ah', 'Capacity (Ah)', 'Battery capacity in ampere-hour', 'NUMBER', 'NUMBER', FALSE, TRUE, 'Ah', 'Enter capacity', 'Useful for battery sizing and search', 20, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 36, 'capacity_ah', 'Capacity (Ah)', 'Battery capacity in ampere-hour', 'NUMBER', 'NUMBER', FALSE, TRUE, 'Ah', 'Enter capacity', 'Useful for battery sizing and search', 20, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 34, 'capacity_ah', 'Capacity (Ah)', 'Battery capacity in ampere-hour', 'NUMBER', 'NUMBER', FALSE, TRUE, 'Ah', 'Enter capacity', 'Useful for battery sizing and search', 20, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 33, 'capacity_ah', 'Capacity (Ah)', 'Battery capacity in ampere-hour', 'NUMBER', 'NUMBER', FALSE, TRUE, 'Ah', 'Enter capacity', 'Useful for battery sizing and search', 20, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 35, 'voltage', 'Voltage', 'Nominal voltage of the battery', 'NUMBER', 'NUMBER', FALSE, TRUE, 'V', 'Enter voltage', 'Common battery voltage rating', 30, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, 36, 'voltage', 'Voltage', 'Nominal voltage of the battery', 'NUMBER', 'NUMBER', FALSE, TRUE, 'V', 'Enter voltage', 'Common battery voltage rating', 30, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, 34, 'voltage', 'Voltage', 'Nominal voltage of the battery', 'NUMBER', 'NUMBER', FALSE, TRUE, 'V', 'Enter voltage', 'Common battery voltage rating', 30, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (12, 33, 'voltage', 'Voltage', 'Nominal voltage of the battery', 'NUMBER', 'NUMBER', FALSE, TRUE, 'V', 'Enter voltage', 'Common battery voltage rating', 30, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (13, 35, 'viscosity_grade', 'Viscosity Grade', 'Lubricant viscosity grade', 'OPTION', 'SELECT', TRUE, TRUE, NULL, 'Select viscosity', 'Examples: 20W40, 10W30', 10, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (14, 36, 'viscosity_grade', 'Viscosity Grade', 'Lubricant viscosity grade', 'OPTION', 'SELECT', TRUE, TRUE, NULL, 'Select viscosity', 'Examples: 20W40, 10W30', 10, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (15, 34, 'viscosity_grade', 'Viscosity Grade', 'Lubricant viscosity grade', 'OPTION', 'SELECT', TRUE, TRUE, NULL, 'Select viscosity', 'Examples: 20W40, 10W30', 10, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (16, 33, 'viscosity_grade', 'Viscosity Grade', 'Lubricant viscosity grade', 'OPTION', 'SELECT', TRUE, TRUE, NULL, 'Select viscosity', 'Examples: 20W40, 10W30', 10, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (17, 35, 'pack_size', 'Pack Size', 'Retail pack size', 'OPTION', 'SELECT', TRUE, TRUE, NULL, 'Select pack size', 'Examples: 500ML, 1L, 4L', 20, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (18, 36, 'pack_size', 'Pack Size', 'Retail pack size', 'OPTION', 'SELECT', TRUE, TRUE, NULL, 'Select pack size', 'Examples: 500ML, 1L, 4L', 20, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (19, 34, 'pack_size', 'Pack Size', 'Retail pack size', 'OPTION', 'SELECT', TRUE, TRUE, NULL, 'Select pack size', 'Examples: 500ML, 1L, 4L', 20, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (20, 33, 'pack_size', 'Pack Size', 'Retail pack size', 'OPTION', 'SELECT', TRUE, TRUE, NULL, 'Select pack size', 'Examples: 500ML, 1L, 4L', 20, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (21, 35, 'oil_type', 'Oil Type', 'Type of lubricant', 'OPTION', 'SELECT', FALSE, TRUE, NULL, 'Select oil type', 'Engine oil, gear oil, coolant, etc.', 30, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (22, 36, 'oil_type', 'Oil Type', 'Type of lubricant', 'OPTION', 'SELECT', FALSE, TRUE, NULL, 'Select oil type', 'Engine oil, gear oil, coolant, etc.', 30, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (23, 34, 'oil_type', 'Oil Type', 'Type of lubricant', 'OPTION', 'SELECT', FALSE, TRUE, NULL, 'Select oil type', 'Engine oil, gear oil, coolant, etc.', 30, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (24, 33, 'oil_type', 'Oil Type', 'Type of lubricant', 'OPTION', 'SELECT', FALSE, TRUE, NULL, 'Select oil type', 'Engine oil, gear oil, coolant, etc.', 30, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (25, 33, 'model', 'Model', NULL, 'TEXT', 'TEXT', TRUE, TRUE, NULL, NULL, NULL, 1, '2026-04-04 19:14:02.241444', 168, '2026-04-04 19:14:02.241444', 168);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (26, 33, 'capacity', 'Capacity', NULL, 'TEXT', 'TEXT', TRUE, TRUE, NULL, 'capacity', NULL, 1, '2026-04-04 19:15:31.29175', 168, '2026-04-04 19:15:31.29175', 168);
+INSERT INTO "product_attribute_definition" ("id", "organization_id", "code", "label", "description", "data_type", "input_type", "is_required", "is_active", "unit_label", "placeholder", "help_text", "sort_order", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 33, 'battery_type', 'Battery Type', 'Battery fitment / maintenance type', 'OPTION', 'SELECT', TRUE, TRUE, NULL, 'Select battery type', 'Used to distinguish RMF / LMF / tubular types', 1, '2026-04-04 18:41:12.742411', 168, '2026-04-06 22:28:09.645394', 169);
+
+-- changeset sameerkhan:1775937591491-87
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 1, 'TUBULAR', 'Tubular', 30, TRUE, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 14, '5W30', '5W30', 40, TRUE, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 2, 'RMF', 'RMF', 10, TRUE, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 18, '900ML', '900 ML', 20, TRUE, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 3, 'LMF', 'LMF', 20, TRUE, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 24, 'BRAKE_FLUID', 'Brake Fluid', 40, TRUE, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 17, '900ML', '900 ML', 20, TRUE, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 20, '500ML', '500 ML', 10, TRUE, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, 18, '500ML', '500 ML', 10, TRUE, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, 19, '4L', '4 L', 40, TRUE, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (13, 15, '5W30', '5W30', 40, TRUE, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (14, 23, 'BRAKE_FLUID', 'Brake Fluid', 40, TRUE, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (15, 16, '5W30', '5W30', 40, TRUE, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (16, 3, 'TUBULAR', 'Tubular', 30, TRUE, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (17, 19, '1L', '1 L', 30, TRUE, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (18, 22, 'BRAKE_FLUID', 'Brake Fluid', 40, TRUE, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (19, 17, '500ML', '500 ML', 10, TRUE, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (20, 20, '900ML', '900 ML', 20, TRUE, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (21, 13, '5W30', '5W30', 40, TRUE, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (22, 2, 'SMF', 'SMF', 40, TRUE, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (23, 1, 'LMF', 'LMF', 20, TRUE, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (24, 21, 'BRAKE_FLUID', 'Brake Fluid', 40, TRUE, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (25, 20, '4L', '4 L', 40, TRUE, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (26, 15, '10W30', '10W30', 10, TRUE, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (27, 16, '10W30', '10W30', 10, TRUE, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (29, 24, 'ENGINE_OIL', 'Engine Oil', 10, TRUE, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (30, 23, 'GEAR_OIL', 'Gear Oil', 20, TRUE, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (31, 20, '1L', '1 L', 30, TRUE, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (32, 1, 'SMF', 'SMF', 40, TRUE, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (33, 2, 'LMF', 'LMF', 20, TRUE, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (34, 14, '15W40', '15W40', 20, TRUE, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (35, 22, 'GEAR_OIL', 'Gear Oil', 20, TRUE, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (36, 19, '900ML', '900 ML', 20, TRUE, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (37, 24, 'COOLANT', 'Coolant', 30, TRUE, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (38, 14, '20W40', '20W40', 30, TRUE, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (39, 21, 'GEAR_OIL', 'Gear Oil', 20, TRUE, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (40, 13, '10W30', '10W30', 10, TRUE, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (41, 3, 'RMF', 'RMF', 10, TRUE, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (42, 21, 'ENGINE_OIL', 'Engine Oil', 10, TRUE, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (43, 14, '10W30', '10W30', 10, TRUE, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (44, 23, 'COOLANT', 'Coolant', 30, TRUE, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (45, 13, '20W40', '20W40', 30, TRUE, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (46, 3, 'SMF', 'SMF', 40, TRUE, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (47, 17, '4L', '4 L', 40, TRUE, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (48, 2, 'TUBULAR', 'Tubular', 30, TRUE, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (49, 1, 'RMF', 'RMF', 10, TRUE, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (50, 13, '15W40', '15W40', 20, TRUE, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (51, 22, 'ENGINE_OIL', 'Engine Oil', 10, TRUE, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (52, 18, '1L', '1 L', 30, TRUE, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (53, 21, 'COOLANT', 'Coolant', 30, TRUE, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (54, 16, '20W40', '20W40', 30, TRUE, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (56, 23, 'ENGINE_OIL', 'Engine Oil', 10, TRUE, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (57, 15, '15W40', '15W40', 20, TRUE, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (58, 24, 'GEAR_OIL', 'Gear Oil', 20, TRUE, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (59, 17, '1L', '1 L', 30, TRUE, '2026-04-04 18:41:12.742411', 190, '2026-04-04 18:41:12.742411', 190);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (60, 22, 'COOLANT', 'Coolant', 30, TRUE, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (61, 15, '20W40', '20W40', 30, TRUE, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (62, 18, '4L', '4 L', 40, TRUE, '2026-04-04 18:41:12.742411', 191, '2026-04-04 18:41:12.742411', 191);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (63, 19, '500ML', '500 ML', 10, TRUE, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (64, 16, '15W40', '15W40', 20, TRUE, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (65, 4, 'rmf', 'RMF', 1, TRUE, '2026-04-06 22:28:09.631716', 169, '2026-04-06 22:28:09.631716', 169);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (66, 4, 'lmf', 'LMF', 2, TRUE, '2026-04-06 22:28:09.637767', 169, '2026-04-06 22:28:09.637767', 169);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (67, 4, 'tubular', 'Tubular', 3, TRUE, '2026-04-06 22:28:09.638455', 169, '2026-04-06 22:28:09.638455', 169);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (68, 4, 'smf', 'SMF', 4, TRUE, '2026-04-06 22:28:09.63933', 169, '2026-04-06 22:28:09.63933', 169);
+INSERT INTO "product_attribute_option" ("id", "attribute_definition_id", "code", "label", "sort_order", "is_active", "created_at", "created_by", "updated_at", "updated_by") VALUES (69, 4, 'li_ion', 'Li-ion', 5, TRUE, '2026-04-06 22:28:09.639911', 169, '2026-04-06 22:28:09.639911', 169);
+
+-- changeset sameerkhan:1775937591491-88
+INSERT INTO "product_attribute_scope" ("id", "organization_id", "attribute_definition_id", "category_id", "brand_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 33, 8, 72, NULL, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_scope" ("id", "organization_id", "attribute_definition_id", "category_id", "brand_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 33, 12, 72, NULL, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_scope" ("id", "organization_id", "attribute_definition_id", "category_id", "brand_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 33, 20, 74, NULL, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_scope" ("id", "organization_id", "attribute_definition_id", "category_id", "brand_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 33, 24, 74, NULL, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_scope" ("id", "organization_id", "attribute_definition_id", "category_id", "brand_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (6, 33, 16, 74, NULL, '2026-04-04 18:41:12.742411', 168, '2026-04-04 18:41:12.742411', 168);
+INSERT INTO "product_attribute_scope" ("id", "organization_id", "attribute_definition_id", "category_id", "brand_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (7, 34, 7, 77, NULL, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_scope" ("id", "organization_id", "attribute_definition_id", "category_id", "brand_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (8, 34, 3, 77, NULL, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_scope" ("id", "organization_id", "attribute_definition_id", "category_id", "brand_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (9, 34, 11, 77, NULL, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_scope" ("id", "organization_id", "attribute_definition_id", "category_id", "brand_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (10, 34, 15, 79, NULL, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_scope" ("id", "organization_id", "attribute_definition_id", "category_id", "brand_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (11, 34, 19, 79, NULL, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_scope" ("id", "organization_id", "attribute_definition_id", "category_id", "brand_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (12, 34, 23, 79, NULL, '2026-04-04 18:41:12.742411', 176, '2026-04-04 18:41:12.742411', 176);
+INSERT INTO "product_attribute_scope" ("id", "organization_id", "attribute_definition_id", "category_id", "brand_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (13, 33, 25, 71, 85, '2026-04-04 19:14:02.24776', 168, '2026-04-04 19:14:02.24776', 168);
+INSERT INTO "product_attribute_scope" ("id", "organization_id", "attribute_definition_id", "category_id", "brand_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (14, 33, 26, 71, 85, '2026-04-04 19:15:31.294424', 168, '2026-04-04 19:15:31.294424', 168);
+INSERT INTO "product_attribute_scope" ("id", "organization_id", "attribute_definition_id", "category_id", "brand_id", "created_at", "created_by", "updated_at", "updated_by") VALUES (15, 33, 4, 72, 86, '2026-04-06 22:28:09.642674', 169, '2026-04-06 22:28:09.642674', 169);
+
+-- changeset sameerkhan:1775937591491-89
+INSERT INTO "store_product_attribute_value" ("id", "organization_id", "store_product_id", "attribute_definition_id", "value_text", "value_number", "value_boolean", "value_date", "value_option_id", "value_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (2, 33, 55, 8, NULL, 65.000000, NULL, NULL, NULL, NULL, '2026-04-04 18:51:35.73117', 168, '2026-04-04 18:51:35.73117', 168);
+INSERT INTO "store_product_attribute_value" ("id", "organization_id", "store_product_id", "attribute_definition_id", "value_text", "value_number", "value_boolean", "value_date", "value_option_id", "value_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (3, 33, 55, 12, NULL, 12.000000, NULL, NULL, NULL, NULL, '2026-04-04 18:51:35.731905', 168, '2026-04-04 18:51:35.731905', 168);
+INSERT INTO "store_product_attribute_value" ("id", "organization_id", "store_product_id", "attribute_definition_id", "value_text", "value_number", "value_boolean", "value_date", "value_option_id", "value_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (4, 33, 57, 26, '1500 VA', NULL, NULL, NULL, NULL, NULL, '2026-04-04 19:36:02.62328', 168, '2026-04-04 19:36:02.62328', 168);
+INSERT INTO "store_product_attribute_value" ("id", "organization_id", "store_product_id", "attribute_definition_id", "value_text", "value_number", "value_boolean", "value_date", "value_option_id", "value_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (5, 33, 57, 25, 'Power', NULL, NULL, NULL, NULL, NULL, '2026-04-04 19:36:02.626522', 168, '2026-04-04 19:36:02.626522', 168);
+INSERT INTO "store_product_attribute_value" ("id", "organization_id", "store_product_id", "attribute_definition_id", "value_text", "value_number", "value_boolean", "value_date", "value_option_id", "value_json", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 33, 55, 4, NULL, NULL, NULL, NULL, NULL, NULL, '2026-04-04 18:51:35.726844', 168, '2026-04-04 18:51:35.726844', 168);
+
+-- changeset sameerkhan:1775937591491-90
+INSERT INTO "warranty_extension" ("id", "organization_id", "product_ownership_id", "serial_number_id", "sales_invoice_id", "sales_invoice_line_id", "extension_type", "months_added", "start_date", "end_date", "status", "reason", "reference_number", "amount", "remarks", "created_at", "created_by", "updated_at", "updated_by") VALUES (1, 33, 4, 54, 10, 24, 'PAID_EXTENDED', 12, '2028-03-04', '2029-03-03', 'ACTIVE', 'Demo extended warranty purchase', 'EXT-DEMO-0001', 1499.00, 'Added during UI verification', '2026-04-04 20:33:54.858431', 168, '2026-04-04 20:33:54.858431', 168);
 
 

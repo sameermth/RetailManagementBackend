@@ -1,6 +1,7 @@
 package com.retailmanagement.modules.auth.controller;
 
 import com.retailmanagement.modules.auth.dto.request.LoginRequest;
+import com.retailmanagement.modules.auth.dto.request.RefreshTokenRequest;
 import com.retailmanagement.modules.auth.dto.request.RegisterRequest;
 import com.retailmanagement.modules.auth.dto.request.SwitchOrganizationRequest;
 import com.retailmanagement.modules.auth.dto.response.JwtResponse;
@@ -8,6 +9,7 @@ import com.retailmanagement.modules.auth.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,8 +24,24 @@ public class AuthController {
 
     @PostMapping("/login")
     @Operation(summary = "Login user")
-    public ResponseEntity<JwtResponse> login(@Valid @RequestBody LoginRequest loginRequest) {
-        return ResponseEntity.ok(authService.login(loginRequest));
+    public ResponseEntity<JwtResponse> login(@Valid @RequestBody LoginRequest loginRequest, HttpServletRequest request) {
+        return ResponseEntity.ok(authService.login(
+                loginRequest,
+                request.getHeader("User-Agent"),
+                request.getHeader("X-Device-Id"),
+                request.getHeader("X-Device-Name")
+        ));
+    }
+
+    @PostMapping("/refresh")
+    @Operation(summary = "Refresh access token using refresh token")
+    public ResponseEntity<JwtResponse> refresh(@Valid @RequestBody RefreshTokenRequest refreshTokenRequest, HttpServletRequest request) {
+        return ResponseEntity.ok(authService.refresh(
+                refreshTokenRequest,
+                request.getHeader("User-Agent"),
+                request.getHeader("X-Device-Id"),
+                request.getHeader("X-Device-Name")
+        ));
     }
 
     @PostMapping("/register")
@@ -34,8 +52,11 @@ public class AuthController {
 
     @PostMapping("/logout")
     @Operation(summary = "Logout user")
-    public ResponseEntity<Void> logout(@RequestHeader("Authorization") String token) {
-        authService.logout(token);
+    public ResponseEntity<Void> logout(
+            @RequestHeader(value = "Authorization", required = false) String token,
+            @RequestBody(required = false) RefreshTokenRequest refreshTokenRequest
+    ) {
+        authService.logout(token, refreshTokenRequest);
         return ResponseEntity.ok().build();
     }
 

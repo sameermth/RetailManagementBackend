@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 
@@ -14,8 +15,12 @@ import java.util.Set;
 @AllArgsConstructor
 public class JwtResponse {
     private String token;
+    private String refreshToken;
     @Builder.Default
     private String type = "Bearer";
+    private LocalDateTime accessTokenExpiresAt;
+    private LocalDateTime refreshTokenExpiresAt;
+    private String clientType;
     private Long id;
     private Long organizationId;
     private String organizationCode;

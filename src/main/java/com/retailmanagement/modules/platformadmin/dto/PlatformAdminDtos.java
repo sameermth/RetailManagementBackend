@@ -58,6 +58,15 @@ public final class PlatformAdminDtos {
             Long organizationsUsed
     ) {}
 
+    public record OwnerAccountReferenceResponse(
+            Long accountId,
+            String loginIdentifier,
+            String fullName,
+            String email,
+            String phone,
+            Boolean active
+    ) {}
+
     public record TeamMemberSummaryResponse(
             Long organizationId,
             String organizationCode,

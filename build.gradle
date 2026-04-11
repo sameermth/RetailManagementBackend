@@ -1,8 +1,17 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.liquibase:liquibase-core:4.31.1'
+    }
+}
+
 plugins {
     id 'org.springframework.boot' version '3.5.6'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'java'
-    id 'org.liquibase.gradle' version '2.2.0' apply false
+    id 'org.liquibase.gradle' version '3.1.0' apply false
 }
 
 springBoot {
@@ -116,17 +125,63 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 
-if (project.hasProperty('liquibase')) {
+if (project.hasProperty('withLiquibase')) {
     apply plugin: 'org.liquibase.gradle'
 
+    dependencies {
+        liquibaseRuntime 'org.liquibase:liquibase-core:4.31.1'
+        liquibaseRuntime 'info.picocli:picocli:4.7.7'
+        liquibaseRuntime 'org.apache.commons:commons-lang3:3.14.0'
+        liquibaseRuntime 'org.postgresql:postgresql:42.6.0'
+        liquibaseRuntime sourceSets.main.output
+    }
+
+    def liquibaseUrl = (project.findProperty('liquibaseUrl')
+            ?: 'jdbc:postgresql://localhost:5432/retail_management_db?currentSchema=retail_management_service') as String
+    def liquibaseUsername = (project.findProperty('liquibaseUsername') ?: 'retail_admin') as String
+    def liquibasePassword = (project.findProperty('liquibasePassword') ?: 'admin') as String
+
     liquibase {
-        activity(name: 'main') {
-            changelogFile = 'src/main/resources/db/changelog/db.changelog-master.yml'
-            url = 'jdbc:postgresql://localhost:5432/retail_management_db?currentSchema=retail_management_schema'
-            username = 'postgres'
-            password = 'password'
-            driver = 'org.postgresql.Driver'
+        activities {
+            main {
+                changelogFile 'src/main/resources/db/changelog/db.changelog-master.yml'
+                url liquibaseUrl
+                username liquibaseUsername
+                password liquibasePassword
+                driver 'org.postgresql.Driver'
+            }
+
+            exportSchema {
+                changelogFile 'src/main/resources/db/changelog/bootstrap/001_bootstrap_schema.sql'
+                url liquibaseUrl
+                username liquibaseUsername
+                password liquibasePassword
+                driver 'org.postgresql.Driver'
+                diffTypes 'tables,views,columns,indexes,foreignkeys,primarykeys,uniqueconstraints,sequences'
+            }
+
+            exportMasterData {
+                changelogFile 'src/main/resources/db/changelog/bootstrap/002_bootstrap_master_data.sql'
+                url liquibaseUrl
+                username liquibaseUsername
+                password liquibasePassword
+                driver 'org.postgresql.Driver'
+                diffTypes 'data'
+                includeObjects 'table:role,table:permission,table:role_permission,table:uom_group,table:uom,table:subscription_plan,table:hsn_master,table:hsn_tax_rate'
+            }
+
+            exportDemoData {
+                changelogFile 'src/main/resources/db/changelog/bootstrap/003_bootstrap_demo_data.sql'
+                url liquibaseUrl
+                username liquibaseUsername
+                password liquibasePassword
+                driver 'org.postgresql.Driver'
+                diffTypes 'data'
+                excludeObjects 'table:databasechangelog,table:databasechangeloglock,table:role,table:permission,table:role_permission,table:uom_group,table:uom,table:subscription_plan,table:hsn_master,table:hsn_tax_rate'
+            }
         }
+
+        runList = (project.findProperty('liquibaseRunList') ?: 'main') as String
     }
 }
 
