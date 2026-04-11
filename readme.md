@@ -1,84 +1,143 @@
 # Retail Management Backend
 
-A comprehensive retail management system built with Spring Boot, PostgreSQL, and Gradle.
-
-## Features
-
-- **Authentication & Authorization**: JWT-based security with role-based access control
-- **Product Management**: Complete CRUD operations for products, categories, and brands
-- **Inventory Management**: Track stock levels, movements, and warehouse management
-- **Sales Management**: Process sales, generate invoices, and track payments
-- **Customer Management**: Manage customer information, dues, and loyalty programs
-- **Supplier Management**: Track suppliers, purchases, and outstanding payments
-- **Distributor Management**: Manage distributors, orders, and commissions
-- **Expense Management**: Track expenses with category budgets and recurring expenses
-- **Reporting**: Generate comprehensive reports in multiple formats (PDF, Excel, CSV)
-- **Notifications**: Multi-channel notifications (Email, SMS, In-app)
+ERP backend for multi-store retail operations with owner-level subscription governance, org-scoped access, and full commerce lifecycle support (catalog, purchase, sales, inventory, returns, service, finance, reporting, and platform admin).
 
 ## Tech Stack
 
-- Java 17
-- Spring Boot 3.1.x
-- Spring Security with JWT
-- Spring Data JPA
-- PostgreSQL
-- Gradle 9.4
-- Lombok
-- MapStruct
+- Java 21
+- Spring Boot 3.5.6
+- Spring Security (JWT + refresh sessions)
+- Spring Data JPA (PostgreSQL)
+- Liquibase
 - OpenAPI (Swagger)
-- iText PDF
-- Apache POI
+- iText (PDF), Apache POI (Excel)
+- Gradle Wrapper 9.0.0
 
-## Prerequisites
+## Architecture Flow
 
-- JDK 17 or higher
-- PostgreSQL 14 or higher
-- Gradle 9.4 (or use the wrapper)
+### 1) Identity, Access, and Organization Context
 
-## Getting Started
+```mermaid
+flowchart LR
+  A[Login] --> B[Resolve client type: web or mobile]
+  B --> C[Issue access token + refresh token]
+  C --> D[Load permissions + subscription snapshot]
+  D --> E[Select active organization]
+  E --> F[Branch-scoped authorization]
+  C --> G[Refresh token rotation]
+  G --> D
+```
 
-1. Clone the repository
-2. Create PostgreSQL database
-3. Update application.properties with your database credentials
-4. Run `./gradlew build`
-5. Run `./gradlew bootRun`
+### 2) Owner Subscription to Organization Setup
 
-## API Documentation
+```mermaid
+flowchart LR
+  A[Owner subscription plan] --> B[Organization limit check]
+  B --> C[Create or update organization]
+  C --> D[Create branches]
+  D --> E[Create warehouses]
+  E --> F[Create employees]
+  F --> G[Assign role + branch access]
+```
 
-Once the application is running, access Swagger UI at:
-http://localhost:8080/swagger-ui.html
+### 3) Sales to Cash
 
-## Project Structure
-rc/main/java/com/retailmanagement/ \
-├── common/ # Common utilities, configs, exceptions  \
-├── modules/ # Business modules \
-│ ├── auth/ # Authentication & Authorization \
-│ ├── product/ # Product management \
-│ ├── inventory/ # Inventory management \
-│ ├── sales/ # Sales management \
-│ ├── customer/ # Customer management \
-│ ├── supplier/ # Supplier management \
-│ ├── purchase/ # Purchase management \
-│ ├── distributor/ # Distributor management \
-│ ├── expense/ # Expense management \
-│ ├── report/ # Report generation \
-│ └── notification/# Notification system \
-└── infrastructure/ # Infrastructure components 
+```mermaid
+flowchart LR
+  A[Quote or Estimate] --> B[Sales Order optional]
+  B --> C[Tax Invoice]
+  C --> D[Inventory out + finance posting]
+  D --> E[Customer Receipt]
+  E --> F[Receipt allocation to invoices]
+  F --> G[Outstanding recalculated]
+  C --> H[PDF or email documents]
+```
 
-## Build and Deployment
+### 4) Purchase to Pay
+
+```mermaid
+flowchart LR
+  A[Purchase Order] --> B[Purchase Receipt]
+  B --> C[Inventory in + payable posting]
+  C --> D[Supplier Payment]
+  D --> E[Payment allocation to receipts]
+  E --> F[Payable recalculated]
+  B --> G[PDF or email documents]
+```
+
+### 5) Service, Warranty, and Agreement Flow
+
+```mermaid
+flowchart LR
+  A[Sold ownership context] --> B[Service Ticket]
+  B --> C[Warranty Claim]
+  C --> D{Decision}
+  D -->|Approved| E[Replacement issuance]
+  D -->|Rejected| F[Ticket closure path]
+  C --> G[Warranty extension optional]
+  B --> H[Service agreement optional]
+  E --> I[Ownership and stock trail updated]
+```
+
+## Module Structure
+
+- `auth`: login/refresh/logout, organization switch, profile, employee membership.
+- `erp.foundation`: organizations, branches, warehouses.
+- `erp.subscription`: owner subscription and plan propagation to owned organizations.
+- `erp.catalog`: shared product catalog, store products, HSN lookup, dynamic attributes, pricing.
+- `erp.party`: customer and supplier relationship management.
+- `erp.purchase`: purchase orders, receipts, supplier payments, allocations.
+- `erp.sales`: quotes/orders/invoices, customer receipts, allocations.
+- `erp.inventory`: balances, transfers, adjustments, reservations, serial/batch tracking.
+- `erp.returns`: sales and purchase returns with inspection/posting flow.
+- `erp.service`: service tickets, warranty claims, replacements, agreements, warranty extensions.
+- `erp.finance`: accounts CRUD, vouchers, ledgers, outstanding, summaries, reconciliation.
+- `erp.tax`: tax registrations and GST threshold settings.
+- `erp.approval` + `erp.workflow`: approval rules/requests and trigger dispatch.
+- `platformadmin`: cross-store admin operations (stores, subscriptions, teams, support, audit, health).
+- `dashboard`, `report`, `notification`: analytics, report scheduling/export, notification channels/templates.
+
+## API Surface (Current Base Paths)
+
+- `/api/auth`, `/api/auth/profile`, `/api/users`
+- `/api/erp/organizations`, `/api/erp/branches`, `/api/erp/warehouses`, `/api/erp/employees`
+- `/api/erp/subscriptions`
+- `/api/erp/catalog`, `/api/erp/catalog/attributes`, `/api/erp/products`, `/api/erp/hsn`
+- `/api/erp/customers`, `/api/erp/suppliers`
+- `/api/erp/purchases`, `/api/erp/sales`, `/api/erp/sales/recurring-invoices`
+- `/api/erp/inventory-balances`, `/api/erp/inventory-operations`, `/api/erp/inventory-reservations`, `/api/erp/inventory-tracking`, `/api/erp/stock-movements`
+- `/api/erp/returns`, `/api/erp/service`, `/api/erp/finance`, `/api/erp/finance/bank-reconciliation`, `/api/erp/finance/recurring-journals`, `/api/erp/tax`
+- `/api/erp/approvals`, `/api/erp/workflow-triggers`, `/api/erp/audit-events`
+- `/api/platform-admin`, `/api/dashboard`, `/api/report-schedules`
+- `/api/notifications`, `/api/notification-templates`, `/api/notifications/email`, `/api/notifications/sms`
+
+## Local Run
+
+1. Ensure Java 21 and PostgreSQL are available.
+2. Create DB/schema and update local credentials as needed.
+3. Set environment variables:
+   - `JWT_SECRET`
+   - `SMTP_PASSWORD` (if email sending is used)
+4. Run:
 
 ```bash
-# Build the project
 ./gradlew clean build
-
-# Run tests
 ./gradlew test
+SPRING_PROFILES_ACTIVE=local ./gradlew bootRun
+```
 
-# Run with dev profile
-./gradlew bootRun
+## Database Bootstrap and Environments
 
-# Create Docker image
-docker build -t retail-management .
+- Active changelog: `src/main/resources/db/changelog/db.changelog-master.yml`
+- Bootstrap SQL files:
+  - `bootstrap/001_bootstrap_schema.sql`
+  - `bootstrap/002_bootstrap_master_data.sql` (`seed` context)
+  - `bootstrap/003_bootstrap_demo_data.sql` (`demo` context)
+- Local profile uses `seed,demo`; production profile uses `seed` only.
+- Legacy incremental migrations are archived under `src/main/resources/db/changelog/legacy`.
 
-# Run with Docker Compose
-docker-compose up
+## Documentation
+
+- Swagger UI: `http://localhost:8080/swagger-ui/index.html`
+- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+- Interactive module flow map: `docs/module_flow_map.html`
