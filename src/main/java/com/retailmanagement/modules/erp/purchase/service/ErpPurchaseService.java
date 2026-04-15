@@ -7,25 +7,27 @@ import com.retailmanagement.modules.erp.approval.service.ErpApprovalService;
 import com.retailmanagement.modules.erp.audit.service.AuditEventWriter;
 import com.retailmanagement.modules.erp.catalog.entity.StoreProduct;
 import com.retailmanagement.modules.erp.catalog.entity.Product;
-import com.retailmanagement.modules.erp.catalog.repository.ProductRepository;
 import com.retailmanagement.modules.erp.finance.service.ErpAccountingPostingService;
 import com.retailmanagement.modules.erp.common.constants.ErpDocumentStatuses;
 import com.retailmanagement.modules.erp.common.constants.ErpInventoryMovementTypes;
 import com.retailmanagement.modules.erp.common.util.ErpJsonPayloads;
 import com.retailmanagement.modules.erp.catalog.repository.StoreProductRepository;
 import com.retailmanagement.modules.erp.catalog.repository.UomRepository;
+import com.retailmanagement.modules.erp.catalog.service.ProductGovernanceGuard;
 import com.retailmanagement.modules.erp.common.ErpSecurityUtils;
 import com.retailmanagement.modules.erp.common.security.ErpAccessGuard;
 import com.retailmanagement.modules.erp.inventory.entity.InventoryBatch;
 import com.retailmanagement.modules.erp.inventory.entity.SerialNumber;
 import com.retailmanagement.modules.erp.inventory.repository.InventoryBatchRepository;
 import com.retailmanagement.modules.erp.inventory.repository.SerialNumberRepository;
+import com.retailmanagement.modules.erp.inventory.service.InventoryBinService;
 import com.retailmanagement.modules.erp.inventory.service.InventoryPostingService;
 import com.retailmanagement.modules.erp.purchase.dto.ErpPurchaseDtos;
 import com.retailmanagement.modules.erp.purchase.dto.ErpPurchaseResponses;
 import com.retailmanagement.modules.erp.purchase.entity.*;
 import com.retailmanagement.modules.erp.purchase.repository.*;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -50,6 +52,9 @@ public class ErpPurchaseService {
 
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final PurchaseOrderLineRepository purchaseOrderLineRepository;
+    private final PurchaseOrderSupplierAccessRepository purchaseOrderSupplierAccessRepository;
+    private final PurchaseOrderSupplierDispatchNoticeRepository purchaseOrderSupplierDispatchNoticeRepository;
+    private final PurchaseOrderSupplierDispatchNoticeLineRepository purchaseOrderSupplierDispatchNoticeLineRepository;
     private final PurchaseReceiptRepository purchaseReceiptRepository;
     private final PurchaseReceiptLineRepository purchaseReceiptLineRepository;
     private final PurchaseReceiptLineSerialRepository purchaseReceiptLineSerialRepository;
@@ -61,10 +66,11 @@ public class ErpPurchaseService {
     private final StoreSupplierTermsRepository storeSupplierTermsRepository;
     private final StoreProductSupplierPreferenceRepository storeProductSupplierPreferenceRepository;
     private final StoreProductRepository productRepository;
-    private final ProductRepository productMasterRepository;
     private final UomRepository uomRepository;
+    private final ProductGovernanceGuard productGovernanceGuard;
     private final InventoryBatchRepository inventoryBatchRepository;
     private final SerialNumberRepository serialNumberRepository;
+    private final InventoryBinService inventoryBinService;
     private final InventoryPostingService inventoryPostingService;
     private final AuditEventWriter auditEventWriter;
     private final ErpAccessGuard accessGuard;
@@ -89,6 +95,164 @@ public class ErpPurchaseService {
         subscriptionAccessService.assertFeature(order.getOrganizationId(), "purchases");
         List<PurchaseOrderLine> lines = purchaseOrderLineRepository.findByPurchaseOrderIdOrderByIdAsc(id);
         return toPurchaseOrderResponse(order, lines);
+    }
+
+    public ErpPurchaseResponses.PurchaseOrderSupplierAccessResponse generateSupplierAccess(Long purchaseOrderId,
+                                                                                           ErpPurchaseDtos.GenerateSupplierPurchaseOrderAccessRequest request) {
+        PurchaseOrder order = purchaseOrderRepository.findById(purchaseOrderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase order not found: " + purchaseOrderId));
+        accessGuard.assertOrganizationAccess(order.getOrganizationId());
+        accessGuard.assertBranchAccess(order.getOrganizationId(), order.getBranchId());
+        subscriptionAccessService.assertFeature(order.getOrganizationId(), "purchases");
+        if (ErpDocumentStatuses.CANCELLED.equals(order.getStatus())) {
+            throw new BusinessException("Cannot generate supplier access for a cancelled purchase order");
+        }
+
+        int expiryDays = request == null || request.expiryDays() == null ? 14 : request.expiryDays();
+        PurchaseOrderSupplierAccess access = purchaseOrderSupplierAccessRepository.findByPurchaseOrderId(purchaseOrderId)
+                .orElseGet(PurchaseOrderSupplierAccess::new);
+        access.setOrganizationId(order.getOrganizationId());
+        access.setBranchId(order.getBranchId());
+        access.setPurchaseOrderId(order.getId());
+        access.setSupplierId(order.getSupplierId());
+        access.setAccessToken(java.util.UUID.randomUUID().toString());
+        access.setExpiresOn(LocalDate.now().plusDays(expiryDays));
+        access.setIsActive(Boolean.TRUE);
+        access = purchaseOrderSupplierAccessRepository.save(access);
+        return new ErpPurchaseResponses.PurchaseOrderSupplierAccessResponse(
+                order.getId(),
+                access.getAccessToken(),
+                "/supplier-portal/purchase-orders/" + access.getAccessToken(),
+                access.getExpiresOn(),
+                Boolean.TRUE.equals(access.getIsActive())
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<ErpPurchaseResponses.SupplierDispatchNoticeResponse> listSupplierDispatchNotices(Long purchaseOrderId) {
+        PurchaseOrder order = purchaseOrderRepository.findById(purchaseOrderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase order not found: " + purchaseOrderId));
+        accessGuard.assertOrganizationAccess(order.getOrganizationId());
+        accessGuard.assertBranchAccess(order.getOrganizationId(), order.getBranchId());
+        subscriptionAccessService.assertFeature(order.getOrganizationId(), "purchases");
+        return supplierDispatchNoticeResponses(purchaseOrderId);
+    }
+
+    @Transactional(readOnly = true)
+    public ErpPurchaseResponses.SupplierPortalPurchaseOrderResponse getSupplierPortalPurchaseOrder(String accessToken) {
+        PurchaseOrderSupplierAccess access = requireSupplierAccess(accessToken);
+        PurchaseOrder order = purchaseOrderRepository.findById(access.getPurchaseOrderId())
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase order not found: " + access.getPurchaseOrderId()));
+        var supplier = supplierRepository.findById(order.getSupplierId())
+                .orElseThrow(() -> new ResourceNotFoundException("Supplier not found: " + order.getSupplierId()));
+        List<PurchaseOrderLine> lines = purchaseOrderLineRepository.findByPurchaseOrderIdOrderByIdAsc(order.getId());
+        List<PurchaseOrderSupplierDispatchNotice> notices = purchaseOrderSupplierDispatchNoticeRepository.findByPurchaseOrderIdOrderByDispatchDateDescIdDesc(order.getId());
+        List<Long> lineIds = lines.stream().map(PurchaseOrderLine::getId).toList();
+        java.util.Map<Long, BigDecimal> notifiedBaseByLine = dispatchedBaseQuantityByPurchaseOrderLine(lineIds);
+        return new ErpPurchaseResponses.SupplierPortalPurchaseOrderResponse(
+                order.getId(),
+                order.getPoNumber(),
+                order.getPoDate(),
+                order.getStatus(),
+                supplier.getId(),
+                supplier.getName(),
+                supplier.getSupplierCode(),
+                access.getExpiresOn(),
+                dispatchSummary(order.getId(), lines),
+                lines.stream().map(line -> new ErpPurchaseResponses.SupplierPortalPurchaseOrderLineResponse(
+                        line.getId(),
+                        line.getProductId(),
+                        line.getSkuSnapshot(),
+                        line.getProductNameSnapshot(),
+                        line.getHsnSnapshot(),
+                        line.getQuantity(),
+                        line.getBaseQuantity(),
+                        line.getReceivedBaseQuantity(),
+                        notifiedBaseByLine.getOrDefault(line.getId(), BigDecimal.ZERO),
+                        line.getBaseQuantity().subtract(notifiedBaseByLine.getOrDefault(line.getId(), BigDecimal.ZERO)).max(BigDecimal.ZERO),
+                        line.getUnitPrice(),
+                        line.getTaxRate(),
+                        line.getLineAmount()
+                )).toList(),
+                notices.stream().map(this::toSupplierDispatchNoticeResponse).toList()
+        );
+    }
+
+    public ErpPurchaseResponses.SupplierDispatchNoticeResponse createSupplierDispatchNotice(String accessToken,
+                                                                                            ErpPurchaseDtos.CreateSupplierDispatchNoticeRequest request) {
+        PurchaseOrderSupplierAccess access = requireSupplierAccess(accessToken);
+        PurchaseOrder order = purchaseOrderRepository.findById(access.getPurchaseOrderId())
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase order not found: " + access.getPurchaseOrderId()));
+        if (ErpDocumentStatuses.CANCELLED.equals(order.getStatus()) || ErpDocumentStatuses.RECEIVED.equals(order.getStatus())) {
+            throw new BusinessException("This purchase order is not open for supplier dispatch updates");
+        }
+
+        List<PurchaseOrderLine> orderLines = purchaseOrderLineRepository.findByPurchaseOrderIdOrderByIdAsc(order.getId());
+        java.util.Map<Long, PurchaseOrderLine> orderLineById = orderLines.stream()
+                .collect(java.util.stream.Collectors.toMap(PurchaseOrderLine::getId, line -> line));
+        java.util.Map<Long, BigDecimal> existingNotifiedBaseByLine = dispatchedBaseQuantityByPurchaseOrderLine(
+                orderLines.stream().map(PurchaseOrderLine::getId).toList()
+        );
+
+        PurchaseOrderSupplierDispatchNotice notice = new PurchaseOrderSupplierDispatchNotice();
+        notice.setOrganizationId(order.getOrganizationId());
+        notice.setBranchId(order.getBranchId());
+        notice.setPurchaseOrderId(order.getId());
+        notice.setSupplierId(order.getSupplierId());
+        notice.setDispatchNumber("SUP-DSP-" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE) + "-" + System.currentTimeMillis());
+        notice.setDispatchDate(request.dispatchDate() == null ? LocalDate.now() : request.dispatchDate());
+        notice.setExpectedDeliveryDate(request.expectedDeliveryDate());
+        notice.setSupplierReferenceNumber(trimToNull(request.supplierReferenceNumber()));
+        notice.setTransporterName(trimToNull(request.transporterName()));
+        notice.setVehicleNumber(trimToNull(request.vehicleNumber()));
+        notice.setTrackingNumber(trimToNull(request.trackingNumber()));
+        notice.setStatus(ErpDocumentStatuses.SUBMITTED);
+        notice.setRemarks(trimToNull(request.remarks()));
+        notice.setSubmittedAt(LocalDateTime.now());
+        notice = purchaseOrderSupplierDispatchNoticeRepository.save(notice);
+
+        for (ErpPurchaseDtos.SupplierDispatchLineRequest lineRequest : request.lines()) {
+            PurchaseOrderLine orderLine = orderLineById.get(lineRequest.purchaseOrderLineId());
+            if (orderLine == null) {
+                throw new BusinessException("Purchase order line does not belong to this purchase order: " + lineRequest.purchaseOrderLineId());
+            }
+            BigDecimal existingNotified = existingNotifiedBaseByLine.getOrDefault(orderLine.getId(), BigDecimal.ZERO);
+            BigDecimal remainingNotifiable = orderLine.getBaseQuantity().subtract(existingNotified).max(BigDecimal.ZERO);
+            if (lineRequest.baseQuantity().compareTo(remainingNotifiable) > 0) {
+                throw new BusinessException("Supplier dispatch base quantity exceeds remaining open quantity for line " + orderLine.getId());
+            }
+
+            PurchaseOrderSupplierDispatchNoticeLine noticeLine = new PurchaseOrderSupplierDispatchNoticeLine();
+            noticeLine.setDispatchNoticeId(notice.getId());
+            noticeLine.setPurchaseOrderLineId(orderLine.getId());
+            noticeLine.setProductId(orderLine.getProductId());
+            noticeLine.setOrderedQuantitySnapshot(orderLine.getQuantity());
+            noticeLine.setOrderedBaseQuantitySnapshot(orderLine.getBaseQuantity());
+            noticeLine.setDispatchedQuantity(lineRequest.quantity());
+            noticeLine.setDispatchedBaseQuantity(lineRequest.baseQuantity());
+            noticeLine.setExpectedRemainingDispatchOn(lineRequest.expectedRemainingDispatchOn());
+            noticeLine.setRemarks(trimToNull(lineRequest.remarks()));
+            purchaseOrderSupplierDispatchNoticeLineRepository.save(noticeLine);
+        }
+
+        auditEventWriter.write(
+                order.getOrganizationId(),
+                order.getBranchId(),
+                "PURCHASE_ORDER_SUPPLIER_DISPATCH_NOTICE",
+                "purchase_order",
+                order.getId(),
+                order.getPoNumber(),
+                "SUPPLIER_UPDATE",
+                null,
+                null,
+                order.getSupplierId(),
+                "Supplier submitted dispatch notice",
+                ErpJsonPayloads.of(
+                        "dispatchNoticeId", notice.getId(),
+                        "dispatchNumber", notice.getDispatchNumber()
+                )
+        );
+        return toSupplierDispatchNoticeResponse(notice);
     }
 
     public ErpPurchaseResponses.PurchaseOrderResponse createPurchaseOrder(Long organizationId, Long branchId, ErpPurchaseDtos.CreatePurchaseOrderRequest request) {
@@ -122,8 +286,7 @@ public class ErpPurchaseService {
             StoreProduct product = productRepository.findById(reqLine.productId())
                     .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + reqLine.productId()));
             ensureStoreProductBelongsToOrganization(organizationId, product);
-            Product productMaster = productMasterRepository.findById(product.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product master not found: " + product.getProductId()));
+            Product productMaster = productGovernanceGuard.requireTransactionAllowed(product, "purchase transactions");
             SupplierProduct supplierProduct = resolveSupplierProduct(organizationId, supplier.getId(), product, reqLine.supplierProductId());
             uomRepository.findById(reqLine.uomId())
                     .orElseThrow(() -> new ResourceNotFoundException("UOM not found: " + reqLine.uomId()));
@@ -273,6 +436,7 @@ public class ErpPurchaseService {
         receipt.setSupplierGstin(supplier.getGstin());
         receipt.setPlaceOfSupplyStateCode(request.placeOfSupplyStateCode());
         receipt.setStatus(ErpDocumentStatuses.POSTED);
+        receipt.setPutawayStatus(ErpDocumentStatuses.PUTAWAY_PENDING);
         receipt.setRemarks(request.remarks());
         receipt.setPostedAt(LocalDateTime.now());
         receipt = purchaseReceiptRepository.save(receipt);
@@ -285,14 +449,14 @@ public class ErpPurchaseService {
             StoreProduct product = productRepository.findById(reqLine.productId())
                     .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + reqLine.productId()));
             ensureStoreProductBelongsToOrganization(organizationId, product);
-            Product productMaster = productMasterRepository.findById(product.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product master not found: " + product.getProductId()));
+            Product productMaster = productGovernanceGuard.requireTransactionAllowed(product, "purchase transactions");
             SupplierProduct supplierProduct = resolveSupplierProduct(organizationId, supplier.getId(), product, reqLine.supplierProductId());
             uomRepository.findById(reqLine.uomId())
                     .orElseThrow(() -> new ResourceNotFoundException("UOM not found: " + reqLine.uomId()));
             validateReceiptTracking(product, reqLine);
 
             BigDecimal lineBase = reqLine.unitCost().multiply(reqLine.quantity());
+            BigDecimal normalizedUnitCost = normalizePerBaseUnit(reqLine.unitCost(), reqLine.quantity(), reqLine.baseQuantity());
             GstTaxService.TaxContext taxContext = gstTaxService.resolvePurchaseTax(
                     organizationId,
                     branchId,
@@ -326,6 +490,8 @@ public class ErpPurchaseService {
             line.setQuantity(reqLine.quantity());
             line.setBaseQuantity(reqLine.baseQuantity());
             line.setUnitCost(reqLine.unitCost());
+            line.setSuggestedSalePrice(reqLine.suggestedSalePrice());
+            line.setMrp(reqLine.mrp());
             line.setTaxRate(taxContext.effectiveTaxRate());
             line.setTaxableAmount(taxContext.taxableAmount());
             line.setCgstRate(taxContext.cgstRate());
@@ -350,6 +516,15 @@ public class ErpPurchaseService {
                 if (BigDecimal.valueOf(reqLine.serialNumbers().size()).compareTo(reqLine.baseQuantity()) != 0) {
                     throw new BusinessException("Serialized receipt requires serial count equal to base quantity for product " + reqLine.productId());
                 }
+                InventoryBatch receiptLot = createInternalReceiptLot(
+                        organizationId,
+                        product.getId(),
+                        receipt,
+                        line,
+                        normalizedUnitCost,
+                        normalizePerBaseUnit(reqLine.suggestedSalePrice(), reqLine.quantity(), reqLine.baseQuantity()),
+                        normalizePerBaseUnit(reqLine.mrp(), reqLine.quantity(), reqLine.baseQuantity())
+                );
                 for (String serialValue : reqLine.serialNumbers()) {
                     serialNumberRepository.findFirstByOrganizationIdAndSerialNumberIgnoreCase(organizationId, serialValue)
                             .ifPresent(existing -> {
@@ -358,6 +533,7 @@ public class ErpPurchaseService {
                     SerialNumber serial = new SerialNumber();
                     serial.setOrganizationId(organizationId);
                     serial.setProductId(product.getId());
+                    serial.setBatchId(receiptLot.getId());
                     serial.setSerialNumber(serialValue);
                     serial.setManufacturerSerialNumber(serialValue);
                     serial.setStatus(ErpDocumentStatuses.IN_STOCK);
@@ -370,15 +546,19 @@ public class ErpPurchaseService {
                     purchaseReceiptLineSerialRepository.save(link);
 
                     inventoryPostingService.postMovement(
-                            organizationId, branchId, receipt.getWarehouseId(), product.getId(), null,
+                            organizationId, branchId, receipt.getWarehouseId(), null, product.getId(), receiptLot.getId(),
                             reqLine.uomId(), BigDecimal.ONE, BigDecimal.ONE, "IN", ErpInventoryMovementTypes.PURCHASE_RECEIPT,
-                            "purchase_receipt", receipt.getId(), receiptNumber, reqLine.unitCost(),
+                            "purchase_receipt", receipt.getId(), receiptNumber, normalizedUnitCost,
                             payloadJson(receipt, product.getId(), line.getId(), "SERIAL")
                     );
                 }
             } else if (reqLine.batchEntries() != null && !reqLine.batchEntries().isEmpty()) {
                 BigDecimal batchBase = BigDecimal.ZERO;
                 for (ErpPurchaseDtos.CreateBatchReceiptLine batchEntry : reqLine.batchEntries()) {
+                    BigDecimal batchSuggestedSalePrice = batchEntry.suggestedSalePrice() != null
+                            ? batchEntry.suggestedSalePrice()
+                            : reqLine.suggestedSalePrice();
+                    BigDecimal batchMrp = batchEntry.mrp() != null ? batchEntry.mrp() : reqLine.mrp();
                     InventoryBatch batch = new InventoryBatch();
                     batch.setOrganizationId(organizationId);
                     batch.setProductId(product.getId());
@@ -387,6 +567,13 @@ public class ErpPurchaseService {
                     batch.setManufacturerBatchNumber(batchEntry.manufacturerBatchNumber());
                     batch.setManufacturedOn(batchEntry.manufacturedOn());
                     batch.setExpiryOn(batchEntry.expiryOn());
+                    batch.setBatchType("EXTERNAL_BATCH");
+                    batch.setSourceDocumentType("purchase_receipt");
+                    batch.setSourceDocumentId(receipt.getId());
+                    batch.setSourceDocumentLineId(line.getId());
+                    batch.setPurchaseUnitCost(normalizedUnitCost);
+                    batch.setSuggestedSalePrice(normalizePerBaseUnit(batchSuggestedSalePrice, batchEntry.quantity(), batchEntry.baseQuantity()));
+                    batch.setMrp(normalizePerBaseUnit(batchMrp, batchEntry.quantity(), batchEntry.baseQuantity()));
                     batch.setStatus(ErpDocumentStatuses.ACTIVE);
                     batch = inventoryBatchRepository.save(batch);
 
@@ -395,12 +582,14 @@ public class ErpPurchaseService {
                     link.setBatchId(batch.getId());
                     link.setQuantity(batchEntry.quantity());
                     link.setBaseQuantity(batchEntry.baseQuantity());
+                    link.setSuggestedSalePrice(batchSuggestedSalePrice);
+                    link.setMrp(batchMrp);
                     purchaseReceiptLineBatchRepository.save(link);
 
                     inventoryPostingService.postMovement(
-                            organizationId, branchId, receipt.getWarehouseId(), product.getId(), batch.getId(),
+                            organizationId, branchId, receipt.getWarehouseId(), null, product.getId(), batch.getId(),
                             reqLine.uomId(), batchEntry.quantity(), batchEntry.baseQuantity(), "IN", ErpInventoryMovementTypes.PURCHASE_RECEIPT,
-                            "purchase_receipt", receipt.getId(), receiptNumber, reqLine.unitCost(),
+                            "purchase_receipt", receipt.getId(), receiptNumber, normalizedUnitCost,
                             payloadJson(receipt, product.getId(), line.getId(), "BATCH")
                     );
                     batchBase = batchBase.add(batchEntry.baseQuantity());
@@ -409,10 +598,19 @@ public class ErpPurchaseService {
                     throw new BusinessException("Batch base quantity mismatch for product " + reqLine.productId());
                 }
             } else {
+                InventoryBatch receiptLot = createInternalReceiptLot(
+                        organizationId,
+                        product.getId(),
+                        receipt,
+                        line,
+                        normalizedUnitCost,
+                        normalizePerBaseUnit(reqLine.suggestedSalePrice(), reqLine.quantity(), reqLine.baseQuantity()),
+                        normalizePerBaseUnit(reqLine.mrp(), reqLine.quantity(), reqLine.baseQuantity())
+                );
                 inventoryPostingService.postMovement(
-                        organizationId, branchId, receipt.getWarehouseId(), product.getId(), null,
+                        organizationId, branchId, receipt.getWarehouseId(), null, product.getId(), receiptLot.getId(),
                         reqLine.uomId(), reqLine.quantity(), reqLine.baseQuantity(), "IN", ErpInventoryMovementTypes.PURCHASE_RECEIPT,
-                        "purchase_receipt", receipt.getId(), receiptNumber, reqLine.unitCost(),
+                        "purchase_receipt", receipt.getId(), receiptNumber, normalizedUnitCost,
                         payloadJson(receipt, product.getId(), line.getId(), "STANDARD")
                 );
             }
@@ -450,6 +648,96 @@ public class ErpPurchaseService {
 
         List<PurchaseReceiptLine> savedLines = purchaseReceiptLineRepository.findByPurchaseReceiptIdOrderByIdAsc(receipt.getId());
         return toPurchaseReceiptResponse(receipt, savedLines);
+    }
+
+    public ErpPurchaseResponses.PurchaseReceiptResponse putawayPurchaseReceipt(Long receiptId,
+                                                                               ErpPurchaseDtos.PutawayPurchaseReceiptRequest request) {
+        PurchaseReceipt receipt = purchaseReceiptRepository.findById(receiptId)
+                .orElseThrow(() -> new ResourceNotFoundException("Purchase receipt not found: " + receiptId));
+        accessGuard.assertOrganizationAccess(receipt.getOrganizationId());
+        accessGuard.assertBranchAccess(receipt.getOrganizationId(), receipt.getBranchId());
+        subscriptionAccessService.assertFeature(receipt.getOrganizationId(), "purchases");
+
+        List<PurchaseReceiptLine> lines = purchaseReceiptLineRepository.findByPurchaseReceiptIdOrderByIdAsc(receipt.getId());
+        java.util.Map<Long, PurchaseReceiptLine> linesById = lines.stream()
+                .collect(java.util.stream.Collectors.toMap(PurchaseReceiptLine::getId, line -> line));
+
+        for (ErpPurchaseDtos.PutawayPurchaseReceiptLineRequest requestLine : request.lines()) {
+            PurchaseReceiptLine line = linesById.get(requestLine.purchaseReceiptLineId());
+            if (line == null) {
+                throw new BusinessException("Receipt line does not belong to receipt " + receipt.getReceiptNumber());
+            }
+            inventoryBinService.requireActiveBin(receipt.getOrganizationId(), receipt.getWarehouseId(), requestLine.binLocationId());
+
+            BigDecimal alreadyPutAwayBase = line.getPutawayBaseQuantity() == null ? BigDecimal.ZERO : line.getPutawayBaseQuantity();
+            BigDecimal remainingBase = line.getBaseQuantity().subtract(alreadyPutAwayBase).max(BigDecimal.ZERO);
+            if (requestLine.baseQuantity().compareTo(remainingBase) > 0) {
+                throw new BusinessException("Putaway quantity exceeds remaining quantity for receipt line " + line.getId());
+            }
+
+            String payload = ErpJsonPayloads.of(
+                    "receiptNumber", receipt.getReceiptNumber(),
+                    "purchaseReceiptId", receipt.getId(),
+                    "purchaseReceiptLineId", line.getId(),
+                    "productId", line.getProductId(),
+                    "binLocationId", requestLine.binLocationId()
+            );
+            inventoryPostingService.postMovement(
+                    receipt.getOrganizationId(),
+                    receipt.getBranchId(),
+                    receipt.getWarehouseId(),
+                    null,
+                    line.getProductId(),
+                    null,
+                    line.getUomId(),
+                    requestLine.quantity(),
+                    requestLine.baseQuantity(),
+                    "OUT",
+                    ErpInventoryMovementTypes.PUTAWAY_OUT,
+                    "purchase_receipt_putaway",
+                    receipt.getId(),
+                    receipt.getReceiptNumber(),
+                    BigDecimal.ZERO,
+                    payload
+            );
+            inventoryPostingService.postMovement(
+                    receipt.getOrganizationId(),
+                    receipt.getBranchId(),
+                    receipt.getWarehouseId(),
+                    requestLine.binLocationId(),
+                    line.getProductId(),
+                    null,
+                    line.getUomId(),
+                    requestLine.quantity(),
+                    requestLine.baseQuantity(),
+                    "IN",
+                    ErpInventoryMovementTypes.PUTAWAY_IN,
+                    "purchase_receipt_putaway",
+                    receipt.getId(),
+                    receipt.getReceiptNumber(),
+                    BigDecimal.ZERO,
+                    payload
+            );
+
+            line.setPutawayBinLocationId(requestLine.binLocationId());
+            line.setPutawayQuantity((line.getPutawayQuantity() == null ? BigDecimal.ZERO : line.getPutawayQuantity()).add(requestLine.quantity()));
+            line.setPutawayBaseQuantity(alreadyPutAwayBase.add(requestLine.baseQuantity()));
+            purchaseReceiptLineRepository.save(line);
+        }
+
+        lines = purchaseReceiptLineRepository.findByPurchaseReceiptIdOrderByIdAsc(receipt.getId());
+        boolean anyPutaway = lines.stream().anyMatch(line -> line.getPutawayBaseQuantity() != null && line.getPutawayBaseQuantity().compareTo(BigDecimal.ZERO) > 0);
+        boolean allPutaway = lines.stream().allMatch(line -> line.getPutawayBaseQuantity() != null && line.getPutawayBaseQuantity().compareTo(line.getBaseQuantity()) >= 0);
+        if (allPutaway) {
+            receipt.setPutawayStatus(ErpDocumentStatuses.PUTAWAY_COMPLETED);
+            receipt.setPutawayCompletedAt(LocalDateTime.now());
+        } else if (anyPutaway) {
+            receipt.setPutawayStatus(ErpDocumentStatuses.PARTIALLY_PUTAWAY);
+        } else {
+            receipt.setPutawayStatus(ErpDocumentStatuses.PUTAWAY_PENDING);
+        }
+        receipt = purchaseReceiptRepository.save(receipt);
+        return toPurchaseReceiptResponse(receipt, lines);
     }
 
     @Transactional(readOnly = true)
@@ -569,6 +857,35 @@ public class ErpPurchaseService {
         );
     }
 
+    private InventoryBatch createInternalReceiptLot(Long organizationId,
+                                                    Long productId,
+                                                    PurchaseReceipt receipt,
+                                                    PurchaseReceiptLine line,
+                                                    BigDecimal normalizedUnitCost,
+                                                    BigDecimal normalizedSuggestedSalePrice,
+                                                    BigDecimal normalizedMrp) {
+        InventoryBatch batch = new InventoryBatch();
+        batch.setOrganizationId(organizationId);
+        batch.setProductId(productId);
+        batch.setBatchNumber("LOT-" + receipt.getReceiptNumber() + "-" + line.getId());
+        batch.setBatchType("RECEIPT_LOT");
+        batch.setSourceDocumentType("purchase_receipt");
+        batch.setSourceDocumentId(receipt.getId());
+        batch.setSourceDocumentLineId(line.getId());
+        batch.setPurchaseUnitCost(normalizedUnitCost);
+        batch.setSuggestedSalePrice(normalizedSuggestedSalePrice);
+        batch.setMrp(normalizedMrp);
+        batch.setStatus(ErpDocumentStatuses.ACTIVE);
+        return inventoryBatchRepository.save(batch);
+    }
+
+    private BigDecimal normalizePerBaseUnit(BigDecimal amount, BigDecimal quantity, BigDecimal baseQuantity) {
+        if (amount == null || quantity == null || baseQuantity == null || quantity.compareTo(BigDecimal.ZERO) == 0) {
+            return amount;
+        }
+        return amount.multiply(quantity).divide(baseQuantity, 2, RoundingMode.HALF_UP);
+    }
+
     private void validateReceiptTracking(StoreProduct product, ErpPurchaseDtos.CreatePurchaseReceiptLineRequest reqLine) {
         boolean expectsSerials = Boolean.TRUE.equals(product.getSerialTrackingEnabled());
         boolean expectsBatches = Boolean.TRUE.equals(product.getBatchTrackingEnabled());
@@ -618,7 +935,9 @@ public class ErpPurchaseService {
                 order.getTaxAmount(),
                 order.getTotalAmount(),
                 order.getStatus(),
-                lines.stream().map(this::toPurchaseLineResponseFromOrder).toList()
+                lines.stream().map(this::toPurchaseLineResponseFromOrder).toList(),
+                dispatchSummary(order.getId(), lines),
+                supplierDispatchNoticeResponses(order.getId())
         );
     }
 
@@ -641,6 +960,8 @@ public class ErpPurchaseService {
                 allocatedAmount(receipt.getId()),
                 outstandingAmount(receipt.getId(), receipt.getTotalAmount()),
                 receipt.getStatus(),
+                receipt.getPutawayStatus(),
+                receipt.getPutawayCompletedAt() == null ? null : receipt.getPutawayCompletedAt().toLocalDate(),
                 lines.stream().map(this::toPurchaseLineResponseFromReceipt).toList(),
                 receiptAllocations(receipt.getId())
         );
@@ -659,7 +980,13 @@ public class ErpPurchaseService {
                 line.getUomId(),
                 line.getQuantity(),
                 line.getBaseQuantity(),
+                line.getReceivedBaseQuantity(),
+                null,
+                null,
+                null,
                 line.getUnitPrice(),
+                null,
+                null,
                 line.getTaxableAmount(),
                 line.getTaxRate(),
                 line.getCgstRate(),
@@ -687,7 +1014,13 @@ public class ErpPurchaseService {
                 line.getUomId(),
                 line.getQuantity(),
                 line.getBaseQuantity(),
+                null,
+                line.getPutawayBinLocationId(),
+                line.getPutawayQuantity(),
+                line.getPutawayBaseQuantity(),
                 line.getUnitCost(),
+                line.getSuggestedSalePrice(),
+                line.getMrp(),
                 line.getTaxableAmount(),
                 line.getTaxRate(),
                 line.getCgstRate(),
@@ -700,6 +1033,97 @@ public class ErpPurchaseService {
                 line.getCessAmount(),
                 line.getLineAmount()
         );
+    }
+
+    private ErpPurchaseResponses.PurchaseOrderSupplierDispatchSummaryResponse dispatchSummary(Long purchaseOrderId, List<PurchaseOrderLine> lines) {
+        List<Long> lineIds = lines.stream().map(PurchaseOrderLine::getId).toList();
+        java.util.Map<Long, BigDecimal> dispatchedBaseByLine = dispatchedBaseQuantityByPurchaseOrderLine(lineIds);
+        List<PurchaseOrderSupplierDispatchNotice> notices = purchaseOrderSupplierDispatchNoticeRepository.findByPurchaseOrderIdOrderByDispatchDateDescIdDesc(purchaseOrderId);
+        BigDecimal totalOrderedBase = lines.stream().map(PurchaseOrderLine::getBaseQuantity).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalDispatchedBase = dispatchedBaseByLine.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        LocalDate lastExpectedDeliveryDate = notices.stream()
+                .map(PurchaseOrderSupplierDispatchNotice::getExpectedDeliveryDate)
+                .filter(java.util.Objects::nonNull)
+                .max(LocalDate::compareTo)
+                .orElse(null);
+        LocalDate lastExpectedRemainingDispatchOn = purchaseOrderSupplierDispatchNoticeLineRepository.findByPurchaseOrderLineIdIn(lineIds).stream()
+                .map(PurchaseOrderSupplierDispatchNoticeLine::getExpectedRemainingDispatchOn)
+                .filter(java.util.Objects::nonNull)
+                .max(LocalDate::compareTo)
+                .orElse(null);
+        return new ErpPurchaseResponses.PurchaseOrderSupplierDispatchSummaryResponse(
+                notices.size(),
+                totalDispatchedBase,
+                totalOrderedBase.subtract(totalDispatchedBase).max(BigDecimal.ZERO),
+                lastExpectedDeliveryDate,
+                lastExpectedRemainingDispatchOn
+        );
+    }
+
+    private List<ErpPurchaseResponses.SupplierDispatchNoticeResponse> supplierDispatchNoticeResponses(Long purchaseOrderId) {
+        return purchaseOrderSupplierDispatchNoticeRepository.findByPurchaseOrderIdOrderByDispatchDateDescIdDesc(purchaseOrderId).stream()
+                .map(this::toSupplierDispatchNoticeResponse)
+                .toList();
+    }
+
+    private ErpPurchaseResponses.SupplierDispatchNoticeResponse toSupplierDispatchNoticeResponse(PurchaseOrderSupplierDispatchNotice notice) {
+        java.util.Map<Long, PurchaseOrderLine> orderLineById = purchaseOrderLineRepository.findByPurchaseOrderIdOrderByIdAsc(notice.getPurchaseOrderId()).stream()
+                .collect(java.util.stream.Collectors.toMap(PurchaseOrderLine::getId, line -> line));
+        return new ErpPurchaseResponses.SupplierDispatchNoticeResponse(
+                notice.getId(),
+                notice.getPurchaseOrderId(),
+                notice.getSupplierId(),
+                notice.getDispatchNumber(),
+                notice.getDispatchDate(),
+                notice.getExpectedDeliveryDate(),
+                notice.getSupplierReferenceNumber(),
+                notice.getTransporterName(),
+                notice.getVehicleNumber(),
+                notice.getTrackingNumber(),
+                notice.getStatus(),
+                notice.getRemarks(),
+                purchaseOrderSupplierDispatchNoticeLineRepository.findByDispatchNoticeIdOrderByIdAsc(notice.getId()).stream()
+                        .map(line -> {
+                            PurchaseOrderLine orderLine = orderLineById.get(line.getPurchaseOrderLineId());
+                            return new ErpPurchaseResponses.SupplierDispatchLineResponse(
+                                    line.getId(),
+                                    line.getPurchaseOrderLineId(),
+                                    line.getProductId(),
+                                    orderLine == null ? null : orderLine.getSkuSnapshot(),
+                                    orderLine == null ? null : orderLine.getProductNameSnapshot(),
+                                    line.getOrderedQuantitySnapshot(),
+                                    line.getOrderedBaseQuantitySnapshot(),
+                                    line.getDispatchedQuantity(),
+                                    line.getDispatchedBaseQuantity(),
+                                    line.getExpectedRemainingDispatchOn(),
+                                    line.getRemarks()
+                            );
+                        })
+                        .toList()
+        );
+    }
+
+    private java.util.Map<Long, BigDecimal> dispatchedBaseQuantityByPurchaseOrderLine(List<Long> lineIds) {
+        java.util.Map<Long, BigDecimal> totals = new java.util.HashMap<>();
+        if (lineIds == null || lineIds.isEmpty()) {
+            return totals;
+        }
+        for (PurchaseOrderSupplierDispatchNoticeLine line : purchaseOrderSupplierDispatchNoticeLineRepository.findByPurchaseOrderLineIdIn(lineIds)) {
+            totals.merge(line.getPurchaseOrderLineId(), line.getDispatchedBaseQuantity(), BigDecimal::add);
+        }
+        return totals;
+    }
+
+    private PurchaseOrderSupplierAccess requireSupplierAccess(String accessToken) {
+        PurchaseOrderSupplierAccess access = purchaseOrderSupplierAccessRepository.findByAccessToken(accessToken)
+                .orElseThrow(() -> new ResourceNotFoundException("Supplier access link not found"));
+        if (!Boolean.TRUE.equals(access.getIsActive())) {
+            throw new BusinessException("Supplier access link is inactive");
+        }
+        if (access.getExpiresOn() != null && access.getExpiresOn().isBefore(LocalDate.now())) {
+            throw new BusinessException("Supplier access link has expired");
+        }
+        return access;
     }
 
     private BigDecimal allocatedAmount(Long purchaseReceiptId) {
@@ -799,5 +1223,13 @@ public class ErpPurchaseService {
             throw new BusinessException("Multiple supplier product mappings exist. Provide supplierProductId to choose the correct one.");
         }
         return matches.getFirst();
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

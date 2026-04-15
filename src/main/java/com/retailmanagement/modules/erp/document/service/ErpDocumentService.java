@@ -41,11 +41,13 @@ import com.retailmanagement.modules.erp.purchase.service.ErpPurchaseService;
 import com.retailmanagement.modules.erp.sales.dto.ErpSalesResponses;
 import com.retailmanagement.modules.erp.sales.entity.CustomerReceipt;
 import com.retailmanagement.modules.erp.sales.entity.CustomerReceiptAllocation;
+import com.retailmanagement.modules.erp.sales.entity.SalesDispatch;
 import com.retailmanagement.modules.erp.sales.entity.SalesInvoice;
 import com.retailmanagement.modules.erp.sales.repository.CustomerReceiptAllocationRepository;
 import com.retailmanagement.modules.erp.sales.repository.CustomerReceiptRepository;
 import com.retailmanagement.modules.erp.sales.repository.SalesInvoiceRepository;
 import com.retailmanagement.modules.erp.sales.service.ErpSalesService;
+import com.retailmanagement.modules.erp.sales.service.SalesDispatchService;
 import com.retailmanagement.modules.notification.dto.request.EmailRequest;
 import com.retailmanagement.modules.notification.service.EmailService;
 import java.io.ByteArrayOutputStream;
@@ -66,6 +68,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ErpDocumentService {
 
     private final ErpSalesService erpSalesService;
+    private final SalesDispatchService salesDispatchService;
     private final ErpPurchaseService erpPurchaseService;
     private final OrganizationRepository organizationRepository;
     private final BranchRepository branchRepository;
@@ -154,6 +157,24 @@ public class ErpDocumentService {
                 invoiceEntity.getRemarks(),
                 enrichSalesInvoiceLines(invoice.organizationId(), invoice.lines()),
                 summarizeSalesInvoiceTaxes(invoice.lines())
+        );
+    }
+
+    public byte[] generateSalesDispatchPdf(Long id) {
+        ErpSalesResponses.SalesDispatchResponse dispatch = salesDispatchService.getDispatch(id);
+        ErpSalesResponses.SalesInvoiceResponse invoice = erpSalesService.getInvoice(dispatch.salesInvoiceId());
+        Organization organization = requireOrganization(dispatch.organizationId());
+        Branch branch = requireBranch(dispatch.organizationId(), dispatch.branchId());
+        Warehouse warehouse = requireWarehouse(dispatch.organizationId(), dispatch.warehouseId());
+        Customer customer = requireCustomer(dispatch.organizationId(), dispatch.customerId());
+        return renderDispatchPdf(
+                dispatch,
+                invoice,
+                organization,
+                branch,
+                warehouse,
+                customer,
+                enrichDispatchLines(dispatch.organizationId(), dispatch.lines())
         );
     }
 
@@ -306,6 +327,20 @@ public class ErpDocumentService {
                 defaultMessage(request.message(), "Please find attached the invoice " + invoice.invoiceNumber() + "."),
                 invoice.invoiceNumber() + ".pdf",
                 generateSalesInvoicePdf(id)
+        );
+    }
+
+    @Transactional
+    public void sendSalesDispatch(Long id, ErpDocumentDtos.SendDocumentRequest request) {
+        ErpSalesResponses.SalesDispatchResponse dispatch = salesDispatchService.getDispatch(id);
+        Customer customer = requireCustomer(dispatch.organizationId(), dispatch.customerId());
+        sendDocumentEmail(
+                resolveRecipient(customer.getEmail(), request),
+                request,
+                defaultSubject(request == null ? null : request.subject(), "Dispatch " + dispatch.dispatchNumber()),
+                defaultMessage(request == null ? null : request.message(), "Please find attached the dispatch note " + dispatch.dispatchNumber() + "."),
+                dispatch.dispatchNumber() + ".pdf",
+                generateSalesDispatchPdf(id)
         );
     }
 
@@ -680,6 +715,85 @@ public class ErpDocumentService {
         }
     }
 
+    private byte[] renderDispatchPdf(
+            ErpSalesResponses.SalesDispatchResponse dispatch,
+            ErpSalesResponses.SalesInvoiceResponse invoice,
+            Organization organization,
+            Branch branch,
+            Warehouse warehouse,
+            Customer customer,
+            List<RenderedLine> lines
+    ) {
+        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            PdfWriter writer = new PdfWriter(out);
+            PdfDocument pdf = new PdfDocument(writer);
+            Document document = new Document(pdf);
+            PdfFont bold = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
+
+            document.add(new Paragraph("Dispatch Note / Packing Slip").setFont(bold).setFontSize(18).setTextAlignment(TextAlignment.CENTER));
+            document.add(new Paragraph(firstNonBlank(organization.getLegalName(), organization.getName()))
+                    .setFont(bold)
+                    .setFontSize(14)
+                    .setTextAlignment(TextAlignment.CENTER));
+            document.add(new Paragraph(joinNonBlank(prefix("Phone: ", organization.getPhone()), prefix("Email: ", organization.getEmail())))
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setFontSize(10));
+            document.add(new Paragraph("\n"));
+
+            Table summary = new Table(UnitValue.createPercentArray(new float[]{1, 1})).useAllAvailableWidth();
+            summary.addCell(labelValueCell("Dispatch No", dispatch.dispatchNumber()));
+            summary.addCell(labelValueCell("Dispatch Date", dispatch.dispatchDate() == null ? "-" : dispatch.dispatchDate().toString()));
+            summary.addCell(labelValueCell("Invoice No", invoice.invoiceNumber()));
+            summary.addCell(labelValueCell("Invoice Date", invoice.invoiceDate() == null ? "-" : invoice.invoiceDate().toString()));
+            summary.addCell(labelValueCell("Status", dispatch.status()));
+            summary.addCell(labelValueCell("Expected Delivery", dispatch.expectedDeliveryDate() == null ? "-" : dispatch.expectedDeliveryDate().toString()));
+            summary.addCell(labelValueCell("Warehouse", warehouse.getName()));
+            summary.addCell(labelValueCell("Tracking No", firstNonBlank(dispatch.trackingNumber(), "-")));
+            summary.addCell(labelValueCell("Transporter", firstNonBlank(dispatch.transporterName(), "-")));
+            summary.addCell(labelValueCell("Vehicle No", firstNonBlank(dispatch.vehicleNumber(), "-")));
+            document.add(summary);
+            document.add(new Paragraph("\n"));
+
+            Table parties = new Table(UnitValue.createPercentArray(new float[]{1, 1})).useAllAvailableWidth();
+            parties.addCell(partyCell("From", organization.getName(), organization.getLegalName(), branch.getPhone(), branch.getEmail(), null));
+            parties.addCell(partyCell(
+                    "Ship To",
+                    firstNonBlank(customer.getFullName(), customer.getTradeName(), customer.getLegalName()),
+                    customer.getLegalName(),
+                    customer.getPhone(),
+                    customer.getEmail(),
+                    firstNonBlank(dispatch.deliveryAddress(), customer.getShippingAddress(), customer.getBillingAddress())
+            ));
+            document.add(parties);
+            document.add(new Paragraph("\n"));
+
+            Table items = new Table(UnitValue.createPercentArray(new float[]{2.6f, 1.1f, 1f, 1f})).useAllAvailableWidth();
+            addHeader(items, "Item");
+            addHeader(items, "SKU/Code");
+            addHeader(items, "Qty");
+            addHeader(items, "UOM");
+            for (RenderedLine line : lines) {
+                items.addCell(valueCell(line.itemName()));
+                items.addCell(valueCell(line.itemCode()));
+                items.addCell(valueCell(line.quantity()));
+                items.addCell(valueCell(line.uomCode()));
+            }
+            document.add(items);
+
+            if (dispatch.remarks() != null && !dispatch.remarks().isBlank()) {
+                document.add(new Paragraph("\nRemarks").setFont(bold).setFontSize(11));
+                document.add(new Paragraph(dispatch.remarks()).setFontSize(10));
+            }
+
+            document.add(new Paragraph("\nContact").setFont(bold).setFontSize(11));
+            document.add(new Paragraph(joinNonBlank(branch.getName(), prefix("Phone: ", branch.getPhone()), prefix("Email: ", branch.getEmail()))).setFontSize(10));
+            document.close();
+            return out.toByteArray();
+        } catch (Exception ex) {
+            throw new BusinessException("Failed to generate PDF document");
+        }
+    }
+
     private List<RenderedLine> enrichSalesLines(Long organizationId, List<ErpSalesResponses.SalesDocumentLineResponse> lines) {
         List<RenderedLine> rendered = new ArrayList<>();
         Map<Long, StoreProduct> storeProducts = loadStoreProducts(lines.stream().map(ErpSalesResponses.SalesDocumentLineResponse::productId).toList());
@@ -713,6 +827,25 @@ public class ErpDocumentService {
                     uomCode(uoms.get(line.uomId())),
                     money(line.unitPrice()),
                     money(line.lineAmount())
+            ));
+        }
+        return rendered;
+    }
+
+    private List<RenderedLine> enrichDispatchLines(Long organizationId, List<ErpSalesResponses.SalesDispatchLineResponse> lines) {
+        List<RenderedLine> rendered = new ArrayList<>();
+        Map<Long, StoreProduct> storeProducts = loadStoreProducts(lines.stream().map(ErpSalesResponses.SalesDispatchLineResponse::productId).toList());
+        Map<Long, Uom> uoms = loadUoms(lines.stream().map(ErpSalesResponses.SalesDispatchLineResponse::uomId).toList());
+        for (ErpSalesResponses.SalesDispatchLineResponse line : lines) {
+            StoreProduct product = storeProducts.get(line.productId());
+            rendered.add(new RenderedLine(
+                    product == null ? "Product #" + line.productId() : product.getName(),
+                    product == null ? null : product.getSku(),
+                    null,
+                    qty(line.quantity()),
+                    uomCode(uoms.get(line.uomId())),
+                    null,
+                    null
             ));
         }
         return rendered;

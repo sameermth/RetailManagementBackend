@@ -38,9 +38,12 @@ public class AuditEventWriter {
         event.setEntityId(entityId);
         event.setEntityNumber(entityNumber);
         event.setAction(action);
-        event.setActorUserId(ErpSecurityUtils.currentUserId().orElse(1L));
-        event.setActorNameSnapshot(ErpSecurityUtils.currentUsername().orElse("system"));
-        event.setActorRoleSnapshot("ERP_USER");
+        Long actorUserId = ErpSecurityUtils.currentUserId().orElse(null);
+        event.setActorUserId(actorUserId);
+        event.setActorNameSnapshot(actorUserId == null
+                ? "public-portal"
+                : ErpSecurityUtils.currentUsername().orElse("system"));
+        event.setActorRoleSnapshot(actorUserId == null ? "PUBLIC" : "ERP_USER");
         event.setWarehouseId(warehouseId);
         event.setCustomerId(customerId);
         event.setSupplierId(supplierId);

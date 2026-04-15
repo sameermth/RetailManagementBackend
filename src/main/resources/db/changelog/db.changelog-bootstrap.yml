@@ -2,6 +2,8 @@ databaseChangeLog:
   - changeSet:
       id: bootstrap-001-schema
       author: sameer
+      validCheckSum:
+        - "9:13928b78bbf527f34937c1a90c59147e"
       preConditions:
         - onFail: MARK_RAN
         - not:
@@ -23,9 +25,6 @@ databaseChangeLog:
       context: seed
       preConditions:
         - onFail: MARK_RAN
-        - sqlCheck:
-            expectedResult: 0
-            sql: "SELECT COUNT(*) FROM role WHERE code = 'OWNER'"
       changes:
         - sqlFile:
             path: bootstrap/002_bootstrap_master_data.sql
@@ -42,9 +41,6 @@ databaseChangeLog:
       context: demo
       preConditions:
         - onFail: MARK_RAN
-        - sqlCheck:
-            expectedResult: 0
-            sql: "SELECT COUNT(*) FROM organization WHERE code IN ('SPC','UHL')"
       changes:
         - sqlFile:
             path: bootstrap/003_bootstrap_demo_data.sql

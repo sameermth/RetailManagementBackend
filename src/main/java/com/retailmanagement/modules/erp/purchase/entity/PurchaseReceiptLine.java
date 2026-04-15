@@ -55,6 +55,21 @@ public class PurchaseReceiptLine extends ErpAuditableEntity {
     @Column(name = "unit_cost", nullable = false, precision = 18, scale = 2)
     private BigDecimal unitCost;
 
+    @Column(name = "suggested_sale_price", precision = 18, scale = 2)
+    private BigDecimal suggestedSalePrice;
+
+    @Column(name = "mrp", precision = 18, scale = 2)
+    private BigDecimal mrp;
+
+    @Column(name = "putaway_bin_location_id")
+    private Long putawayBinLocationId;
+
+    @Column(name = "putaway_quantity", precision = 18, scale = 6)
+    private BigDecimal putawayQuantity;
+
+    @Column(name = "putaway_base_quantity", precision = 18, scale = 6)
+    private BigDecimal putawayBaseQuantity;
+
     @Column(name = "tax_rate", nullable = false, precision = 9, scale = 4)
     private BigDecimal taxRate = BigDecimal.ZERO;
 

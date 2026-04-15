@@ -15,6 +15,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import io.jsonwebtoken.Claims;
 
 @Slf4j
 @Component
@@ -32,11 +33,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String jwt = getJwtFromRequest(request);
 
             if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
-                String username = tokenProvider.getUsernameFromToken(jwt);
-                Long organizationId = tokenProvider.getOrganizationIdFromToken(jwt);
-                UserDetails userDetails = organizationId == null
+                Claims claims = tokenProvider.getClaims(jwt);
+                String username = claims.getSubject();
+                Number organizationId = claims.get("organizationId", Number.class);
+                Boolean onboardingRequired = claims.get("onboardingRequired", Boolean.class);
+                UserDetails userDetails = Boolean.TRUE.equals(onboardingRequired)
+                        ? userDetailsService.loadOnboardingUserByUsername(username)
+                        : organizationId == null
                         ? userDetailsService.loadUserByUsername(username)
-                        : userDetailsService.loadUserByUsernameAndOrganization(username, organizationId);
+                        : userDetailsService.loadUserByUsernameAndOrganization(username, organizationId.longValue());
                 if (!(userDetails instanceof UserPrincipal principal) || !tokenProvider.isSubscriptionContextValid(jwt, principal)) {
                     filterChain.doFilter(request, response);
                     return;

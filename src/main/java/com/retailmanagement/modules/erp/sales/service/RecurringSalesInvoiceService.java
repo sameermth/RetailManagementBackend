@@ -2,6 +2,7 @@ package com.retailmanagement.modules.erp.sales.service;
 
 import com.retailmanagement.common.exceptions.BusinessException;
 import com.retailmanagement.common.exceptions.ResourceNotFoundException;
+import com.retailmanagement.modules.erp.catalog.service.ProductGovernanceGuard;
 import com.retailmanagement.modules.erp.catalog.repository.StoreProductRepository;
 import com.retailmanagement.modules.erp.catalog.repository.UomRepository;
 import com.retailmanagement.modules.erp.common.constants.ErpDocumentStatuses;
@@ -40,6 +41,7 @@ public class RecurringSalesInvoiceService {
     private final CustomerRepository customerRepository;
     private final StoreProductRepository storeProductRepository;
     private final UomRepository uomRepository;
+    private final ProductGovernanceGuard productGovernanceGuard;
     private final ErpAccessGuard accessGuard;
     private final SubscriptionAccessService subscriptionAccessService;
     private final ErpSalesService erpSalesService;
@@ -94,6 +96,10 @@ public class RecurringSalesInvoiceService {
         for (RecurringSalesDtos.CreateRecurringSalesInvoiceLineRequest requestLine : request.lines()) {
             var storeProduct = storeProductRepository.findById(requestLine.productId())
                     .orElseThrow(() -> new ResourceNotFoundException("Store product not found: " + requestLine.productId()));
+            productGovernanceGuard.assertTransactionAllowed(
+                    productGovernanceGuard.requireProductMaster(storeProduct),
+                    "recurring sales setup"
+            );
             uomRepository.findById(requestLine.uomId())
                     .orElseThrow(() -> new ResourceNotFoundException("UOM not found: " + requestLine.uomId()));
             RecurringSalesInvoiceLine line = new RecurringSalesInvoiceLine();
@@ -157,9 +163,6 @@ public class RecurringSalesInvoiceService {
                         line.getUomId(),
                         line.getQuantity(),
                         line.getBaseQuantity(),
-                        line.getUnitPrice(),
-                        null,
-                        null,
                         line.getDiscountAmount(),
                         null,
                         null,

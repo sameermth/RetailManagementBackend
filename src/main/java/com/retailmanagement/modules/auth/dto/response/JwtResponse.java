@@ -27,6 +27,7 @@ public class JwtResponse {
     private String organizationName;
     private String username;
     private String email;
+    private Boolean onboardingRequired;
     private Set<String> roles;
     private Set<String> permissions;
     private Long subscriptionVersion;

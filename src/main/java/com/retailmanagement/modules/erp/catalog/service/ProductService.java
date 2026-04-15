@@ -9,11 +9,13 @@ import com.retailmanagement.modules.erp.catalog.entity.Brand;
 import com.retailmanagement.modules.erp.catalog.entity.Category;
 import com.retailmanagement.modules.erp.catalog.entity.Product;
 import com.retailmanagement.modules.erp.catalog.entity.StoreProduct;
+import com.retailmanagement.modules.erp.catalog.entity.StoreProductBundleComponent;
 import com.retailmanagement.modules.erp.catalog.entity.TaxGroup;
 import com.retailmanagement.modules.erp.catalog.repository.BrandRepository;
 import com.retailmanagement.modules.erp.catalog.repository.CategoryRepository;
 import com.retailmanagement.modules.erp.catalog.repository.ProductRepository;
 import com.retailmanagement.modules.erp.catalog.repository.StoreProductRepository;
+import com.retailmanagement.modules.erp.catalog.repository.StoreProductBundleComponentRepository;
 import com.retailmanagement.modules.erp.catalog.repository.TaxGroupRepository;
 import com.retailmanagement.modules.erp.catalog.repository.UomRepository;
 import com.retailmanagement.modules.erp.common.security.ErpAccessGuard;
@@ -41,6 +43,7 @@ public class ProductService {
  private final HsnMasterService hsnMasterService;
  private final TaxGroupRepository taxGroupRepository;
  private final ProductAttributeService productAttributeService;
+ private final StoreProductBundleComponentRepository storeProductBundleComponentRepository;
  private final ErpAccessGuard accessGuard;
  private final InventoryBalanceRepository inventoryBalanceRepository;
  private final InventoryBatchRepository inventoryBatchRepository;
@@ -175,8 +178,11 @@ public class ProductService {
   existing.setMinStockBaseQty(updates.getMinStockBaseQty() == null ? BigDecimal.ZERO : updates.getMinStockBaseQty());
   existing.setReorderLevelBaseQty(updates.getReorderLevelBaseQty() == null ? BigDecimal.ZERO : updates.getReorderLevelBaseQty());
   existing.setDefaultSalePrice(updates.getDefaultSalePrice());
+  existing.setDefaultMrp(updates.getDefaultMrp());
   existing.setDefaultWarrantyMonths(updates.getDefaultWarrantyMonths());
   existing.setWarrantyTerms(trimToNull(updates.getWarrantyTerms()));
+  existing.setIsBundle(booleanValue(updates.getIsBundle()));
+  existing.setBundlePricingMode(trimToNull(updates.getBundlePricingMode()) == null ? "COMPONENT_SUM" : updates.getBundlePricingMode().trim().toUpperCase());
   existing.setIsServiceItem(booleanValue(updates.getIsServiceItem()));
   existing.setIsActive(updates.getIsActive() == null || updates.getIsActive());
 
@@ -190,6 +196,7 @@ public class ProductService {
   accessGuard.assertOrganizationAccess(request.organizationId());
   Product product = productRepository.findById(request.productId())
           .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + request.productId()));
+  assertProductGovernanceAllowsStoreAdoption(product);
   storeProductRepository.findByOrganizationIdAndProductId(request.organizationId(), product.getId())
           .ifPresent(existing -> {
            throw new BusinessException("Product is already linked to this organization as store product " + existing.getId());
@@ -219,6 +226,11 @@ public class ProductService {
   if (request.defaultSalePrice() != null) {
    storeProduct.setDefaultSalePrice(request.defaultSalePrice());
   }
+  if (request.defaultMrp() != null) {
+   storeProduct.setDefaultMrp(request.defaultMrp());
+  }
+  storeProduct.setIsBundle(Boolean.TRUE.equals(request.isBundle()));
+  storeProduct.setBundlePricingMode(trimToNull(request.bundlePricingMode()) == null ? "COMPONENT_SUM" : request.bundlePricingMode().trim().toUpperCase());
   storeProduct.setIsServiceItem(booleanValue(product.getIsServiceItem()));
   storeProduct.setIsActive(request.isActive() == null ? booleanValue(product.getIsActive()) : request.isActive());
   validateReferences(storeProduct);
@@ -227,6 +239,46 @@ public class ProductService {
            throw new BusinessException("Product SKU already exists in organization: " + existing.getSku());
           });
   return storeProductRepository.save(storeProduct);
+ }
+
+ @Transactional(readOnly=true)
+ public List<StoreProductBundleComponent> listBundleComponents(Long storeProductId) {
+  StoreProduct storeProduct = get(storeProductId);
+  return storeProductBundleComponentRepository.findByOrganizationIdAndStoreProductIdOrderBySortOrderAscIdAsc(storeProduct.getOrganizationId(), storeProductId);
+ }
+
+ public List<StoreProductBundleComponent> replaceBundleComponents(Long storeProductId, ProductDtos.UpsertStoreProductBundleRequest request) {
+  StoreProduct storeProduct = get(storeProductId);
+  if (!storeProduct.getOrganizationId().equals(request.organizationId())) {
+   throw new BusinessException("Bundle request organization does not match store product organization");
+  }
+  if (!Boolean.TRUE.equals(storeProduct.getIsBundle())) {
+   throw new BusinessException("Store product is not marked as a bundle");
+  }
+  storeProductBundleComponentRepository.deleteByOrganizationIdAndStoreProductId(storeProduct.getOrganizationId(), storeProductId);
+  java.util.List<StoreProductBundleComponent> saved = new java.util.ArrayList<>();
+  java.util.Set<Long> seen = new java.util.HashSet<>();
+  for (ProductDtos.StoreProductBundleComponentRequest componentRequest : request.components()) {
+   if (!seen.add(componentRequest.componentStoreProductId())) {
+    throw new BusinessException("Duplicate bundle component: " + componentRequest.componentStoreProductId());
+   }
+   if (storeProductId.equals(componentRequest.componentStoreProductId())) {
+    throw new BusinessException("Bundle cannot include itself as a component");
+   }
+   StoreProduct component = get(componentRequest.componentStoreProductId());
+   if (Boolean.TRUE.equals(component.getIsBundle())) {
+    throw new BusinessException("Nested bundles are not supported yet");
+   }
+   StoreProductBundleComponent row = new StoreProductBundleComponent();
+   row.setOrganizationId(storeProduct.getOrganizationId());
+   row.setStoreProductId(storeProductId);
+   row.setComponentStoreProductId(componentRequest.componentStoreProductId());
+   row.setComponentQuantity(componentRequest.componentQuantity());
+   row.setComponentBaseQuantity(componentRequest.componentBaseQuantity());
+   row.setSortOrder(componentRequest.sortOrder());
+   saved.add(storeProductBundleComponentRepository.save(row));
+  }
+  return saved;
  }
 
  @Transactional(readOnly = true)
@@ -275,18 +327,27 @@ public class ProductService {
           .orElseThrow(() -> new ResourceNotFoundException("Category not found: " + storeProduct.getCategoryId()));
   brandRepository.findById(storeProduct.getBrandId())
           .orElseThrow(() -> new ResourceNotFoundException("Brand not found: " + storeProduct.getBrandId()));
-  taxGroupRepository.findByIdAndOrganizationId(storeProduct.getTaxGroupId(), storeProduct.getOrganizationId())
+ taxGroupRepository.findByIdAndOrganizationId(storeProduct.getTaxGroupId(), storeProduct.getOrganizationId())
           .orElseThrow(() -> new ResourceNotFoundException("Tax group not found: " + storeProduct.getTaxGroupId()));
+  if (Boolean.TRUE.equals(storeProduct.getIsBundle())) {
+   if (Boolean.TRUE.equals(storeProduct.getSerialTrackingEnabled()) || Boolean.TRUE.equals(storeProduct.getBatchTrackingEnabled())) {
+    throw new BusinessException("Bundle product cannot be serial or batch tracked");
+   }
+   if (!"STANDARD".equalsIgnoreCase(storeProduct.getInventoryTrackingMode())) {
+    throw new BusinessException("Bundle product must use STANDARD inventory tracking mode");
+   }
+  }
  }
 
  private Product resolveProduct(StoreProduct storeProduct, String hsnCode) {
   String normalizedHsnCode = validateHsnCode(hsnCode);
-  if (storeProduct.getProductId() != null) {
+ if (storeProduct.getProductId() != null) {
    Product product = productRepository.findById(storeProduct.getProductId())
            .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + storeProduct.getProductId()));
    if (normalizedHsnCode != null && product.getHsnCode() != null && !normalizedHsnCode.equals(product.getHsnCode())) {
     throw new BusinessException("Selected catalog product already uses HSN " + product.getHsnCode());
    }
+   assertProductGovernanceAllowsStoreAdoption(product);
    return product;
   }
 
@@ -295,7 +356,7 @@ public class ProductService {
   Category category = categoryRepository.findById(storeProduct.getCategoryId())
           .orElseThrow(() -> new ResourceNotFoundException("Category not found: " + storeProduct.getCategoryId()));
 
-  return productRepository.findExactMatch(
+  Product product = productRepository.findExactMatch(
           storeProduct.getName(),
           brand.getName(),
           storeProduct.getBaseUomId(),
@@ -306,6 +367,8 @@ public class ProductService {
           booleanValue(storeProduct.getFractionalQuantityAllowed()),
           booleanValue(storeProduct.getIsServiceItem())
   ).orElseGet(() -> createProduct(storeProduct, category, brand, normalizedHsnCode));
+  assertProductGovernanceAllowsStoreAdoption(product);
+  return product;
  }
 
  private Product createProduct(StoreProduct storeProduct, Category category, Brand brand, String hsnCode) {
@@ -324,6 +387,17 @@ public class ProductService {
   product.setIsServiceItem(booleanValue(storeProduct.getIsServiceItem()));
   product.setIsActive(booleanValue(storeProduct.getIsActive()));
   return productRepository.save(product);
+ }
+
+ private void assertProductGovernanceAllowsStoreAdoption(Product product) {
+  String governanceStatus = trimToNull(product.getGovernanceStatus());
+  boolean blockNewStoreAdoption = booleanValue(product.getBlockNewStoreAdoption());
+  if (blockNewStoreAdoption || "BLOCKED".equalsIgnoreCase(governanceStatus) || "DISCONTINUED".equalsIgnoreCase(governanceStatus)) {
+   throw new BusinessException(
+           "Catalog product is not available for new store adoption"
+                   + (product.getGovernanceReason() == null ? "" : ": " + product.getGovernanceReason())
+   );
+  }
  }
 
  private String validateHsnCode(String hsnCode) {

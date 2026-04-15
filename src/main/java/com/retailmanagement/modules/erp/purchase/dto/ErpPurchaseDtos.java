@@ -29,6 +29,29 @@ public final class ErpPurchaseDtos {
             @DecimalMin(value = "0.00") BigDecimal taxRate
     ) {}
 
+    public record GenerateSupplierPurchaseOrderAccessRequest(
+            @Min(1) @Max(90) Integer expiryDays
+    ) {}
+
+    public record CreateSupplierDispatchNoticeRequest(
+            LocalDate dispatchDate,
+            LocalDate expectedDeliveryDate,
+            String supplierReferenceNumber,
+            String transporterName,
+            String vehicleNumber,
+            String trackingNumber,
+            String remarks,
+            @NotEmpty List<@Valid SupplierDispatchLineRequest> lines
+    ) {}
+
+    public record SupplierDispatchLineRequest(
+            @NotNull Long purchaseOrderLineId,
+            @NotNull @DecimalMin(value = "0.000001") BigDecimal quantity,
+            @NotNull @DecimalMin(value = "0.000001") BigDecimal baseQuantity,
+            LocalDate expectedRemainingDispatchOn,
+            String remarks
+    ) {}
+
     public record CreatePurchaseReceiptRequest(
             Long organizationId,
             Long branchId,
@@ -50,9 +73,24 @@ public final class ErpPurchaseDtos {
             @NotNull @DecimalMin(value = "0.000001") BigDecimal quantity,
             @NotNull @DecimalMin(value = "0.000001") BigDecimal baseQuantity,
             @NotNull @DecimalMin(value = "0.00") BigDecimal unitCost,
+            @DecimalMin(value = "0.00") BigDecimal suggestedSalePrice,
+            @DecimalMin(value = "0.00") BigDecimal mrp,
             @DecimalMin(value = "0.00") BigDecimal taxRate,
             List<String> serialNumbers,
             List<@Valid CreateBatchReceiptLine> batchEntries
+    ) {}
+
+    public record PutawayPurchaseReceiptRequest(
+            Long organizationId,
+            Long branchId,
+            @NotEmpty List<@Valid PutawayPurchaseReceiptLineRequest> lines
+    ) {}
+
+    public record PutawayPurchaseReceiptLineRequest(
+            @NotNull Long purchaseReceiptLineId,
+            @NotNull Long binLocationId,
+            @NotNull @DecimalMin(value = "0.000001") BigDecimal quantity,
+            @NotNull @DecimalMin(value = "0.000001") BigDecimal baseQuantity
     ) {}
 
     public record CreateBatchReceiptLine(
@@ -60,6 +98,8 @@ public final class ErpPurchaseDtos {
             String manufacturerBatchNumber,
             LocalDate manufacturedOn,
             LocalDate expiryOn,
+            @DecimalMin(value = "0.00") BigDecimal suggestedSalePrice,
+            @DecimalMin(value = "0.00") BigDecimal mrp,
             @NotNull @DecimalMin(value = "0.000001") BigDecimal quantity,
             @NotNull @DecimalMin(value = "0.000001") BigDecimal baseQuantity
     ) {}

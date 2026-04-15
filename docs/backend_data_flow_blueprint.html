@@ -1,0 +1,2316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Retail Backend Data Flow Blueprint</title>
+  <style>
+    :root {
+      --bg: #f4f1ea;
+      --panel: #fffdf8;
+      --panel-2: #f7f4ec;
+      --line: #ddd5c6;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --teal: #0f766e;
+      --teal-soft: #dff4ef;
+      --blue: #1d4ed8;
+      --blue-soft: #e8f0ff;
+      --orange: #b45309;
+      --orange-soft: #fff0d9;
+      --violet: #6d28d9;
+      --violet-soft: #efe5ff;
+      --red: #b91c1c;
+      --red-soft: #fdecec;
+      --shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top right, rgba(15,118,110,0.10), transparent 20%),
+        linear-gradient(180deg, #faf7f1 0%, var(--bg) 100%);
+    }
+
+    .page {
+      max-width: 1540px;
+      margin: 0 auto;
+      padding: 28px 20px 42px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #0f172a 0%, #164e63 44%, #0f766e 100%);
+      color: #fff;
+      border-radius: 28px;
+      padding: 28px;
+      box-shadow: var(--shadow);
+      margin-bottom: 22px;
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 34px;
+      line-height: 1.08;
+    }
+
+    .hero p {
+      margin: 0;
+      max-width: 1080px;
+      line-height: 1.62;
+      color: rgba(255,255,255,0.9);
+    }
+
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .hero-pill {
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .global-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+
+    .global-card,
+    .sidebar,
+    .main {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+    }
+
+    .global-card {
+      padding: 18px;
+    }
+
+    .global-card h2 {
+      margin: 0 0 10px;
+      font-size: 17px;
+    }
+
+    .global-card p,
+    .global-card li {
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 13px;
+    }
+
+    .global-card ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .system-flow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .system-node {
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .system-arrow {
+      color: var(--teal);
+      font-weight: 800;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 22px;
+      align-items: start;
+    }
+
+    .sidebar {
+      padding: 18px;
+      position: sticky;
+      top: 16px;
+    }
+
+    .sidebar h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+
+    .search {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: #fff;
+      margin-bottom: 14px;
+      font-size: 14px;
+    }
+
+    .module-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 72vh;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .module-btn {
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #fff;
+      padding: 14px;
+      cursor: pointer;
+      transition: 0.18s ease;
+    }
+
+    .module-btn:hover,
+    .module-btn.active {
+      transform: translateY(-1px);
+      border-color: var(--teal);
+      background: var(--teal-soft);
+    }
+
+    .module-btn strong {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .module-btn small {
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .main {
+      padding: 24px;
+    }
+
+    .module-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .module-head h2 {
+      margin: 0 0 6px;
+      font-size: 30px;
+    }
+
+    .module-head p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .tag {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--blue-soft);
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .meta-pill {
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .tab {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .tab.active {
+      background: var(--text);
+      color: #fff;
+      border-color: var(--text);
+    }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .section-title {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+    }
+
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 15px;
+    }
+
+    .card p,
+    .card li {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .card ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .flow-track {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      margin-bottom: 18px;
+    }
+
+    .flow-step {
+      min-width: 320px;
+      max-width: 360px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 16px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+    }
+
+    .flow-step h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+    }
+
+    .flow-step p {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .flow-step .lane {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+
+    .lane-actor { background: var(--blue-soft); color: var(--blue); }
+    .lane-api { background: var(--teal-soft); color: var(--teal); }
+    .lane-service { background: var(--orange-soft); color: var(--orange); }
+    .lane-db { background: var(--violet-soft); color: var(--violet); }
+    .lane-async { background: var(--red-soft); color: var(--red); }
+
+    .step-list {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .step-list li {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+      margin-bottom: 6px;
+    }
+
+    .flow-arrow {
+      align-self: center;
+      color: var(--teal);
+      font-size: 26px;
+      font-weight: 900;
+      flex: 0 0 auto;
+    }
+
+    .api-table {
+      display: grid;
+      gap: 10px;
+    }
+
+    .api-row {
+      display: grid;
+      grid-template-columns: 92px 1fr 1.1fr;
+      gap: 12px;
+      padding: 14px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      align-items: start;
+    }
+
+    .method {
+      font-size: 12px;
+      font-weight: 900;
+      border-radius: 999px;
+      padding: 8px 10px;
+      text-align: center;
+      color: #fff;
+    }
+
+    .m-get { background: var(--blue); }
+    .m-post { background: var(--teal); }
+    .m-put { background: var(--orange); }
+    .m-delete { background: var(--red); }
+
+    .api-path {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      color: var(--text);
+      line-height: 1.5;
+      word-break: break-word;
+    }
+
+    .api-purpose {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .db-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 14px;
+    }
+
+    .db-box {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+    }
+
+    .db-box h3 {
+      margin: 0 0 10px;
+      font-size: 15px;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip {
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 800;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      color: var(--text);
+    }
+
+    .note-box {
+      margin-top: 16px;
+      padding: 16px;
+      background: #fff7ed;
+      border: 1px solid #f6cf9a;
+      border-radius: 18px;
+      color: #9a4d06;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 1120px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+      .api-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <h1>Retail Backend Data Flow Blueprint</h1>
+      <p>
+        Detailed backend blueprint for the current Spring Boot implementation. This page maps actors, controllers, API methods,
+        service orchestration, persistence groups, and major data movement paths across authentication, ERP, reporting, notifications,
+        and platform administration.
+      </p>
+      <div class="hero-meta">
+        <span class="hero-pill">Open locally without build steps</span>
+        <span class="hero-pill">Grounded in current controller surface</span>
+        <span class="hero-pill">Includes actors, methods, and DB operations</span>
+        <span class="hero-pill">Date reference: 2026-04-14</span>
+      </div>
+    </section>
+
+    <section class="global-grid">
+      <div class="global-card">
+        <h2>Actors</h2>
+        <ul>
+          <li>Public user and onboarding user</li>
+          <li>Owner, admin, cashier, accountant, purchase operator</li>
+          <li>Inventory operator, technician, service desk staff</li>
+          <li>Approver and manager roles</li>
+          <li>Platform administrator and ops team</li>
+          <li>Schedulers, notification workers, document generation flows</li>
+        </ul>
+      </div>
+      <div class="global-card">
+        <h2>Core Runtime Layers</h2>
+        <div class="system-flow">
+          <div class="system-node">Actors / UI / Mobile</div>
+          <div class="system-arrow">→</div>
+          <div class="system-node">Spring Security + JWT</div>
+          <div class="system-arrow">→</div>
+          <div class="system-node">Controllers</div>
+          <div class="system-arrow">→</div>
+          <div class="system-node">Services</div>
+          <div class="system-arrow">→</div>
+          <div class="system-node">Repositories / JPA</div>
+          <div class="system-arrow">→</div>
+          <div class="system-node">PostgreSQL</div>
+        </div>
+      </div>
+      <div class="global-card">
+        <h2>Cross-Cutting Flows</h2>
+        <ul>
+          <li>PDF generation and send actions through ERP document service</li>
+          <li>Role and permission gating before controller access</li>
+          <li>Audit event production for sensitive or state-changing operations</li>
+          <li>Approval and workflow triggers for controlled business flows</li>
+          <li>Report schedules and notification dispatch as asynchronous support flows</li>
+        </ul>
+      </div>
+      <div class="global-card">
+        <h2>Primary Data Stores</h2>
+        <ul>
+          <li>Identity: person, auth_account, app_user, organization_person_profile, auth_refresh_session</li>
+          <li>ERP: organization, branch, warehouse, catalog, party, document, inventory, service, finance tables</li>
+          <li>Governance: approval_rule, approval_request, approval_history, audit_event</li>
+          <li>Platform ops: subscriptions, notifications, report schedules</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="layout">
+      <aside class="sidebar">
+        <h2>Modules</h2>
+        <input id="search" class="search" type="text" placeholder="Filter modules..." />
+        <div id="moduleList" class="module-list"></div>
+      </aside>
+
+      <main class="main">
+        <div class="module-head">
+          <div>
+            <h2 id="title"></h2>
+            <p id="summary"></p>
+          </div>
+          <div id="tag" class="tag"></div>
+        </div>
+
+        <div id="metaRow" class="meta-row"></div>
+
+        <div class="tabs">
+          <button class="tab active" data-tab="overview">Overview</button>
+          <button class="tab" data-tab="dfd">Data Flow</button>
+          <button class="tab" data-tab="api">API Methods</button>
+          <button class="tab" data-tab="db">DB Operations</button>
+          <button class="tab" data-tab="scenarios">Key Scenarios</button>
+        </div>
+
+        <section id="overview" class="panel active"></section>
+        <section id="dfd" class="panel"></section>
+        <section id="api" class="panel"></section>
+        <section id="db" class="panel"></section>
+        <section id="scenarios" class="panel"></section>
+      </main>
+    </section>
+  </div>
+
+  <script>
+    const modules = [
+      {
+        key: "identity",
+        name: "Identity, Profile, Session",
+        tag: "Auth",
+        summary: "Account-first onboarding, organization switching, profile management, employee membership management, and long-lived refresh-session flow for web and mobile clients.",
+        actors: ["Public user", "Onboarding account holder", "Authenticated user", "Owner / Admin", "Platform admin"],
+        controllers: ["AuthController", "ProfileController", "EmployeeManagementController", "UserController"],
+        stores: {
+          reads: ["person", "auth_account", "app_user", "organization", "organization_person_profile", "role", "permission", "user_branch_access", "auth_refresh_session"],
+          writes: ["person", "auth_account", "app_user", "organization_person_profile", "auth_refresh_session"],
+          sideEffects: ["JWT issuance", "refresh token rotation", "organization-scoped authority snapshot"]
+        },
+        flows: [
+          {
+            lane: "actor",
+            title: "Public registration and login entry",
+            detail: "Public user signs up, logs in, or refreshes access based on device behavior and active organization context.",
+            bullets: [
+              "POST /api/auth/register accepts username, email, password, and optional personal fields.",
+              "POST /api/auth/login accepts username, password, optional organizationId, and optional clientType.",
+              "POST /api/auth/refresh renews access using refresh token and device headers."
+            ]
+          },
+          {
+            lane: "api",
+            title: "Controller and security gate",
+            detail: "JWT filter, security context, and controller-level role checks determine whether the request remains account-only or organization-scoped.",
+            bullets: [
+              "JwtAuthenticationFilter resolves onboarding tokens differently from normal organization-bound tokens.",
+              "Profile routes use current authenticated principal instead of free-form user selection.",
+              "Employee routes require user.view or user.manage, while role lookup also allows platform.manage."
+            ]
+          },
+          {
+            lane: "service",
+            title: "Service orchestration",
+            detail: "Auth and profile services coordinate person identity, account credentials, memberships, current org context, and password or token lifecycle.",
+            bullets: [
+              "Register flow creates person and auth account, then waits for organization onboarding or links into org context.",
+              "Organization switch issues a new organization-scoped token after membership validation.",
+              "Employee management creates or updates person, account, user membership, and branch allocation data."
+            ]
+          },
+          {
+            lane: "db",
+            title: "Persistence path",
+            detail: "Identity writes are split between personal identity, login identity, org-specific display identity, and runtime session persistence.",
+            bullets: [
+              "Reads and writes center on person, auth_account, app_user, organization_person_profile, and auth_refresh_session.",
+              "Employee create writes branch access and default branch relationships.",
+              "Role and permission data are read to build effective authorities in tokens and UI responses."
+            ]
+          },
+          {
+            lane: "async",
+            title: "Response and downstream effects",
+            detail: "Successful auth flows return session payloads consumed by UI routing, organization switchers, and permission-based rendering.",
+            bullets: [
+              "Signup may return onboardingRequired with no organizationId.",
+              "Login and refresh return access token, refresh token, memberships, permissions, and subscription snapshot.",
+              "Employee mutations affect later UI gating, approval visibility, and assignable user lists."
+            ]
+          }
+        ],
+        apis: [
+          ["POST", "/api/auth/register", "Create public account and return onboarding-aware JWT response."],
+          ["POST", "/api/auth/login", "Authenticate with optional organization context and client type override."],
+          ["POST", "/api/auth/refresh", "Rotate access using refresh token plus device metadata."],
+          ["POST", "/api/auth/logout", "Invalidate current access and optional refresh session."],
+          ["POST", "/api/auth/switch-organization", "Switch active organization for current account and issue new token."],
+          ["POST", "/api/auth/change-password", "Admin-style password change by userId query params."],
+          ["GET", "/api/auth/profile", "Get current authenticated profile."],
+          ["PUT", "/api/auth/profile", "Update current profile fields."],
+          ["POST", "/api/auth/profile/change-password", "Change current profile password using payload."],
+          ["GET", "/api/erp/employees/roles", "Search available employee roles."],
+          ["GET", "/api/erp/employees", "List employee memberships for an organization."],
+          ["GET", "/api/erp/employees/{id}", "Get employee membership detail."],
+          ["POST", "/api/erp/employees", "Create employee membership with branch allocations."],
+          ["PUT", "/api/erp/employees/{id}", "Update employee membership."],
+          ["PUT", "/api/erp/employees/{id}/activate", "Activate employee membership."],
+          ["PUT", "/api/erp/employees/{id}/deactivate", "Deactivate employee membership."],
+          ["GET", "/api/users", "List users for admin-level user management."],
+          ["GET", "/api/users/{id}", "Get user detail by ID."],
+          ["PUT", "/api/users/{id}/activate", "Activate user."],
+          ["PUT", "/api/users/{id}/deactivate", "Deactivate user."]
+        ],
+        scenarios: [
+          "Fresh signup -> onboarding token -> create first organization -> switch organization -> dashboard.",
+          "Mobile login with device headers -> refresh session persisted for longer-lived app experience.",
+          "Owner creates employee -> branch allocations and role code drive UI menu and action permissions."
+        ],
+        notes: "Identity table names come from current auth model mappings: person, auth_account, app_user, organization_person_profile, and auth_refresh_session."
+      },
+      {
+        key: "foundation",
+        name: "Organization, Branch, Warehouse",
+        tag: "Foundation",
+        summary: "Core organizational structure layer used by every ERP flow, including organization onboarding, branch scoping, warehouse scoping, and default branch assignment for users.",
+        actors: ["Onboarding owner", "Owner", "Admin", "Platform admin"],
+        controllers: ["OrganizationController", "BranchController", "WarehouseController"],
+        stores: {
+          reads: ["organization", "branch", "warehouse", "organization_subscription", "user_branch_access", "app_user"],
+          writes: ["organization", "branch", "warehouse"],
+          sideEffects: ["organization switching", "branch-scoped permissions", "warehouse-scoped inventory operations"]
+        },
+        flows: [
+          {
+            lane: "actor",
+            title: "Structural setup",
+            detail: "Owner or platform admin creates organizational structure before commercial operations begin.",
+            bullets: [
+              "Organization is created either directly by ERP owner flow or through platform-admin onboarding.",
+              "Branch creation establishes operating locations and employee allocation scope.",
+              "Warehouse creation establishes stock-holding scope inside a branch."
+            ]
+          },
+          {
+            lane: "api",
+            title: "Controller entry points",
+            detail: "Separate CRUD-style endpoints exist for organizations, branches, and warehouses with organization or branch query context where needed.",
+            bullets: [
+              "Organization list is scoped to accessible memberships.",
+              "Branch list requires organizationId.",
+              "Warehouse list requires organizationId and optional branchId."
+            ]
+          },
+          {
+            lane: "service",
+            title: "Validation and orchestration",
+            detail: "Services validate ownership, active scope, uniqueness, and subscription or access constraints before persistence.",
+            bullets: [
+              "Organization code and branch code uniqueness are validated in service layer.",
+              "Warehouse service ties warehouses to the chosen branch and organization.",
+              "Later flows reuse branchId and warehouseId as required document and stock anchors."
+            ]
+          },
+          {
+            lane: "db",
+            title: "Persistence groups",
+            detail: "Foundation writes update the structural tables consumed by most downstream modules.",
+            bullets: [
+              "organization stores business identity plus GST threshold settings and owner linkage.",
+              "branch stores address, contact, and active state.",
+              "warehouse stores branch mapping, primary flag, and active state."
+            ]
+          },
+          {
+            lane: "async",
+            title: "Downstream impact",
+            detail: "These entities become required foreign keys for employees, inventory, purchases, sales, service, finance, and tax scope.",
+            bullets: [
+              "Default branch assignment shapes employee experience.",
+              "Warehouse IDs are mandatory in invoice, receipt, transfer, and replacement flows.",
+              "Organization IDs drive subscription, tax, and approval scope."
+            ]
+          }
+        ],
+        apis: [
+          ["GET", "/api/erp/organizations", "List accessible organizations."],
+          ["GET", "/api/erp/organizations/{id}", "Get organization detail."],
+          ["POST", "/api/erp/organizations", "Create organization."],
+          ["PUT", "/api/erp/organizations/{id}", "Update organization."],
+          ["GET", "/api/erp/branches", "List branches for an organization."],
+          ["GET", "/api/erp/branches/{id}", "Get branch detail."],
+          ["POST", "/api/erp/branches", "Create branch."],
+          ["PUT", "/api/erp/branches/{id}", "Update branch."],
+          ["GET", "/api/erp/warehouses", "List warehouses for an organization and optional branch."],
+          ["GET", "/api/erp/warehouses/{id}", "Get warehouse detail."],
+          ["POST", "/api/erp/warehouses", "Create warehouse."],
+          ["PUT", "/api/erp/warehouses/{id}", "Update warehouse."]
+        ],
+        scenarios: [
+          "Onboarding owner creates organization, then first branch, then first warehouse before creating products or invoices.",
+          "Employee branch access and default branch selection rely on branch records already existing.",
+          "Inventory and service replacement flows require branch and warehouse state to be active."
+        ],
+        notes: "Organization creation is also a gateway step in auth onboarding and platform-admin store onboarding."
+      },
+      {
+        key: "catalog",
+        name: "Catalog, HSN, Attributes, Pricing",
+        tag: "Catalog",
+        summary: "Shared and store-local product catalog layer with searchable references, HSN tax guidance, dynamic variant attributes, supplier links, store-specific pricing, and bundle or kit composition.",
+        actors: ["Owner", "Admin", "Purchase operator", "Store manager"],
+        controllers: ["ProductController", "CatalogReferenceController", "HsnMasterController", "ProductAttributeController"],
+        stores: {
+          reads: ["category", "brand", "uom", "uom_group", "tax_group", "hsn_master", "hsn_tax_rate", "product", "product_attribute_definition", "product_attribute_option", "product_attribute_scope", "store_product", "store_product_price", "supplier_product", "store_product_bundle_component"],
+          writes: ["product", "store_product", "store_product_attribute_value", "store_product_price", "product_attribute_definition", "product_attribute_option", "product_attribute_scope", "store_product_supplier_preference", "store_product_bundle_component"],
+          sideEffects: ["tax group suggestion", "dynamic product form generation", "supplier sourcing availability", "bundle component expansion rules for downstream sales"]
+        },
+        flows: [
+          {
+            lane: "actor",
+            title: "Search, discover, and create catalog records",
+            detail: "Product creation starts with reference lookups and may either link an existing shared product or create a new store-scoped catalog entry, then optionally define a bundle or kit composition.",
+            bullets: [
+              "UI calls searchable category, brand, UOM, and tax-group reference APIs.",
+              "HSN lookup and tax-group suggestion reduce manual tax selection.",
+              "Dynamic attributes are loaded based on organization, category, and brand.",
+              "Bundle setup lets one sellable store product point to multiple component store products."
+            ]
+          },
+          {
+            lane: "api",
+            title: "Product controller actions",
+            detail: "Product endpoints cover listing, detail, barcode or query scan, shared catalog discovery, create, update, link, supplier mapping, pricing, and bundle composition.",
+            bullets: [
+              "GET /api/erp/products lists store products for an organization.",
+              "POST /api/erp/products creates a store product association and may also create shared product master if productId is absent.",
+              "POST /api/erp/products/link links an existing shared product into store catalog.",
+              "Bundle endpoints return and replace bundle component rows for one store product."
+            ]
+          },
+          {
+            lane: "service",
+            title: "Service orchestration",
+            detail: "Service layer composes shared master data, store data, attribute definitions, price records, supplier preferences, and bundle component rules.",
+            bullets: [
+              "Attribute values are stored separately from store product core fields.",
+              "Pricing service maintains effective date windows and default price designation.",
+              "Supplier management service can attach supplier paths to store product detail.",
+              "Bundle validation prevents nested bundles and blocks serial or batch tracking on bundle parents."
+            ]
+          },
+          {
+            lane: "db",
+            title: "Persistence groups",
+            detail: "Catalog persistence is split across shared references, shared products, store-local products, attributes, bundle composition, and commercial overlays.",
+            bullets: [
+              "Reference data includes category, brand, UOM, tax_group, HSN master, and HSN tax rates.",
+              "Store-local layers use store_product, store_product_attribute_value, and store_product_price.",
+              "Bundle component composition is stored separately from store_product core fields.",
+              "Supplier-linked sourcing data is consumed from supplier_product and product preference tables."
+            ]
+          },
+          {
+            lane: "async",
+            title: "Downstream consumption",
+            detail: "Catalog output feeds purchases, inventory, sales, service, and reporting flows.",
+            bullets: [
+              "Products and prices drive invoice and receipt line defaults.",
+              "Tracking flags drive serial, batch, and warranty behavior.",
+              "HSN and tax group metadata feed GST breakup in documents and reports.",
+              "Bundles currently expand into component lines during quote, order, and invoice persistence."
+            ]
+          }
+        ],
+        apis: [
+          ["GET", "/api/erp/catalog/categories", "Search product categories by organization and query."],
+          ["GET", "/api/erp/catalog/brands", "Search brands by organization and query."],
+          ["GET", "/api/erp/catalog/uoms", "Search UOM references."],
+          ["GET", "/api/erp/catalog/tax-groups", "Search tax groups by organization and query."],
+          ["GET", "/api/erp/hsn", "Search HSN master."],
+          ["GET", "/api/erp/hsn/{hsnCode}", "Get HSN detail by code and effective date."],
+          ["GET", "/api/erp/catalog/attributes", "List dynamic attribute definitions for product forms."],
+          ["GET", "/api/erp/catalog/attributes/{id}", "Get attribute definition detail."],
+          ["GET", "/api/erp/catalog/attributes/ui-config", "Get attribute builder UI config."],
+          ["POST", "/api/erp/catalog/attributes", "Create attribute definition."],
+          ["PUT", "/api/erp/catalog/attributes/{id}", "Update attribute definition."],
+          ["GET", "/api/erp/products", "List store products."],
+          ["GET", "/api/erp/products/{id}", "Get store product detail."],
+          ["GET", "/api/erp/products/scan", "Resolve scan query to product, batch, or serial context."],
+          ["GET", "/api/erp/products/catalog", "Search shared product catalog."],
+          ["GET", "/api/erp/products/catalog/{id}", "Get shared product detail."],
+          ["GET", "/api/erp/products/discover", "Find shared products not yet linked to organization."],
+          ["GET", "/api/erp/products/tax-group-suggestion", "Suggest tax group from HSN."],
+          ["POST", "/api/erp/products", "Create store product association."],
+          ["PUT", "/api/erp/products/{id}", "Update store product."],
+          ["POST", "/api/erp/products/link", "Link shared product to store catalog."],
+          ["GET", "/api/erp/products/{id}/bundle", "Get bundle component definition for a store product."],
+          ["PUT", "/api/erp/products/{id}/bundle", "Replace bundle component definition for a store product."],
+          ["GET", "/api/erp/products/{id}/suppliers", "Get linked suppliers for a store product."],
+          ["PUT", "/api/erp/products/{id}/suppliers", "Upsert linked suppliers for a store product."],
+          ["GET", "/api/erp/products/{id}/prices", "List store product prices."],
+          ["POST", "/api/erp/products/{id}/prices", "Create store product price."],
+          ["PUT", "/api/erp/products/{id}/prices/{priceId}", "Update store product price."]
+        ],
+        scenarios: [
+          "Search HSN -> suggest tax group -> load dynamic attributes -> create store product -> add price -> attach suppliers.",
+          "Discover shared product -> link to store catalog -> preserve shared identity but maintain store-level commercial fields.",
+          "Create bundle product -> define component store products -> downstream sales expand the bundle into component lines.",
+          "Scan product code or serial -> resolve product or tracked inventory context before sale or service."
+        ],
+        notes: "Shared-product write on create is an implementation inference from current request shape where productId is optional."
+      },
+      {
+        key: "party",
+        name: "Customers, Suppliers, Terms, Sourcing",
+        tag: "Party",
+        summary: "Party management layer for customer and supplier identity, commercial terms, and supplier-to-product sourcing relationships.",
+        actors: ["Owner", "Admin", "Cashier", "Purchase operator", "Accountant"],
+        controllers: ["CustomerManagementController", "SupplierManagementController"],
+        stores: {
+          reads: ["customer", "store_customer_terms", "supplier", "supplier_product", "store_supplier_terms", "store_product_supplier_preference", "store_product"],
+          writes: ["customer", "store_customer_terms", "supplier", "supplier_product", "store_supplier_terms", "store_product_supplier_preference"],
+          sideEffects: ["sales credit behavior", "supplier sourcing preference", "purchase defaults", "customer service context"]
+        },
+        flows: [
+          {
+            lane: "actor",
+            title: "Party master capture",
+            detail: "Users capture store-specific customers and suppliers before transactional flows such as quotes, invoices, POs, and service tickets.",
+            bullets: [
+              "Customer creation is scoped by organization and branch.",
+              "Supplier creation is scoped by organization and branch.",
+              "Terms are maintained separately from the core identity record."
+            ]
+          },
+          {
+            lane: "api",
+            title: "Relationship and terms APIs",
+            detail: "The party layer exposes create and update operations, plus dedicated terms endpoints and supplier product-link APIs.",
+            bullets: [
+              "Customers expose terms APIs for store-specific credit and loyalty settings.",
+              "Suppliers expose terms APIs plus supplier catalog and product-link management.",
+              "Store-product supplier preference endpoints expose preferred sourcing path."
+            ]
+          },
+          {
+            lane: "service",
+            title: "Business orchestration",
+            detail: "Party services maintain clean separation between party identity and commercial overlays used by downstream modules.",
+            bullets: [
+              "Store customer terms can override or extend credit settings.",
+              "Supplier terms influence payment behavior and communication preferences.",
+              "Supplier product links bridge store product, supplier naming, and preferred procurement sequence."
+            ]
+          },
+          {
+            lane: "db",
+            title: "Persistence groups",
+            detail: "Party and commercial tables are independent but connected by organization and party identifiers.",
+            bullets: [
+              "customer and supplier store the base party profile.",
+              "store_customer_terms and store_supplier_terms store organization-commercial overlays.",
+              "supplier_product and store_product_supplier_preference drive sourcing behavior."
+            ]
+          },
+          {
+            lane: "async",
+            title: "Downstream effects",
+            detail: "Party data is consumed by sales, purchase, finance, service, and reporting modules.",
+            bullets: [
+              "Customer terms affect invoice and outstanding behavior.",
+              "Supplier mappings affect PO and receipt line selection.",
+              "Customer and supplier references appear in notifications, reports, and service history."
+            ]
+          }
+        ],
+        apis: [
+          ["GET", "/api/erp/customers", "List customers by organization."],
+          ["POST", "/api/erp/customers", "Create customer by organization and branch."],
+          ["PUT", "/api/erp/customers/{customerId}", "Update customer."],
+          ["GET", "/api/erp/customers/{customerId}/terms", "Get store-customer terms."],
+          ["PUT", "/api/erp/customers/{customerId}/terms", "Upsert store-customer terms."],
+          ["GET", "/api/erp/suppliers", "List suppliers by organization."],
+          ["POST", "/api/erp/suppliers", "Create supplier by organization and branch."],
+          ["PUT", "/api/erp/suppliers/{supplierId}", "Update supplier."],
+          ["GET", "/api/erp/suppliers/{supplierId}/catalog", "Get supplier purchasable catalog for organization."],
+          ["GET", "/api/erp/suppliers/{supplierId}/products", "List supplier product links."],
+          ["POST", "/api/erp/suppliers/{supplierId}/products", "Create supplier product link."],
+          ["PUT", "/api/erp/suppliers/{supplierId}/products/{supplierProductId}", "Update supplier product link."],
+          ["GET", "/api/erp/suppliers/{supplierId}/terms", "Get store-supplier terms."],
+          ["PUT", "/api/erp/suppliers/{supplierId}/terms", "Upsert store-supplier terms."],
+          ["GET", "/api/erp/suppliers/product-preferences/{storeProductId}", "Get preferred supplier path for a store product."],
+          ["PUT", "/api/erp/suppliers/product-preferences/{storeProductId}", "Upsert preferred supplier path for a store product."]
+        ],
+        scenarios: [
+          "Create customer -> define store terms -> use in quote, invoice, and outstanding flows.",
+          "Create supplier -> link supplier products -> create PO with supplier-specific product naming and preference.",
+          "Set preferred supplier per store product -> drive procurement and replenishment decisions."
+        ],
+        notes: "Customer and supplier codes may be auto-generated depending on active backend behavior around UI-generated vs backend-generated identifiers."
+      },
+      {
+        key: "imports",
+        name: "Bulk Imports and Import History",
+        tag: "Imports",
+        summary: "Bulk onboarding layer for customers, suppliers, and products with preview-first validation, execution history, per-row status, and failed-row export.",
+        actors: ["Owner", "Admin", "Store manager", "Migration operator"],
+        controllers: ["ErpImportController"],
+        stores: {
+          reads: ["customer", "supplier", "store_product", "category", "brand", "uom", "tax_group", "import_job", "import_job_row"],
+          writes: ["customer", "supplier", "product", "store_product", "category", "brand", "import_job", "import_job_row"],
+          sideEffects: ["bulk onboarding acceleration", "master-data normalization", "failed-row retry workflow"]
+        },
+        flows: [
+          {
+            lane: "actor",
+            title: "Template and preview-first import flow",
+            detail: "User downloads a template, uploads a CSV or Excel file, reviews row validation, and only then executes the import.",
+            bullets: [
+              "Templates are available separately for customers, suppliers, and products.",
+              "Preview is read-only and does not create import history.",
+              "Execution returns a persisted import job id for later review."
+            ]
+          },
+          {
+            lane: "api",
+            title: "Import execution and history endpoints",
+            detail: "Import controller exposes template, preview, execute, history list, detail, and failed-row download APIs.",
+            bullets: [
+              "Customer and supplier imports are organization plus branch scoped.",
+              "Product imports are organization scoped and can update existing rows by SKU.",
+              "History can be filtered by entity type for focused UI views."
+            ]
+          },
+          {
+            lane: "service",
+            title: "Planning, validation, and persistence",
+            detail: "Import service parses the file into row plans, validates each row, executes create or update actions, and persists job-level plus row-level results.",
+            bullets: [
+              "Row plans track intended action, resolved reference, validation messages, and source values.",
+              "Product import can auto-create missing category and brand references when allowed by current backend rules.",
+              "Failed rows remain downloadable as CSV for retry-oriented correction."
+            ]
+          },
+          {
+            lane: "db",
+            title: "Persistence groups",
+            detail: "Import history is stored separately from operational master data so UI can audit past onboarding runs without scanning business tables.",
+            bullets: [
+              "import_job stores one execution summary per uploaded file.",
+              "import_job_row stores row number, action, status, validation messages, and source values.",
+              "Operational writes still land in customer, supplier, product, and store_product tables."
+            ]
+          },
+          {
+            lane: "async",
+            title: "Downstream usage",
+            detail: "Bulk imports feed directly into sales, purchase, catalog, and reporting modules once execution succeeds.",
+            bullets: [
+              "Imported customers become immediately selectable in quote and invoice flows.",
+              "Imported suppliers and supplier-linked products accelerate PO creation.",
+              "Imported products reduce manual catalog setup during store onboarding or migration."
+            ]
+          }
+        ],
+        apis: [
+          ["GET", "/api/erp/imports/customers/template", "Download customer import template."],
+          ["POST", "/api/erp/imports/customers/preview", "Preview customer import rows."],
+          ["POST", "/api/erp/imports/customers", "Execute customer import."],
+          ["GET", "/api/erp/imports/suppliers/template", "Download supplier import template."],
+          ["POST", "/api/erp/imports/suppliers/preview", "Preview supplier import rows."],
+          ["POST", "/api/erp/imports/suppliers", "Execute supplier import."],
+          ["GET", "/api/erp/imports/products/template", "Download product import template."],
+          ["POST", "/api/erp/imports/products/preview", "Preview product import rows."],
+          ["POST", "/api/erp/imports/products", "Execute product import."],
+          ["GET", "/api/erp/imports/history", "List import jobs for an organization and optional entity type."],
+          ["GET", "/api/erp/imports/history/{id}", "Get import job detail with row results."],
+          ["GET", "/api/erp/imports/history/{id}/failed-rows", "Download failed rows as CSV."]
+        ],
+        scenarios: [
+          "Upload customer file -> preview shows one invalid row -> execute import -> import job status becomes PARTIAL_FAILURE -> failed-row CSV downloaded for retry.",
+          "Upload supplier file -> preview clean -> execute import -> import job status becomes COMPLETED and newly imported suppliers appear in procurement flows.",
+          "Upload product file -> missing brand or category auto-created -> store products created -> catalog list immediately reflects imported products."
+        ],
+        notes: "Preview and execution are intentionally separate so UI can give migration operators a safe review step before writing data."
+      },
+      {
+        key: "purchase",
+        name: "Purchases, Receiving, Supplier Payments",
+        tag: "Procure-to-Stock",
+        summary: "Procurement flow from purchase order to supplier dispatch collaboration to purchase receipt to optional bin putaway to supplier payment, with PDF generation, tax breakup, inventory posting, and receipt-level commercial snapshots for MRP plus selling price.",
+        actors: ["Purchase operator", "Owner", "Admin", "Accountant", "Inventory receiver", "Supplier portal user"],
+        controllers: ["ErpPurchaseController", "SupplierPurchasePortalController"],
+        stores: {
+          reads: ["supplier", "supplier_product", "store_product", "tax_registration", "purchase_order", "purchase_order_supplier_access", "purchase_order_supplier_dispatch_notice", "purchase_order_supplier_dispatch_notice_line", "purchase_receipt", "supplier_payment", "organization", "branch", "warehouse"],
+          writes: ["purchase_order", "purchase_order_line", "purchase_order_supplier_access", "purchase_order_supplier_dispatch_notice", "purchase_order_supplier_dispatch_notice_line", "purchase_receipt", "purchase_receipt_line", "purchase_receipt_line_batch", "purchase_receipt_line_serial", "supplier_payment", "supplier_payment_allocation", "inventory_batch", "serial_number", "inventory_balance", "stock_movement", "voucher", "ledger_entry", "audit_event"],
+          sideEffects: ["PO PDF", "receipt PDF", "supplier payment PDF", "supplier access link", "supplier dispatch ETA capture", "email send via document service", "stock increment", "bin putaway movement", "payables movement"]
+        },
+        flows: [
+          {
+            lane: "actor",
+            title: "Procurement initiation",
+            detail: "Purchase operator selects supplier and supplier-linked products to create a PO or directly posts a purchase receipt, then may invite the supplier into a limited portal flow.",
+            bullets: [
+              "PO is optional precursor; receipt can also be created directly.",
+              "Supplier-specific product codes and names can appear through supplier-product mapping.",
+              "State code and GST data feed tax computation.",
+              "PO detail can generate a supplier access link for external collaboration."
+            ]
+          },
+          {
+            lane: "api",
+            title: "Order, supplier collaboration, receipt, and payment endpoints",
+            detail: "Internal purchase endpoints cover list, detail, create, PDF generation, send, supplier-link generation, dispatch-history review, payment creation, and payment allocation. Public supplier-portal endpoints cover PO view and dispatch-notice submit.",
+            bullets: [
+              "PO create uses purchase.create authority.",
+              "Receipt create uses purchase.post or inventory.receive authority.",
+              "Supplier payment create and allocation use payment.pay authority.",
+              "Supplier portal endpoints are token-based and intentionally public for low-friction vendor participation."
+            ]
+          },
+          {
+            lane: "service",
+            title: "Supplier collaboration and backorder visibility",
+            detail: "Supplier dispatch notice flow captures what can ship now, what remains pending, and when the remainder is expected, without posting stock prematurely.",
+            bullets: [
+              "Supplier dispatch notices validate remaining open PO quantity line by line.",
+              "Partial dispatch and future remaining-dispatch ETA are both stored.",
+              "Internal PO detail aggregates dispatchCount, dispatched quantity, pending quantity, expected delivery date, and expected remaining-dispatch date.",
+              "Actual stock still enters the system only through purchase receipt posting."
+            ]
+          },
+          {
+            lane: "service",
+            title: "Posting orchestration",
+            detail: "Purchase service validates supplier context, computes line and tax amounts, posts receiving data, supports later receipt putaway, and stamps each inward stock layer with purchase cost, suggested selling price, and MRP.",
+            bullets: [
+              "Receipt lines can carry serialNumbers and batchEntries, plus suggested sale price and MRP.",
+              "Batch-tracked receipts store pricing snapshot on each batch, while serial and standard receipts create internal receipt lots in inventory_batch.",
+              "Receipt putaway can later move received quantity into warehouse bins without changing the original commercial receipt.",
+              "Supplier payment allocation updates outstanding state of purchase receipts.",
+              "Document service can render and email PO, receipt, and supplier payment PDFs."
+            ]
+          },
+          {
+            lane: "db",
+            title: "Persistence groups",
+            detail: "Procure-to-stock writes purchase documents, tracked receipt details, stock state, payment allocation records, and the commercial snapshot needed for later sales pricing.",
+            bullets: [
+              "purchase_order and purchase_order_line capture commercial intent.",
+              "purchase_receipt and child tracked tables capture actual received stock plus receipt-level MRP and suggested sale price.",
+              "inventory_batch now stores both real supplier batches and internal receipt lots used for standard and serial stock pricing.",
+              "supplier_payment and supplier_payment_allocation capture payable settlement.",
+              "Inventory tables and finance tables are updated as posting side effects."
+            ]
+          },
+          {
+            lane: "async",
+            title: "Cross-module impact",
+            detail: "Supplier ETA can inform internal follow-up and backorder commitment, while receiving increases inventory and payment allocation affects finance and outstanding views.",
+            bullets: [
+              "Supplier dispatch notices create a pre-receipt visibility layer for inbound goods.",
+              "Batch and serial records are created when receipt lines include tracked items.",
+              "Standard receipts also create internal lots so later sales can derive price from the actual inward layer instead of a pooled product default.",
+              "Inventory balances and stock movements are updated on receipt posting.",
+              "Receipt allocations later appear in finance outstanding and supplier views."
+            ]
+          }
+        ],
+        apis: [
+          ["GET", "/api/erp/purchases/orders", "List purchase orders."],
+          ["GET", "/api/erp/purchases/orders/{id}", "Get purchase order detail."],
+          ["POST", "/api/erp/purchases/orders/{id}/supplier-access-link", "Generate supplier portal access for a purchase order."],
+          ["GET", "/api/erp/purchases/orders/{id}/supplier-dispatches", "List supplier dispatch notices for a purchase order."],
+          ["GET", "/api/erp/purchases/orders/{id}/pdf", "Download purchase order PDF."],
+          ["POST", "/api/erp/purchases/orders/{id}/send", "Email purchase order PDF."],
+          ["POST", "/api/erp/purchases/orders", "Create purchase order."],
+          ["GET", "/api/supplier-portal/purchase-orders/{accessToken}", "Get supplier-facing purchase order detail."],
+          ["POST", "/api/supplier-portal/purchase-orders/{accessToken}/dispatch-notices", "Submit supplier full or partial dispatch notice."],
+          ["GET", "/api/erp/purchases/receipts", "List purchase receipts."],
+          ["GET", "/api/erp/purchases/receipts/{id}", "Get purchase receipt detail."],
+          ["GET", "/api/erp/purchases/receipts/{id}/pdf", "Download purchase receipt PDF."],
+          ["POST", "/api/erp/purchases/receipts/{id}/send", "Email purchase receipt PDF."],
+          ["POST", "/api/erp/purchases/receipts", "Create purchase receipt."],
+          ["POST", "/api/erp/purchases/receipts/{id}/putaway", "Record bin-level putaway for received stock."],
+          ["GET", "/api/erp/purchases/supplier-payments", "List supplier payments."],
+          ["GET", "/api/erp/purchases/supplier-payments/{id}/pdf", "Download supplier payment PDF."],
+          ["POST", "/api/erp/purchases/supplier-payments/{id}/send", "Email supplier payment PDF."],
+          ["POST", "/api/erp/purchases/supplier-payments", "Create supplier payment."],
+          ["POST", "/api/erp/purchases/supplier-payments/{id}/allocate", "Allocate supplier payment to receipts."]
+        ],
+        scenarios: [
+          "Supplier product mapping -> PO creation -> PDF send -> supplier receives formal document.",
+          "PO detail -> supplier access link -> supplier partial dispatch notice -> internal team sees pending quantity and ETA before receipt posting.",
+          "Purchase receipt with tracked items -> batch and serial creation -> inventory balance increment -> receipt PDF generation.",
+          "Purchase receipt with standard items -> internal receipt lot creation -> later invoice derives unit price and MRP from that inward layer.",
+          "Purchase receipt -> putaway action -> stock movements recorded from null-bin receipt state into specific warehouse bins.",
+          "Supplier payment -> allocation to multiple receipts -> finance outstanding reduction."
+        ],
+        notes: "Finance side effects are represented conceptually here because controller surface exposes purchase and finance separately while service layer likely bridges them during posting. Supplier dispatch notices act as advance shipping notices and ETA commitments, not as stock-posting events."
+      },
+      {
+        key: "sales",
+        name: "Quotes, Orders, POS, Invoices, Customer Receipts",
+        tag: "Quote-to-Cash",
+        summary: "Commercial flow from quote to order to invoice or POS checkout to payment request to pick or pack to dispatch to receipt, including GST breakup, validity windows, stock issue, fulfillment tracking, ownership creation, bundle expansion, customer-payment allocation, cashier session control, and a plug-and-play payment gateway abstraction, with quote or order pricing derived from store-product defaults and invoice price plus tax derived from stored catalog and stock data.",
+        actors: ["Cashier", "Sales operator", "Owner", "Admin", "Accountant"],
+        controllers: ["ErpSalesController", "RecurringSalesInvoiceController", "PosController"],
+        stores: {
+          reads: ["customer", "store_product", "inventory_balance", "serial_number", "inventory_batch", "tax_registration", "sales_quote", "sales_order", "sales_invoice", "sales_invoice_payment_request", "customer_receipt", "pos_session"],
+          writes: ["sales_quote", "sales_quote_line", "sales_order", "sales_order_line", "sales_invoice", "sales_invoice_line", "sales_invoice_payment_request", "sales_line_serial", "sales_line_batch", "sales_dispatch", "sales_dispatch_line", "product_ownership", "customer_receipt", "customer_receipt_allocation", "inventory_balance", "stock_movement", "inventory_reservation", "voucher", "ledger_entry", "recurring_sales_invoice", "recurring_sales_invoice_line", "pos_session"],
+          sideEffects: ["quote/order/invoice/dispatch/receipt PDF", "payment-link style collection prompt", "email send via document service", "stock deduction", "pick-pack-dispatch tracking", "ownership creation", "receivable movement", "cash-session summary"]
+        },
+        flows: [
+          {
+            lane: "actor",
+            title: "POS counter sale",
+            detail: "Cashier or owner opens a POS session for one warehouse, scans or searches sellable items, optionally uses a walk-in customer, and completes invoice plus receipt in one counter flow.",
+            bullets: [
+              "POS catalog search returns cashier-friendly type-ahead rows by SKU or name and excludes out-of-stock stocked items for the current warehouse.",
+              "POS lookup returns both storeProductId and productId, but checkout uses storeProductId because invoicing is store-catalog scoped.",
+              "POS lookup can match SKU, serial number, or batch text and returns tracked context for the item.",
+              "POS checkout can create or reuse a Walk-In Customer automatically.",
+              "Session close summarizes invoices, receipts, cash collected, and cash variance."
+            ]
+          },
+          {
+            lane: "actor",
+            title: "Commercial document creation",
+            detail: "Sales user creates quotes, orders, or direct invoices using customer, warehouse, product, and discount context while backend derives pricing and tax.",
+            bullets: [
+              "Quotes can convert to orders or invoices only while they are within their validity window.",
+              "Orders can convert to invoices only while they are within their fulfillment window.",
+              "Invoices can be direct or conversion-based.",
+              "Quotes default validUntil when omitted, and orders default expectedFulfillmentBy when omitted.",
+              "Quote and order lines persist a current MRP snapshot from store-product defaults.",
+              "Across quote, order, and invoice lines, discount remains editable while unit price and tax are system-derived.",
+              "Dispatch documents are created only after invoice posting and capture packed, dispatched, and delivered lifecycle state."
+            ]
+          },
+          {
+            lane: "api",
+            title: "Document, fulfillment, and payment endpoints",
+            detail: "Sales controller exposes list, detail, create, cancel, convert, payment-request, dispatch, PDF, send, receipt, and receipt-allocation actions.",
+            bullets: [
+              "Cancel applies to quote and order, while expired documents are blocked from downstream conversion.",
+              "Payment requests can be created per invoice and return request number, link token, and invoice-aware collection status.",
+              "Dispatch can be created from invoice detail and later advanced through packed, dispatched, and delivered statuses.",
+              "Receipt create uses payment.receive authority.",
+              "Receipt allocation updates invoice paid and outstanding state."
+            ]
+          },
+          {
+            lane: "service",
+            title: "Posting orchestration",
+            detail: "Sales service computes tax, discount, totals, tracked inventory usage, dispatch state, and receivable state while preserving source references and receipt-lot pricing.",
+            bullets: [
+              "Invoice lines can include serialNumberIds and batchSelections, and standard items auto-allocate from internal receipt lots when possible.",
+              "POS service wraps invoice plus receipt creation, links both documents back to pos_session_id, and lets session reporting stay query-light for UI.",
+              "Quote and order lines use catalog pricing plus default MRP, while invoice lines use the selected or auto-allocated stock layer for price and MRP.",
+              "Invoice response now includes both dispatchSummary and paymentRequestSummary so UI can show fulfillment and collection state without extra client-side aggregation.",
+              "Quote expiry and order fulfillment deadlines are enforced during conversion and reflected in document status.",
+              "Line discount is the editable commercial input across the document flow.",
+              "If seller is non-GST on invoice date, tax resolution returns zero tax while still preserving item tax classification for future registered periods.",
+              "Invoice responses include productOwnershipId and productOwnershipIds for downstream service or AMC flows.",
+              "Recurring invoice controller supports templated repeat invoicing."
+            ]
+          },
+          {
+            lane: "db",
+            title: "Persistence groups",
+            detail: "Quote-to-cash persistence spans commercial docs, tracked line tables, dispatch lines, ownership, payment allocation, and inventory-finance effects, including the lot chosen for invoice pricing.",
+            bullets: [
+              "sales_quote preserves validUntil, while sales_order preserves expectedFulfillmentBy, source conversion lineage, and line-level MRP snapshots.",
+              "sales_invoice writes invoice, line, tracked serial or batch usage, line-level MRP snapshot, and product_ownership for sold assets.",
+              "sales_dispatch and sales_dispatch_line persist post-invoice fulfillment quantities, transport metadata, and delivery lifecycle timestamps.",
+              "sales_line_batch may now be written for standard items as well when backend auto-allocates internal receipt lots.",
+              "sales_invoice_payment_request persists invoice-linked collection prompts and link tokens.",
+              "customer_receipt and allocation tables persist incoming payment state."
+            ]
+          },
+          {
+            lane: "async",
+            title: "Cross-module impact",
+            detail: "Invoice posting affects inventory, finance, service eligibility, fulfillment tracking, and reporting.",
+            bullets: [
+              "Inventory balance and stock movement reflect issued goods.",
+              "Inventory reservation now follows the chosen receipt lot or serial-linked batch so the same priced stock is held through posting.",
+              "Dispatch creation does not deduct stock again; it records shipment progress after invoice posting.",
+              "Product ownership becomes anchor for warranty extension and service agreement flows.",
+              "Receipt allocation updates finance outstanding, dashboard due summaries, and invoice-linked payment-request status."
+            ]
+          }
+        ],
+        apis: [
+          ["GET", "/api/erp/sales/quotes", "List sales quotes."],
+          ["GET", "/api/erp/sales/quotes/{id}", "Get quote detail."],
+          ["GET", "/api/erp/sales/quotes/{id}/pdf", "Download quote PDF."],
+          ["POST", "/api/erp/sales/quotes/{id}/send", "Email quote PDF."],
+          ["POST", "/api/erp/sales/quotes", "Create quote."],
+          ["POST", "/api/erp/sales/quotes/{id}/cancel", "Cancel quote."],
+          ["POST", "/api/erp/sales/quotes/{id}/convert-to-order", "Convert quote to order."],
+          ["POST", "/api/erp/sales/quotes/{id}/convert-to-invoice", "Convert quote to invoice."],
+          ["GET", "/api/erp/sales/orders", "List sales orders."],
+          ["GET", "/api/erp/sales/orders/{id}", "Get order detail."],
+          ["GET", "/api/erp/sales/orders/{id}/pdf", "Download order PDF."],
+          ["POST", "/api/erp/sales/orders/{id}/send", "Email order PDF."],
+          ["POST", "/api/erp/sales/orders", "Create order."],
+          ["POST", "/api/erp/sales/orders/{id}/cancel", "Cancel order."],
+          ["POST", "/api/erp/sales/orders/{id}/convert-to-invoice", "Convert order to invoice."],
+          ["GET", "/api/erp/sales/invoices", "List invoices."],
+          ["GET", "/api/erp/sales/invoices/{id}", "Get invoice detail."],
+          ["GET", "/api/erp/sales/invoices/{id}/pdf", "Download invoice PDF."],
+          ["POST", "/api/erp/sales/invoices/{id}/send", "Email invoice PDF."],
+          ["POST", "/api/erp/sales/invoices", "Create invoice."],
+          ["GET", "/api/erp/pos/sessions", "List POS sessions."],
+          ["GET", "/api/erp/pos/sessions/active", "Get active POS session for current user and warehouse."],
+          ["GET", "/api/erp/pos/sessions/{id}", "Get POS session detail."],
+          ["POST", "/api/erp/pos/sessions", "Open POS session."],
+          ["POST", "/api/erp/pos/sessions/{id}/close", "Close POS session and capture counted cash."],
+          ["GET", "/api/erp/pos/sessions/{id}/catalog/search", "Return cashier type-ahead results by SKU or name for the current warehouse."],
+          ["GET", "/api/erp/pos/sessions/{id}/catalog/lookup", "Resolve POS sellable item by SKU, serial, or batch text."],
+          ["POST", "/api/erp/pos/sessions/{id}/checkout", "Create invoice and optional receipt through the POS flow."],
+          ["GET", "/api/erp/sales/payment-requests", "List invoice payment requests."],
+          ["GET", "/api/erp/sales/payment-gateway/providers", "List available payment gateway providers for UI selection and configuration awareness."],
+          ["GET", "/api/erp/sales/payment-requests/{id}", "Get payment request detail."],
+          ["GET", "/api/erp/sales/invoices/{id}/payment-requests", "List invoice payment requests for one invoice."],
+          ["POST", "/api/erp/sales/invoices/{id}/payment-requests", "Create payment request for an invoice and resolve the requested or configured gateway provider."],
+          ["POST", "/api/erp/sales/payment-requests/{id}/sync-provider-status", "Synchronize stored gateway provider state for one payment request."],
+          ["POST", "/api/erp/sales/payment-requests/{id}/cancel", "Cancel payment request."],
+          ["GET", "/api/erp/sales/dispatches", "List sales dispatch documents."],
+          ["GET", "/api/erp/sales/dispatches/{id}", "Get sales dispatch detail."],
+          ["POST", "/api/erp/sales/invoices/{id}/dispatches", "Create dispatch for an invoice."],
+          ["POST", "/api/erp/sales/dispatches/{id}/pick", "Record picked quantity and optional source bin for a dispatch."],
+          ["POST", "/api/erp/sales/dispatches/{id}/pack", "Record packed quantity before shipment."],
+          ["POST", "/api/erp/sales/dispatches/{id}/status", "Advance dispatch status."],
+          ["GET", "/api/erp/sales/dispatches/{id}/pdf", "Download dispatch PDF."],
+          ["POST", "/api/erp/sales/dispatches/{id}/send", "Email dispatch PDF."],
+          ["GET", "/api/erp/sales/receipts", "List customer receipts."],
+          ["POST", "/api/erp/sales/receipts", "Create customer receipt."],
+          ["POST", "/api/erp/sales/receipts/{id}/allocate", "Allocate receipt to invoices."],
+          ["GET", "/api/erp/sales/receipts/{id}/pdf", "Download customer receipt PDF."],
+          ["POST", "/api/erp/sales/receipts/{id}/send", "Email receipt PDF."],
+          ["GET", "/api/erp/sales/recurring-invoices", "List recurring invoice definitions."],
+          ["GET", "/api/erp/sales/recurring-invoices/{id}", "Get recurring invoice detail."],
+          ["POST", "/api/erp/sales/recurring-invoices", "Create recurring invoice definition."],
+          ["POST", "/api/erp/sales/recurring-invoices/{id}/run", "Run recurring invoice immediately."]
+        ],
+        scenarios: [
+          "Quote -> order -> invoice conversion with preserved source references and PDF generation at each stage.",
+          "Direct invoice with serial or batch selections -> stock issue -> product ownership creation -> receipt allocation later.",
+          "POS session open -> serial lookup -> walk-in customer checkout -> receipt allocation -> session close with zero variance.",
+          "Posted invoice -> pick or pack progress captured on dispatch lines -> one or more partial dispatch documents -> delivered summary reflected back on invoice detail and list.",
+          "Invoice payment request -> gateway adapter creates provider link and stores provider metadata without posting accounting immediately.",
+          "Payment request provider sync refreshes operational gateway state like link readiness while ERP collection state remains receipt-driven.",
+          "Bundle product on quote, order, or invoice -> backend expands to component lines and persists commercial remarks for UI grouping.",
+          "Invoice payment request -> receipt allocation later updates invoice detail and payment request summary to partially paid or paid.",
+          "Partial payment receipts -> multiple receipt allocations returned with invoice detail."
+        ],
+        notes: "Inventory reservation is included as a possible side effect because tracked stock orchestration exists, though reservation behavior depends on service logic rather than controller contract alone. Dispatch is intentionally modeled as post-invoice fulfillment rather than a second stock-issue path, and current bundle support expands into component lines rather than returning a dedicated parent-child document structure."
+      },
+      {
+        key: "inventory",
+        name: "Inventory Balances, Tracking, Operations",
+        tag: "Inventory",
+        summary: "Operational stock layer covering balances, movements, tracked items, reservations, manual adjustments, transfers, warehouse bins, receipt putaway, and receipt-lot pricing snapshots across warehouses.",
+        actors: ["Inventory operator", "Store manager", "Technician", "Purchase receiver", "Sales user for lookup"],
+        controllers: ["InventoryBinController", "InventoryBalanceController", "InventoryTrackingController", "InventoryOperationsController", "InventoryReservationController", "StockMovementController"],
+        stores: {
+          reads: ["warehouse_bin_location", "inventory_balance", "inventory_batch", "serial_number", "inventory_reservation", "stock_movement", "warehouse", "store_product"],
+          writes: ["warehouse_bin_location", "stock_adjustment", "stock_adjustment_line", "stock_transfer", "stock_transfer_line", "inventory_balance", "stock_movement", "stock_movement_batch", "stock_movement_serial", "inventory_reservation"],
+          sideEffects: ["stock availability changes", "tracked serial status changes", "cross-module reference resolution", "bin-level stock visibility", "replenishment recommendation and action planning"]
+        },
+        flows: [
+          {
+            lane: "actor",
+            title: "Stock visibility and intervention",
+            detail: "Inventory users inspect balances, bins, serials, batches, reservations, and movements before adjusting or transferring stock.",
+            bullets: [
+              "Warehouse view is optimized for stock location.",
+              "Bin view is optimized for shelf, rack, and zone-level visibility inside a warehouse.",
+              "Product view is optimized for item-centric stock traceability.",
+              "Serial lookup supports service and warranty troubleshooting.",
+              "Batch lookup now also exposes internal receipt lots that carry purchase cost, suggested sale price, and MRP."
+            ]
+          },
+          {
+            lane: "api",
+            title: "Read and operate endpoints",
+            detail: "Inventory APIs are split into bin master endpoints, read-only balance and tracking endpoints, and operation endpoints for adjustment, transfer, reservation release, stock count, and replenishment planning.",
+            bullets: [
+              "Bin controller exposes warehouse bin list, create, and update operations.",
+              "Balance controllers expose warehouse, product, and bin slices.",
+              "Tracking controller exposes batches and serials by product.",
+              "Operations controller posts manual adjustments and stock transfers, each with optional bin context.",
+              "Planning controller exposes replenishment recommendations and can turn them into transfer or draft purchase-order actions."
+            ]
+          },
+          {
+            lane: "service",
+            title: "Operational orchestration",
+            detail: "Inventory services calculate available, reserved, and on-hand state, then write movements plus balance deltas during operational changes, sales reservations, stock count variance posting, replenishment planning, and bin-aware stock changes.",
+            bullets: [
+              "Warehouse bins support physical location structure like racks, shelves, and zones within one warehouse.",
+              "Manual adjustment captures quantityDelta, baseQuantityDelta, unitCost, and reason, and can target a specific bin.",
+              "Stock transfer creates transfer document and line records across warehouses and can optionally carry source and destination bins.",
+              "Reservation release updates reservation lifecycle and frees available stock.",
+              "Sales reservation follows the chosen batch or internal receipt lot so price-safe stock remains reserved through invoice posting.",
+              "Replenishment planning compares available qty against min stock plus reorder level, tries cross-warehouse transfer first for standard items, then falls back to supplier purchase suggestion."
+            ]
+          },
+          {
+            lane: "db",
+            title: "Persistence groups",
+            detail: "Inventory tables store both current state and detailed movement history.",
+            bullets: [
+              "warehouse_bin_location stores named bins per warehouse with active and default markers.",
+              "inventory_balance stores on-hand, reserved, available, average cost, and optional bin-scoped balance state.",
+              "inventory_batch and serial_number store tracked identifiers, receipt-lot lineage, and commercial snapshot fields such as purchase cost, suggested sale price, and MRP.",
+              "stock_movement plus child tracked tables store historical movement lineage, including the bin touched when present."
+            ]
+          },
+          {
+            lane: "async",
+            title: "Cross-module dependencies",
+            detail: "Purchase, sales, returns, and service replacement flows all pass through inventory state or movement write paths.",
+            bullets: [
+              "Receipt posting increases stock and creates priced receipt lots.",
+              "Invoice posting and replacements decrease stock.",
+              "Return inspection and posting may add or remove stock depending on disposition."
+            ]
+          }
+        ],
+        apis: [
+          ["GET", "/api/erp/inventory-bins", "List warehouse bins by organization and warehouse."],
+          ["POST", "/api/erp/inventory-bins", "Create warehouse bin."],
+          ["PUT", "/api/erp/inventory-bins/{id}", "Update warehouse bin."],
+          ["GET", "/api/erp/inventory-balances/warehouse/{warehouseId}", "List inventory balances by warehouse."],
+          ["GET", "/api/erp/inventory-balances/product/{productId}", "List inventory balances by product."],
+          ["GET", "/api/erp/inventory-balances/bin/{binLocationId}", "List inventory balances by bin."],
+          ["GET", "/api/erp/inventory-tracking/batches/product/{productId}", "List product batches."],
+          ["GET", "/api/erp/inventory-tracking/serials/product/{productId}", "List product serials."],
+          ["POST", "/api/erp/inventory-operations/adjustments/manual", "Post manual stock adjustment."],
+          ["POST", "/api/erp/inventory-operations/transfers", "Create stock transfer."],
+          ["GET", "/api/erp/inventory-counts", "List stock count sessions."],
+          ["GET", "/api/erp/inventory-counts/{id}", "Get stock count session detail."],
+          ["POST", "/api/erp/inventory-counts", "Create stock count session."],
+          ["PUT", "/api/erp/inventory-counts/{id}/lines", "Upsert stock count lines."],
+          ["POST", "/api/erp/inventory-counts/{id}/submit", "Submit stock count."],
+          ["POST", "/api/erp/inventory-counts/{id}/post-variances", "Post stock count variances."],
+          ["GET", "/api/erp/inventory-planning/replenishment", "List replenishment recommendations by organization, branch, or warehouse scope."],
+          ["POST", "/api/erp/inventory-planning/replenishment/draft-purchase-orders", "Create draft purchase order from replenishment recommendation."],
+          ["POST", "/api/erp/inventory-planning/replenishment/transfers", "Create stock transfer from replenishment recommendation."],
+          ["GET", "/api/erp/inventory-reservations", "List inventory reservations."],
+          ["POST", "/api/erp/inventory-reservations/expire", "Expire eligible reservations."],
+          ["POST", "/api/erp/inventory-reservations/{id}/release", "Release a reservation."],
+          ["GET", "/api/erp/stock-movements/bin/{binLocationId}", "List stock movements by bin."],
+          ["GET", "/api/erp/stock-movements/warehouse/{warehouseId}", "List stock movements by warehouse."],
+          ["GET", "/api/erp/stock-movements/product/{productId}", "List stock movements by product."],
+          ["GET", "/api/erp/stock-movements/reference/{referenceType}/{referenceId}", "List stock movements by document reference."]
+        ],
+        scenarios: [
+          "Open product stock detail -> inspect serial and batch state -> open movement history before service or sale.",
+          "Create warehouse bin -> post manual adjustment into that bin -> inspect bin stock and recent movements.",
+          "Inspect internal receipt lot -> see purchase cost, suggested sale price, and MRP used later by invoice pricing.",
+          "Manual stock correction -> write stock_adjustment, stock_movement, and balance delta.",
+          "Transfer stock between warehouses -> create transfer doc and adjust both source and destination balances.",
+          "Open replenishment planning -> see low stock by warehouse -> create internal transfer for standard stock or create draft purchase order when supplier mapping exists."
+        ],
+        notes: "Inventory is the central shared state updated indirectly by purchase, sales, returns, and service replacement modules, and now also drives first-class replenishment planning decisions plus explicit warehouse-bin visibility for UI and managers."
+      },
+      {
+        key: "returns",
+        name: "Sales Returns and Purchase Returns",
+        tag: "Returns",
+        summary: "Reverse-flow documents that link back to original invoices or purchase receipts and may drive inventory and finance adjustments after inspection or posting.",
+        actors: ["Cashier", "Store manager", "Accountant", "Purchase operator"],
+        controllers: ["ErpReturnController"],
+        stores: {
+          reads: ["sales_invoice", "sales_invoice_line", "purchase_receipt", "purchase_receipt_line", "serial_number", "inventory_batch", "customer", "supplier"],
+          writes: ["sales_return", "sales_return_line", "sales_return_line_serial", "sales_return_line_batch", "purchase_return", "purchase_return_line", "purchase_return_line_serial", "purchase_return_line_batch", "inventory_balance", "stock_movement", "voucher", "ledger_entry"],
+          sideEffects: ["financial reversals", "stock add-back or supplier return stock out", "adjustment review visibility"]
+        },
+        flows: [
+          {
+            lane: "actor",
+            title: "Return intake",
+            detail: "User starts from original sales invoice or original purchase receipt and selects eligible lines for return quantity capture.",
+            bullets: [
+              "Sales returns capture customer-facing reason and may later be inspected.",
+              "Purchase returns capture supplier-facing reason and original receipt linkage.",
+              "Tracked return lines can include serial IDs or batch selections."
+            ]
+          },
+          {
+            lane: "api",
+            title: "Sales and purchase return endpoints",
+            detail: "Return controller exposes list, detail, create, and sales-return inspection endpoints.",
+            bullets: [
+              "Sales return inspection is separated from creation.",
+              "Purchase return flow is create plus list/detail in current controller surface."
+            ]
+          },
+          {
+            lane: "service",
+            title: "Operational orchestration",
+            detail: "Return service validates source eligibility, computes reversed tax, and applies inspection decisions before any stock or finance side effect.",
+            bullets: [
+              "Sales inspection updates line disposition and inspection status.",
+              "Purchase returns reference original receipt line for cost and tax context.",
+              "Disposition ultimately determines inventory impact."
+            ]
+          },
+          {
+            lane: "db",
+            title: "Persistence groups",
+            detail: "Returns persist a new reverse document plus tracked sub-records that preserve linkage to original documents.",
+            bullets: [
+              "sales_return and sales_return_line preserve originalSalesInvoice and original line linkage.",
+              "purchase_return and purchase_return_line preserve originalPurchaseReceipt and original line linkage.",
+              "Tracked serial and batch child tables preserve precise reversed stock context."
+            ]
+          },
+          {
+            lane: "async",
+            title: "Cross-module impact",
+            detail: "Posted returns affect inventory and appear in adjustment and finance review reporting.",
+            bullets: [
+              "Sales returns may add stock back depending on inspection outcome.",
+              "Purchase returns push stock back out toward supplier.",
+              "Finance adjustment review surfaces return-linked financial corrections."
+            ]
+          }
+        ],
+        apis: [
+          ["GET", "/api/erp/returns/sales", "List sales returns."],
+          ["GET", "/api/erp/returns/sales/{id}", "Get sales return detail."],
+          ["POST", "/api/erp/returns/sales", "Create sales return."],
+          ["POST", "/api/erp/returns/sales/{id}/inspect", "Inspect sales return and set line outcomes."],
+          ["GET", "/api/erp/returns/purchases", "List purchase returns."],
+          ["GET", "/api/erp/returns/purchases/{id}", "Get purchase return detail."],
+          ["POST", "/api/erp/returns/purchases", "Create purchase return."]
+        ],
+        scenarios: [
+          "Invoice-linked customer return -> create sales return -> inspect quantities and dispositions -> inventory plus finance correction.",
+          "Receipt-linked supplier return -> create purchase return -> reduce stock and payable context.",
+          "Tracked item returns preserve serial and batch lineage back to source documents."
+        ],
+        notes: "Inspection is explicitly implemented only for sales returns in the current controller surface."
+      },
+      {
+        key: "service",
+        name: "Service Tickets, Warranty, Agreements, Replacements",
+        tag: "Post-Sale Service",
+        summary: "After-sales support module anchored on invoice, serial, and product ownership context, with tickets, visits, claims, warranty extensions, agreements, and replacement issuance.",
+        actors: ["Service desk staff", "Technician", "Owner", "Warranty coordinator", "Platform admin support"],
+        controllers: ["ErpServiceWarrantyController"],
+        stores: {
+          reads: ["service_ticket", "service_ticket_item", "service_visit", "warranty_claim", "warranty_extension", "service_agreement", "service_agreement_item", "service_replacement", "product_ownership", "serial_number", "sales_invoice", "sales_return", "customer", "inventory_balance"],
+          writes: ["service_ticket", "service_ticket_item", "service_visit", "warranty_claim", "warranty_extension", "service_agreement", "service_agreement_item", "service_replacement", "inventory_balance", "stock_movement"],
+          sideEffects: ["technician assignment", "warranty timeline updates", "replacement stock issue", "support and grievance visibility"]
+        },
+        flows: [
+          {
+            lane: "actor",
+            title: "Issue capture and lookup",
+            detail: "Service desk user starts from customer, invoice, serial, or ownership context to create a service ticket or claim.",
+            bullets: [
+              "Ticket items can reference productId, serialNumberId, and productOwnershipId.",
+              "Claims can reference service tickets, invoice, serial, supplier, or distributor routes.",
+              "Ownership lookup anchors warranty and AMC actions."
+            ]
+          },
+          {
+            lane: "api",
+            title: "Ticket, claim, agreement, and replacement endpoints",
+            detail: "Single service controller exposes operational endpoints for tickets, claims, warranty views, agreements, and replacements.",
+            bullets: [
+              "Tickets support assign, visit logging, and close actions.",
+              "Claims support create and status update.",
+              "Ownership endpoints expose warranty summary and extension history.",
+              "Replacements are issued through stock-aware replacement endpoint."
+            ]
+          },
+          {
+            lane: "service",
+            title: "Service orchestration",
+            detail: "Service layer correlates ownership, warranty windows, extension history, agreements, visits, and replacement eligibility.",
+            bullets: [
+              "Claim responses include ownership warranty summary and service agreement summary.",
+              "Warranty extension creation changes effective warranty end date.",
+              "Replacement flow consumes warehouse stock and writes service replacement document."
+            ]
+          },
+          {
+            lane: "db",
+            title: "Persistence groups",
+            detail: "Post-sale support writes separate operational records while reading sales and inventory anchors.",
+            bullets: [
+              "service_ticket, service_visit, and service_ticket_item support the ticket workspace.",
+              "warranty_claim and warranty_extension persist coverage and upstream route state.",
+              "service_agreement and service_agreement_item persist AMC-style contractual coverage.",
+              "service_replacement bridges service event and stock issue."
+            ]
+          },
+          {
+            lane: "async",
+            title: "Cross-module impact",
+            detail: "Service events appear in support queues, ownership history, replacement stock movements, and notifications.",
+            bullets: [
+              "Platform-admin support queue reads open service tickets and claims.",
+              "Replacement issuance reduces inventory and may start new warranty window.",
+              "Customer experience and feedback can later map back through service visits."
+            ]
+          }
+        ],
+        apis: [
+          ["GET", "/api/erp/service/tickets", "List service tickets."],
+          ["GET", "/api/erp/service/tickets/{id}", "Get ticket detail with items and visits."],
+          ["POST", "/api/erp/service/tickets", "Create service ticket."],
+          ["POST", "/api/erp/service/tickets/{id}/assign", "Assign service ticket."],
+          ["POST", "/api/erp/service/tickets/{id}/visits", "Create service visit."],
+          ["POST", "/api/erp/service/tickets/{id}/close", "Close service ticket."],
+          ["GET", "/api/erp/service/warranty-claims", "List warranty claims."],
+          ["GET", "/api/erp/service/warranty-claims/{id}", "Get warranty claim detail."],
+          ["POST", "/api/erp/service/warranty-claims", "Create warranty claim."],
+          ["POST", "/api/erp/service/warranty-claims/{id}/status", "Update warranty claim status."],
+          ["GET", "/api/erp/service/ownership/{id}/warranty", "Get ownership warranty summary."],
+          ["GET", "/api/erp/service/ownership/{id}/warranty-extensions", "List warranty extensions."],
+          ["POST", "/api/erp/service/ownership/{id}/warranty-extensions", "Create warranty extension."],
+          ["POST", "/api/erp/service/warranty-extensions/{id}/cancel", "Cancel warranty extension."],
+          ["GET", "/api/erp/service/agreements", "List service agreements."],
+          ["GET", "/api/erp/service/agreements/{id}", "Get service agreement detail."],
+          ["POST", "/api/erp/service/agreements", "Create service agreement."],
+          ["GET", "/api/erp/service/replacements", "List service replacements."],
+          ["GET", "/api/erp/service/replacements/{id}", "Get replacement detail."],
+          ["POST", "/api/erp/service/replacements", "Issue service replacement."]
+        ],
+        scenarios: [
+          "Invoice-created ownership -> service ticket -> service visit -> close ticket.",
+          "Warranty claim against ownership -> status updates -> replacement issuance from warehouse.",
+          "Create service agreement from invoice context -> future ticket responses include agreement summary."
+        ],
+        notes: "Invoice-side productOwnershipId exposure enables cleaner UI actions for AMC and extended warranty against invoice lines."
+      },
+      {
+        key: "finance",
+        name: "Accounts, Vouchers, Ledgers, Expenses, Reconciliation",
+        tag: "Finance",
+        summary: "Accounting layer for chart of accounts, vouchers, ledgers, outstanding review, adjustment review, expense posting, recurring journals, bank statement import batches, and reconciliation.",
+        actors: ["Accountant", "Owner", "Finance operator", "Admin"],
+        controllers: ["ErpFinanceController", "RecurringJournalController", "BankReconciliationController", "ErpExpenseController"],
+        stores: {
+          reads: ["account", "voucher", "ledger_entry", "expense", "expense_category", "bank_statement_import_batch", "bank_statement_entry", "recurring_journal", "sales_invoice", "purchase_receipt", "customer_receipt", "supplier_payment", "sales_return", "purchase_return"],
+          writes: ["account", "voucher", "ledger_entry", "expense_category", "expense", "bank_statement_import_batch", "bank_statement_entry", "recurring_journal", "recurring_journal_line"],
+          sideEffects: ["outstanding summaries", "aging", "cash-bank summaries", "expense reporting", "matched/unmatched reconciliation state", "auto-reconcile on import batch"]
+        },
+        flows: [
+          {
+            lane: "actor",
+            title: "Accounting configuration and posting",
+            detail: "Finance users maintain accounts, post vouchers, run ledgers, create expenses, and reconcile bank statement entries.",
+            bullets: [
+              "Accounts and vouchers are core manual accounting surfaces.",
+              "Expenses provide a business-friendly finance capture path.",
+              "Recurring journals automate repeat ledger entries."
+            ]
+          },
+          {
+            lane: "api",
+            title: "Finance and expense endpoints",
+            detail: "Finance controller exposes CRUD-style account endpoints, voucher posting, and multiple report query endpoints; expense and reconciliation controllers cover operational finance tasks.",
+            bullets: [
+              "GET daybook plus POST-style ledger and outstanding queries support filtered reporting.",
+              "Expense categories and expenses are kept in a separate expense controller.",
+              "Bank reconciliation controller now also exposes import-batch history and batch auto-reconcile."
+            ]
+          },
+          {
+            lane: "service",
+            title: "Service orchestration",
+            detail: "Finance services bridge base accounting tables with operational documents for outstanding, cash-bank, expense, and adjustment views.",
+            bullets: [
+              "Voucher line references can point to customer, supplier, invoice, receipt, and purchase receipt context.",
+              "Outstanding queries aggregate allocations from sales and purchase payment modules.",
+              "Adjustment review surfaces returns and replacement-linked finance consequences."
+            ]
+          },
+          {
+            lane: "db",
+            title: "Persistence groups",
+            detail: "The accounting layer stores both master accounting configuration and transaction-level ledger state.",
+            bullets: [
+              "account holds chart-of-account hierarchy.",
+              "voucher and ledger_entry store posted accounting events.",
+              "expense and expense_category store operational spending data.",
+              "bank_statement_import_batch stores upload or manual-import session metadata.",
+              "bank_statement_entry stores imported statement lines, import-batch linkage, and reconciliation state."
+            ]
+          },
+          {
+            lane: "async",
+            title: "Cross-module consumption",
+            detail: "Finance aggregates effects from sales, purchase, returns, and service replacement modules rather than owning all source document creation itself.",
+            bullets: [
+              "Outstanding views depend on invoice and receipt allocations.",
+              "Cash-bank summaries depend on payment and voucher flows.",
+              "Recurring journals and expenses feed dashboard and reports."
+            ]
+          }
+        ],
+        apis: [
+          ["GET", "/api/erp/finance/accounts", "List accounts."],
+          ["GET", "/api/erp/finance/accounts/{id}", "Get account detail."],
+          ["POST", "/api/erp/finance/accounts", "Create account."],
+          ["PUT", "/api/erp/finance/accounts/{id}", "Update account."],
+          ["DELETE", "/api/erp/finance/accounts/{id}", "Delete account."],
+          ["GET", "/api/erp/finance/vouchers", "List vouchers."],
+          ["GET", "/api/erp/finance/vouchers/{id}", "Get voucher detail."],
+          ["POST", "/api/erp/finance/vouchers", "Create voucher."],
+          ["GET", "/api/erp/finance/daybook", "Get daybook."],
+          ["POST", "/api/erp/finance/party-ledger", "Get party ledger."],
+          ["POST", "/api/erp/finance/account-ledger", "Get account ledger."],
+          ["POST", "/api/erp/finance/outstanding", "Get outstanding summary."],
+          ["POST", "/api/erp/finance/adjustments/review", "Review return and adjustment-impact documents."],
+          ["POST", "/api/erp/finance/cash-bank-summary", "Get cash-bank summary."],
+          ["POST", "/api/erp/finance/expense-summary", "Get expense summary."],
+          ["GET", "/api/erp/finance/recurring-journals", "List recurring journals."],
+          ["GET", "/api/erp/finance/recurring-journals/{id}", "Get recurring journal detail."],
+          ["POST", "/api/erp/finance/recurring-journals", "Create recurring journal."],
+          ["POST", "/api/erp/finance/recurring-journals/{id}/run", "Run recurring journal now."],
+          ["POST", "/api/erp/finance/bank-reconciliation/statements", "Import bank statement lines."],
+          ["GET", "/api/erp/finance/bank-reconciliation/imports", "List bank statement import batches."],
+          ["GET", "/api/erp/finance/bank-reconciliation/imports/{id}", "Get bank statement import batch detail."],
+          ["POST", "/api/erp/finance/bank-reconciliation/imports/{id}/auto-reconcile", "Auto reconcile a bank statement import batch."],
+          ["POST", "/api/erp/finance/bank-reconciliation/summary", "Get bank reconciliation summary."],
+          ["GET", "/api/erp/finance/bank-reconciliation/statements/{id}/candidates", "Get candidate ledger entries for a statement line."],
+          ["POST", "/api/erp/finance/bank-reconciliation/statements/{id}/reconcile", "Reconcile a statement line."],
+          ["POST", "/api/erp/finance/bank-reconciliation/statements/{id}/unreconcile", "Undo reconciliation."],
+          ["GET", "/api/erp/expenses/categories", "List expense categories."],
+          ["POST", "/api/erp/expenses/categories", "Create expense category."],
+          ["GET", "/api/erp/expenses", "List expenses."],
+          ["GET", "/api/erp/expenses/{id}", "Get expense detail."],
+          ["POST", "/api/erp/expenses", "Create expense."],
+          ["POST", "/api/erp/expenses/{id}/pay", "Pay expense."]
+        ],
+        scenarios: [
+          "Create voucher -> write voucher and ledger entries -> show in daybook and account ledger.",
+          "Create expense -> optional markPaid -> later pay expense -> reflected in expense summary.",
+          "Import bank statements -> batch history created -> get candidates or auto reconcile -> update matched and unmatched counts."
+        ],
+        notes: "This module is heavily query-oriented; several endpoints are analytical reads over finance plus operational documents."
+      },
+      {
+        key: "subscription-tax",
+        name: "Subscriptions, Plans, Features, Tax",
+        tag: "Governance",
+        summary: "Owner subscription lifecycle and GST registration layer used for feature gating, organization limits, plan management, and document tax context.",
+        actors: ["Owner", "Admin", "Platform admin"],
+        controllers: ["SubscriptionController", "TaxRegistrationController"],
+        stores: {
+          reads: ["subscription_plan", "subscription_feature", "subscription_plan_feature", "organization_subscription", "account_subscription", "organization", "tax_registration"],
+          writes: ["organization_subscription", "account_subscription", "tax_registration", "organization"],
+          sideEffects: ["feature gating in UI", "organization creation limits", "GST scope resolution for documents"]
+        },
+        flows: [
+          {
+            lane: "actor",
+            title: "Plan awareness and tax setup",
+            detail: "Owners review current subscription, activate or change plan, maintain history, and configure GST registrations plus threshold settings.",
+            bullets: [
+              "Current subscription is organization-facing but linked to owner account subscription logic.",
+              "Plan limits affect whether owner can create additional organizations.",
+              "Tax registrations may be organization-wide or branch-specific."
+            ]
+          },
+          {
+            lane: "api",
+            title: "Subscription and tax endpoints",
+            detail: "Subscription controller exposes plan discovery, current plan, activation, change-plan, cancel, and history; tax controller exposes registrations and threshold settings.",
+            bullets: [
+              "Both plan activation and plan change use ActivateOrganizationSubscriptionRequest payload shape.",
+              "Tax list API returns effective registration selection and scope warnings."
+            ]
+          },
+          {
+            lane: "service",
+            title: "Service orchestration",
+            detail: "Subscription service resolves owner-owned organization limits and features, while tax service resolves the correct GST registration for a given document date and branch.",
+            bullets: [
+              "Current subscription response includes canCreateOrganization and featureCodes.",
+              "Threshold status computes financial-year turnover against configured threshold.",
+              "Tax registration service returns effective registration and conflict warnings."
+            ]
+          },
+          {
+            lane: "db",
+            title: "Persistence groups",
+            detail: "Plan metadata is separate from current organization or owner subscription state and separate from tax registrations.",
+            bullets: [
+              "subscription_plan and subscription_plan_feature store plan definitions.",
+              "organization_subscription and account_subscription store active lifecycle state.",
+              "tax_registration stores GST identity with branch or organization scope and effective dates."
+            ]
+          },
+          {
+            lane: "async",
+            title: "Cross-module effect",
+            detail: "Subscriptions shape UI access and organization creation while tax data shapes sales, purchase, and report tax presentation.",
+            bullets: [
+              "Feature codes affect disabled-but-visible UI behavior.",
+              "Organization limit affects onboarding and store creation.",
+              "Tax scope and state code affect GST breakup in documents."
+            ]
+          }
+        ],
+        apis: [
+          ["GET", "/api/erp/subscriptions/plans", "List active subscription plans."],
+          ["GET", "/api/erp/subscriptions/current", "Get current organization subscription."],
+          ["GET", "/api/erp/subscriptions/history", "Get owner subscription history for an organization."],
+          ["POST", "/api/erp/subscriptions/organizations/{organizationId}/activate", "Activate organization subscription."],
+          ["POST", "/api/erp/subscriptions/organizations/{organizationId}/change-plan", "Change owner subscription plan for organization."],
+          ["POST", "/api/erp/subscriptions/organizations/{organizationId}/cancel", "Cancel current subscription."],
+          ["GET", "/api/erp/tax/registrations", "List tax registrations and effective registration resolution."],
+          ["POST", "/api/erp/tax/registrations", "Create tax registration."],
+          ["PUT", "/api/erp/tax/registrations/{registrationId}", "Update tax registration."],
+          ["GET", "/api/erp/tax/gstin-lookup", "Run GSTIN lookup through the configured provider abstraction and return a UI-friendly business profile."],
+          ["GET", "/api/erp/tax/compliance/invoices/{invoiceId}/documents", "List stored e-invoice and e-way bill draft records for an invoice."],
+          ["GET", "/api/erp/tax/compliance/documents/{documentId}", "Load one stored GST compliance document including payload, warnings, and provider response."],
+          ["POST", "/api/erp/tax/compliance/invoices/{invoiceId}/drafts/e-invoice", "Generate and persist an e-invoice draft payload from a posted sales invoice."],
+          ["POST", "/api/erp/tax/compliance/invoices/{invoiceId}/drafts/e-way-bill", "Generate and persist an e-way bill draft payload with optional transport details."],
+          ["POST", "/api/erp/tax/compliance/documents/{documentId}/submit", "Submit the stored GST compliance document to the configured provider abstraction."],
+          ["POST", "/api/erp/tax/compliance/documents/{documentId}/sync-status", "Synchronize provider status for an already submitted GST compliance document."],
+          ["GET", "/api/erp/tax/threshold-status", "Get GST threshold status."],
+          ["PUT", "/api/erp/tax/threshold-settings", "Update GST threshold settings."]
+        ],
+        scenarios: [
+          "Owner changes plan -> new feature set and organization-limit snapshot appear in UI after refresh.",
+          "Tax registration lookup resolves organization or branch GSTIN for a sales or purchase document.",
+          "GSTIN lookup helps onboarding screens prefill business identity while still allowing non-GST fallback.",
+          "Posted invoice -> tax compliance draft endpoint builds e-invoice payload, stores warnings, and exposes readiness for UI review.",
+          "Eligible GST compliance draft -> submit endpoint stores provider acknowledgement and timestamps.",
+          "Submitted GST compliance document -> sync endpoint refreshes provider status to generated or current provider state.",
+          "Threshold monitoring drives GST alert messaging before or after threshold reached."
+        ],
+        notes: "Owner subscription applies across owner-owned organizations rather than being independent per store. GST compliance now supports draft, submit, fetch, and sync flows through a provider abstraction. A configurable HTTP provider adapter now exists for real integration wiring, while local verification still commonly uses the simulated provider."
+      },
+      {
+        key: "approval-audit",
+        name: "Approvals, Workflow Triggers, Audit",
+        tag: "Control Plane",
+        summary: "Governance layer for approval-rule evaluation, request lifecycle, trigger review and dispatch, and entity-level audit visibility.",
+        actors: ["Owner", "Manager", "Approver", "Platform admin oversight", "Workflow dispatcher"],
+        controllers: ["ErpApprovalController", "WorkflowTriggerController", "AuditEventController"],
+        stores: {
+          reads: ["approval_rule", "approval_request", "approval_history", "audit_event", "source operational documents"],
+          writes: ["approval_rule", "approval_request", "approval_history", "audit_event", "notification"],
+          sideEffects: ["workflow dispatch", "manager action queue", "cross-module approval gating"]
+        },
+        flows: [
+          {
+            lane: "actor",
+            title: "Rule setup and request review",
+            detail: "Managers define rules, create or auto-evaluate approval requests, and act on pending requests.",
+            bullets: [
+              "Approval rules can be scoped by entityType, branch, amount threshold, and approver role.",
+              "Approval requests carry source entity identifiers and current approver snapshots.",
+              "Approval history preserves approve, reject, and cancel decisions with remarks."
+            ]
+          },
+          {
+            lane: "api",
+            title: "Approval and workflow endpoints",
+            detail: "Approval controller exposes rule CRUD-lite, request lifecycle, evaluation, queue summary, and decision actions. Workflow controller exposes review and dispatch.",
+            bullets: [
+              "Audit controller exposes entity-type and entity-id scoped event lookup.",
+              "Workflow dispatch requires approval.manage authority."
+            ]
+          },
+          {
+            lane: "service",
+            title: "Evaluation and orchestration",
+            detail: "Services determine whether approval is required, whether a pending request already exists, and which approver role should receive it.",
+            bullets: [
+              "Evaluation returns approvalRequired, matchedRuleId, approverRoleCode, and pendingRequestId.",
+              "Decision actions append approval_history and update request state.",
+              "Workflow review aggregates trigger items and dispatch state."
+            ]
+          },
+          {
+            lane: "db",
+            title: "Persistence groups",
+            detail: "Control-plane tables track rules, live requests, and immutable history while audit events expose source-entity trails.",
+            bullets: [
+              "approval_rule stores thresholds and approver role mapping.",
+              "approval_request stores current state and source entity linkage.",
+              "approval_history stores every action.",
+              "audit_event stores entity-level traces for UI and oversight."
+            ]
+          },
+          {
+            lane: "async",
+            title: "Cross-module impact",
+            detail: "Approvals and workflow triggers can delay or permit actions in purchase, sales, expense, or finance operations while also notifying users.",
+            bullets: [
+              "Queue summaries support manager dashboard visibility.",
+              "Workflow dispatch can create notifications tied to source entities.",
+              "Audit event reads support entity detail activity panels."
+            ]
+          }
+        ],
+        apis: [
+          ["GET", "/api/erp/approvals/rules", "List approval rules."],
+          ["POST", "/api/erp/approvals/rules", "Create approval rule."],
+          ["GET", "/api/erp/approvals/requests", "List approval requests."],
+          ["GET", "/api/erp/approvals/requests/{id}", "Get approval request details with history."],
+          ["POST", "/api/erp/approvals/requests", "Create approval request."],
+          ["POST", "/api/erp/approvals/evaluate", "Evaluate whether entity needs approval."],
+          ["GET", "/api/erp/approvals/requests/summary", "Get pending approval queue summary."],
+          ["POST", "/api/erp/approvals/requests/{id}/approve", "Approve request."],
+          ["POST", "/api/erp/approvals/requests/{id}/reject", "Reject request."],
+          ["POST", "/api/erp/approvals/requests/{id}/cancel", "Cancel request."],
+          ["GET", "/api/erp/workflow-triggers/review", "Review workflow triggers."],
+          ["POST", "/api/erp/workflow-triggers/dispatch", "Dispatch workflow trigger notifications."],
+          ["GET", "/api/erp/audit-events", "List audit events by entity type and entity ID."]
+        ],
+        scenarios: [
+          "Expense or purchase document evaluated -> approval required -> approver acts -> request history preserved.",
+          "Workflow review and dispatch surface threshold-triggered actions to managers or dashboards.",
+          "Entity detail page opens audit timeline using entityType and entityId."
+        ],
+        notes: "The workflow trigger layer is intentionally lightweight and acts as a review-and-dispatch adjunct to approvals and dashboard alerts."
+      },
+      {
+        key: "platform-admin",
+        name: "Platform Admin, Store Ops, Plan Governance",
+        tag: "Platform",
+        summary: "Marketplace-style administrative plane for store onboarding, owner account discovery, subscription control, catalog governance, incident handling, store-team oversight, support queues, feedback, health, and analytics.",
+        actors: ["Platform administrator", "Platform ops", "Growth team", "Support team"],
+        controllers: ["PlatformAdminController"],
+        stores: {
+          reads: ["organization", "auth_account", "person", "app_user", "organization_person_profile", "branch", "warehouse", "organization_subscription", "account_subscription", "subscription_plan", "product", "store_product", "platform_incident", "service_ticket", "warranty_claim", "notification", "audit_event", "report_schedule"],
+          writes: ["person", "auth_account", "organization", "organization_person_profile", "app_user", "branch", "organization_subscription", "account_subscription", "subscription_plan", "subscription_plan_feature", "product", "platform_incident"],
+          sideEffects: ["store onboarding", "owner account provisioning", "catalog governance enforcement", "support queue intervention", "platform health aggregation"]
+        },
+        flows: [
+          {
+            lane: "actor",
+            title: "Platform-level onboarding and oversight",
+            detail: "Platform admin can create stores for existing owners or fully onboard new owner plus store plus branch plus plan in one flow.",
+            bullets: [
+              "Store onboarding request contains owner, store, optional branch, and optional subscription blocks.",
+              "Platform admin can also manage plans and plan features centrally.",
+              "Catalog governance console can inspect linked stores, open incidents, and push shared products into restricted, discontinued, blocked, or recalled state.",
+              "Store-team console exposes employee-like organization users across stores."
+            ]
+          },
+          {
+            lane: "api",
+            title: "Administrative control surface",
+            detail: "Platform admin controller exposes overview, store, owner account lookup, onboarding, subscription, plan-feature, catalog governance, incident, team, support, feedback, notification, audit, health, and reports endpoints.",
+            bullets: [
+              "Store onboarding uses POST /api/platform-admin/stores/onboard.",
+              "Catalog governance now exposes product-impact and incident-to-governance action endpoints.",
+              "Support queue actions can assign or close service tickets and update claim status.",
+              "Read-only ops surfaces include feedback, notifications, audit activity, system health, and reports."
+            ]
+          },
+          {
+            lane: "service",
+            title: "Cross-domain orchestration",
+            detail: "Platform admin service spans auth, organization, subscription, catalog, and support domains to produce store-level operational control.",
+            bullets: [
+              "Onboarding creates person, auth account, organization, owner membership, optional branch, and optional subscription in one flow.",
+              "Store status changes affect whether organization remains active.",
+              "Incident governance actions can recall or block a shared product and immediately affect downstream transactional entry points.",
+              "Plan feature updates flow into later subscription-gating behavior."
+            ]
+          },
+          {
+            lane: "db",
+            title: "Persistence groups",
+            detail: "Platform admin mostly writes into existing auth, foundation, subscription, and governance tables while reading from operational support and telemetry tables.",
+            bullets: [
+              "Writes identity and organization tables during onboarding.",
+              "Writes product governance state and platform incidents for catalog control.",
+              "Writes subscription tables during plan and feature changes.",
+              "Reads support, notification, audit, and report data for oversight."
+            ]
+          },
+          {
+            lane: "async",
+            title: "Cross-module impact",
+            detail: "Platform actions shape store accessibility, product availability, support handling, and long-term governance capabilities.",
+            bullets: [
+              "Plan changes influence owner organization limits and feature sets.",
+              "Blocked or recalled shared products are rejected by purchase, sales, recurring, and service entry points in store modules.",
+              "Support queue actions directly touch service-ticket and warranty-claim lifecycle.",
+              "Health and reports aggregate notification and schedule outcomes across platform."
+            ]
+          }
+        ],
+        apis: [
+          ["GET", "/api/platform-admin/overview", "Platform summary dashboard."],
+          ["GET", "/api/platform-admin/stores", "List platform stores."],
+          ["GET", "/api/platform-admin/catalog/products", "List governed shared catalog products."],
+          ["GET", "/api/platform-admin/catalog/products/{productId}/impact", "List linked store products impacted by a shared catalog product."],
+          ["PUT", "/api/platform-admin/catalog/products/{productId}/governance", "Update shared product governance flags directly."],
+          ["GET", "/api/platform-admin/incidents", "List platform incidents and quality complaints."],
+          ["POST", "/api/platform-admin/incidents", "Create platform incident."],
+          ["PUT", "/api/platform-admin/incidents/{incidentId}/status", "Update platform incident status."],
+          ["POST", "/api/platform-admin/incidents/{incidentId}/apply-governance", "Apply recall, block, discontinue, restrict, or clear action to linked shared product."],
+          ["GET", "/api/platform-admin/owner-accounts", "Search owner accounts."],
+          ["GET", "/api/platform-admin/stores/{organizationId}", "Get store detail."],
+          ["POST", "/api/platform-admin/stores", "Create store for existing owner."],
+          ["POST", "/api/platform-admin/stores/onboard", "Create owner plus store plus optional branch plus optional subscription."],
+          ["PUT", "/api/platform-admin/stores/{organizationId}", "Update store."],
+          ["PUT", "/api/platform-admin/stores/{organizationId}/status", "Update store active state."],
+          ["GET", "/api/platform-admin/subscriptions", "List subscription summaries."],
+          ["POST", "/api/platform-admin/subscriptions/organizations/{organizationId}/change-plan", "Change plan."],
+          ["POST", "/api/platform-admin/subscriptions/organizations/{organizationId}/cancel", "Cancel subscription."],
+          ["GET", "/api/platform-admin/plans-features", "List plans and features."],
+          ["POST", "/api/platform-admin/plans-features/plans", "Create plan."],
+          ["PUT", "/api/platform-admin/plans-features/plans/{planId}", "Update plan."],
+          ["PUT", "/api/platform-admin/plans-features/plans/{planId}/features", "Update plan features."],
+          ["GET", "/api/platform-admin/store-teams", "List store team members."],
+          ["GET", "/api/platform-admin/store-teams/{userId}", "Get store team member detail."],
+          ["PUT", "/api/platform-admin/store-teams/{userId}", "Update store team member."],
+          ["PUT", "/api/platform-admin/store-teams/{userId}/status", "Update store team member status."],
+          ["GET", "/api/platform-admin/support-grievances", "Get support and grievance queue."],
+          ["POST", "/api/platform-admin/support-grievances/service-tickets/{ticketId}/assign", "Assign service ticket from platform console."],
+          ["POST", "/api/platform-admin/support-grievances/service-tickets/{ticketId}/close", "Close service ticket from platform console."],
+          ["POST", "/api/platform-admin/support-grievances/warranty-claims/{claimId}/status", "Update warranty claim status from platform console."],
+          ["GET", "/api/platform-admin/feedback", "List platform-visible customer feedback."],
+          ["GET", "/api/platform-admin/notifications", "List platform notification summary."],
+          ["GET", "/api/platform-admin/audit-activity", "List audit activity across stores."],
+          ["GET", "/api/platform-admin/system-health", "Get system health snapshot."],
+          ["GET", "/api/platform-admin/reports", "Get platform report summary."]
+        ],
+        scenarios: [
+          "Platform admin onboards new owner and store end to end without leaving platform console.",
+          "Platform admin opens incident -> applies RECALL_PRODUCT -> impacted linked store products remain visible while future purchase, sales, recurring, and service actions are blocked.",
+          "Support team opens support-grievance queue and intervenes in service tickets and warranty claims.",
+          "Growth team changes plan features and immediately affects future store entitlement logic."
+        ],
+        notes: "This controller acts as a control plane over existing auth, foundation, support, and subscription tables rather than introducing a separate platform-specific entity layer."
+      },
+      {
+        key: "dashboard-notify-report",
+        name: "Dashboard, Reports, Notifications, Templates",
+        tag: "Observability",
+        summary: "Read-heavy operational visibility layer plus report scheduling, notification delivery, template management, and channel-specific message dispatch.",
+        actors: ["Owner", "Admin", "Manager", "Accountant", "Platform admin", "Schedulers", "Notification workers"],
+        controllers: ["DashboardController", "ReportScheduleController", "NotificationController", "TemplateController", "EmailController", "SmsController"],
+        stores: {
+          reads: ["sales_invoice", "purchase_receipt", "inventory_balance", "service_ticket", "ledger_entry", "notification", "notification_template", "report_schedule", "audit_event"],
+          writes: ["notification", "notification_template", "report_schedule"],
+          sideEffects: ["email send", "SMS send", "scheduled execution", "dashboard widget aggregation"]
+        },
+        flows: [
+          {
+            lane: "actor",
+            title: "Operational visibility and communication",
+            detail: "Users consume dashboards, create report schedules, browse notification inboxes, and manage reusable message templates.",
+            bullets: [
+              "Dashboard widgets are read-only aggregates.",
+              "Notification inbox is user-centric, while templates and stats are admin-centric.",
+              "Report schedules can be activated, deactivated, and executed immediately."
+            ]
+          },
+          {
+            lane: "api",
+            title: "Read models and dispatch endpoints",
+            detail: "Dashboard controller provides specialized aggregate reads; report schedules provide CRUD-like scheduling; notifications provide inbox, send, schedule, read-state, stats, retry, and template management.",
+            bullets: [
+              "Email and SMS controllers provide channel-specific dispatch helpers.",
+              "Template render endpoint supports previewing merge output before sending."
+            ]
+          },
+          {
+            lane: "service",
+            title: "Aggregation and delivery orchestration",
+            detail: "Services pull from operational tables for dashboard or report outputs and push notification content to channel delivery implementations.",
+            bullets: [
+              "Dashboard service aggregates sales, dues, inventory, tax, profitability, and aging metrics.",
+              "Schedule service persists recurrence and executes due schedules.",
+              "Notification service tracks read state, stats, and retry-failed behavior."
+            ]
+          },
+          {
+            lane: "db",
+            title: "Persistence groups",
+            detail: "Observability writes are small but critical, while reads span many operational domains.",
+            bullets: [
+              "report_schedule stores recurrence configuration and state.",
+              "notification and notification_template store message state and reusable content.",
+              "Dashboard reads span sales, inventory, finance, service, and audit-like activity sources."
+            ]
+          },
+          {
+            lane: "async",
+            title: "Scheduler and delivery loops",
+            detail: "Schedules and notifications introduce asynchronous execution patterns beyond direct request-response APIs.",
+            bullets: [
+              "Report schedules can be executed by timer or manual run-now action.",
+              "Notification retries and channel sends act as async operational loops.",
+              "Platform health surfaces pending, failed, and unread notification counts."
+            ]
+          }
+        ],
+        apis: [
+          ["GET", "/api/dashboard/summary", "Get dashboard summary."],
+          ["GET", "/api/dashboard/sales/today", "Get today's sales summary."],
+          ["GET", "/api/dashboard/sales/period", "Get sales summary for date range."],
+          ["GET", "/api/dashboard/products/top", "Get top products."],
+          ["GET", "/api/dashboard/inventory/low-stock", "Get low stock alerts."],
+          ["GET", "/api/dashboard/activities/recent", "Get recent activities."],
+          ["GET", "/api/dashboard/dues/summary", "Get due summary."],
+          ["GET", "/api/dashboard/dues/upcoming", "Get upcoming dues."],
+          ["GET", "/api/dashboard/profitability", "Get profitability summary."],
+          ["GET", "/api/dashboard/aging", "Get aging dashboard."],
+          ["GET", "/api/dashboard/inventory/stock-summary", "Get stock snapshot summary."],
+          ["GET", "/api/dashboard/tax/summary", "Get tax summary."],
+          ["POST", "/api/report-schedules", "Create report schedule."],
+          ["PUT", "/api/report-schedules/{id}", "Update report schedule."],
+          ["GET", "/api/report-schedules/{id}", "Get schedule by ID."],
+          ["GET", "/api/report-schedules", "Get schedules with pagination."],
+          ["GET", "/api/report-schedules/active", "Get active schedules."],
+          ["GET", "/api/report-schedules/user/{userId}", "Get schedules by user."],
+          ["DELETE", "/api/report-schedules/{id}", "Delete schedule."],
+          ["PUT", "/api/report-schedules/{id}/activate", "Activate schedule."],
+          ["PUT", "/api/report-schedules/{id}/deactivate", "Deactivate schedule."],
+          ["POST", "/api/report-schedules/{id}/execute", "Execute schedule now."],
+          ["GET", "/api/report-schedules/due", "Get schedules due for execution."],
+          ["GET", "/api/report-schedules/check-schedule-id", "Check schedule ID uniqueness."],
+          ["POST", "/api/notifications/send", "Send notification immediately."],
+          ["POST", "/api/notifications/schedule", "Schedule notification."],
+          ["GET", "/api/notifications/{id}", "Get notification by database ID."],
+          ["GET", "/api/notifications/notification-id/{notificationId}", "Get notification by logical notification ID."],
+          ["GET", "/api/notifications/user/{userId}", "Get notifications by user."],
+          ["GET", "/api/notifications/customer/{customerId}", "Get notifications by customer."],
+          ["GET", "/api/notifications/user/{userId}/unread", "Get unread notifications for user."],
+          ["GET", "/api/notifications/user/{userId}/unread-count", "Get unread count."],
+          ["PUT", "/api/notifications/{id}/read", "Mark one notification read."],
+          ["PUT", "/api/notifications/user/{userId}/read-all", "Mark all notifications read."],
+          ["DELETE", "/api/notifications/{id}", "Cancel notification."],
+          ["GET", "/api/notifications/stats", "Get notification stats."],
+          ["POST", "/api/notifications/retry-failed", "Retry failed notifications."],
+          ["POST", "/api/notification-templates", "Create notification template."],
+          ["PUT", "/api/notification-templates/{id}", "Update template."],
+          ["GET", "/api/notification-templates/{id}", "Get template by ID."],
+          ["GET", "/api/notification-templates/code/{templateCode}", "Get template by code."],
+          ["GET", "/api/notification-templates", "List templates with pagination."],
+          ["GET", "/api/notification-templates/type/{type}", "Get templates by type."],
+          ["GET", "/api/notification-templates/channel/{channel}", "Get templates by channel."],
+          ["DELETE", "/api/notification-templates/{id}", "Delete template."],
+          ["PUT", "/api/notification-templates/{id}/activate", "Activate template."],
+          ["PUT", "/api/notification-templates/{id}/deactivate", "Deactivate template."],
+          ["POST", "/api/notification-templates/{templateCode}/render", "Render template preview."],
+          ["GET", "/api/notification-templates/check-code", "Check template code uniqueness."],
+          ["POST", "/api/notifications/email/send", "Send email."],
+          ["POST", "/api/notifications/email/send-html", "Send HTML email."],
+          ["POST", "/api/notifications/email/send-with-attachment", "Send email with attachment."],
+          ["POST", "/api/notifications/email/send-template/{templateCode}", "Send templated email."],
+          ["POST", "/api/notifications/email/send-bulk", "Send bulk email."],
+          ["POST", "/api/notifications/sms/send", "Send SMS."],
+          ["POST", "/api/notifications/sms/send-bulk", "Send bulk SMS."],
+          ["POST", "/api/notifications/sms/send-template/{templateCode}", "Send templated SMS."],
+          ["GET", "/api/notifications/sms/status/{messageId}", "Get SMS delivery status."]
+        ],
+        scenarios: [
+          "Dashboard loads role-aware operational widgets sourced from multiple domains.",
+          "Manager creates report schedule -> scheduler runs due item -> report response generated and later delivered or surfaced.",
+          "Notification template rendered -> send or schedule notification -> inbox and stats update -> retry loop for failures."
+        ],
+        notes: "Notification and reporting are where the backend most clearly mixes synchronous CRUD with asynchronous operational tasks."
+      }
+    ];
+
+    const listEl = document.getElementById("moduleList");
+    const searchEl = document.getElementById("search");
+    const titleEl = document.getElementById("title");
+    const summaryEl = document.getElementById("summary");
+    const tagEl = document.getElementById("tag");
+    const metaRowEl = document.getElementById("metaRow");
+    const overviewEl = document.getElementById("overview");
+    const dfdEl = document.getElementById("dfd");
+    const apiEl = document.getElementById("api");
+    const dbEl = document.getElementById("db");
+    const scenariosEl = document.getElementById("scenarios");
+
+    let activeKey = modules[0].key;
+
+    function methodClass(method) {
+      const lower = method.toLowerCase();
+      if (lower === "get") return "m-get";
+      if (lower === "post") return "m-post";
+      if (lower === "put") return "m-put";
+      if (lower === "delete") return "m-delete";
+      return "m-get";
+    }
+
+    function renderModuleList(filter = "") {
+      const normalized = filter.trim().toLowerCase();
+      listEl.innerHTML = "";
+
+      modules
+        .filter((module) => {
+          if (!normalized) return true;
+          const haystack = [
+            module.name,
+            module.tag,
+            module.summary,
+            module.actors.join(" "),
+            module.controllers.join(" ")
+          ].join(" ").toLowerCase();
+          return haystack.includes(normalized);
+        })
+        .forEach((module) => {
+          const button = document.createElement("button");
+          button.className = "module-btn" + (module.key === activeKey ? " active" : "");
+          button.innerHTML = `<strong>${module.name}</strong><small>${module.tag} · ${module.controllers.join(", ")}</small>`;
+          button.addEventListener("click", () => {
+            activeKey = module.key;
+            renderModuleList(searchEl.value);
+            renderModule(module);
+          });
+          listEl.appendChild(button);
+        });
+    }
+
+    function renderOverview(module) {
+      overviewEl.innerHTML = `
+        <h3 class="section-title">Blueprint Overview</h3>
+        <div class="card-grid">
+          <div class="card">
+            <h3>Primary Actors</h3>
+            <div class="chips">${module.actors.map((item) => `<span class="chip">${item}</span>`).join("")}</div>
+          </div>
+          <div class="card">
+            <h3>Controllers</h3>
+            <div class="chips">${module.controllers.map((item) => `<span class="chip">${item}</span>`).join("")}</div>
+          </div>
+          <div class="card">
+            <h3>Primary Reads</h3>
+            <div class="chips">${module.stores.reads.map((item) => `<span class="chip">${item}</span>`).join("")}</div>
+          </div>
+          <div class="card">
+            <h3>Primary Writes</h3>
+            <div class="chips">${module.stores.writes.map((item) => `<span class="chip">${item}</span>`).join("")}</div>
+          </div>
+        </div>
+        ${module.notes ? `<div class="note-box">${module.notes}</div>` : ""}
+      `;
+    }
+
+    function renderDFD(module) {
+      dfdEl.innerHTML = `
+        <h3 class="section-title">Detailed Data Flow</h3>
+        <div class="flow-track">
+          ${module.flows.map((step, index) => `
+            <div class="flow-step">
+              <span class="lane lane-${step.lane}">${step.lane.toUpperCase()}</span>
+              <h3>${index + 1}. ${step.title}</h3>
+              <p>${step.detail}</p>
+              <ul class="step-list">
+                ${step.bullets.map((item) => `<li>${item}</li>`).join("")}
+              </ul>
+            </div>
+            ${index < module.flows.length - 1 ? `<div class="flow-arrow">→</div>` : ""}
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function renderAPI(module) {
+      apiEl.innerHTML = `
+        <h3 class="section-title">API Methods</h3>
+        <div class="api-table">
+          ${module.apis.map(([method, path, purpose]) => `
+            <div class="api-row">
+              <div class="method ${methodClass(method)}">${method}</div>
+              <div class="api-path">${path}</div>
+              <div class="api-purpose">${purpose}</div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function renderDB(module) {
+      dbEl.innerHTML = `
+        <h3 class="section-title">DB Operations And Side Effects</h3>
+        <div class="db-grid">
+          <div class="db-box">
+            <h3>Read Sets</h3>
+            <div class="chips">${module.stores.reads.map((item) => `<span class="chip">${item}</span>`).join("")}</div>
+          </div>
+          <div class="db-box">
+            <h3>Write Sets</h3>
+            <div class="chips">${module.stores.writes.map((item) => `<span class="chip">${item}</span>`).join("")}</div>
+          </div>
+          <div class="db-box">
+            <h3>Side Effects</h3>
+            <div class="chips">${module.stores.sideEffects.map((item) => `<span class="chip">${item}</span>`).join("")}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderScenarios(module) {
+      scenariosEl.innerHTML = `
+        <h3 class="section-title">Key Scenarios</h3>
+        <div class="card-grid">
+          ${module.scenarios.map((scenario) => `
+            <div class="card">
+              <h3>Scenario</h3>
+              <p>${scenario}</p>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function renderModule(module) {
+      titleEl.textContent = module.name;
+      summaryEl.textContent = module.summary;
+      tagEl.textContent = module.tag;
+      metaRowEl.innerHTML = `
+        <span class="meta-pill">${module.actors.length} actor groups</span>
+        <span class="meta-pill">${module.controllers.length} controllers</span>
+        <span class="meta-pill">${module.apis.length} endpoint patterns</span>
+        <span class="meta-pill">${module.stores.reads.length} read groups</span>
+        <span class="meta-pill">${module.stores.writes.length} write groups</span>
+      `;
+      renderOverview(module);
+      renderDFD(module);
+      renderAPI(module);
+      renderDB(module);
+      renderScenarios(module);
+    }
+
+    document.querySelectorAll(".tab").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach((tab) => tab.classList.remove("active"));
+        document.querySelectorAll(".panel").forEach((panel) => panel.classList.remove("active"));
+        button.classList.add("active");
+        document.getElementById(button.dataset.tab).classList.add("active");
+      });
+    });
+
+    searchEl.addEventListener("input", () => renderModuleList(searchEl.value));
+
+    renderModuleList();
+    renderModule(modules[0]);
+  </script>
+</body>
+</html>

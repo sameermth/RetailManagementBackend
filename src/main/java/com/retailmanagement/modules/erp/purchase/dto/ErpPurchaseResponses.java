@@ -19,7 +19,13 @@ public final class ErpPurchaseResponses {
             Long uomId,
             BigDecimal quantity,
             BigDecimal baseQuantity,
+            BigDecimal receivedBaseQuantity,
+            Long putawayBinLocationId,
+            BigDecimal putawayQuantity,
+            BigDecimal putawayBaseQuantity,
             BigDecimal unitValue,
+            BigDecimal suggestedSalePrice,
+            BigDecimal mrp,
             BigDecimal taxableAmount,
             BigDecimal taxRate,
             BigDecimal cgstRate,
@@ -31,6 +37,82 @@ public final class ErpPurchaseResponses {
             BigDecimal cessRate,
             BigDecimal cessAmount,
             BigDecimal lineAmount
+    ) {}
+
+    public record PurchaseOrderSupplierAccessResponse(
+            Long purchaseOrderId,
+            String accessToken,
+            String portalUrl,
+            LocalDate expiresOn,
+            boolean active
+    ) {}
+
+    public record SupplierDispatchLineResponse(
+            Long id,
+            Long purchaseOrderLineId,
+            Long productId,
+            String sku,
+            String productName,
+            BigDecimal orderedQuantity,
+            BigDecimal orderedBaseQuantity,
+            BigDecimal dispatchedQuantity,
+            BigDecimal dispatchedBaseQuantity,
+            LocalDate expectedRemainingDispatchOn,
+            String remarks
+    ) {}
+
+    public record SupplierDispatchNoticeResponse(
+            Long id,
+            Long purchaseOrderId,
+            Long supplierId,
+            String dispatchNumber,
+            LocalDate dispatchDate,
+            LocalDate expectedDeliveryDate,
+            String supplierReferenceNumber,
+            String transporterName,
+            String vehicleNumber,
+            String trackingNumber,
+            String status,
+            String remarks,
+            List<SupplierDispatchLineResponse> lines
+    ) {}
+
+    public record PurchaseOrderSupplierDispatchSummaryResponse(
+            int dispatchCount,
+            BigDecimal totalDispatchedBaseQuantity,
+            BigDecimal pendingBaseQuantity,
+            LocalDate lastExpectedDeliveryDate,
+            LocalDate lastExpectedRemainingDispatchOn
+    ) {}
+
+    public record SupplierPortalPurchaseOrderLineResponse(
+            Long purchaseOrderLineId,
+            Long productId,
+            String sku,
+            String productName,
+            String hsnCode,
+            BigDecimal orderedQuantity,
+            BigDecimal orderedBaseQuantity,
+            BigDecimal receivedBaseQuantity,
+            BigDecimal alreadyNotifiedBaseQuantity,
+            BigDecimal remainingBaseQuantity,
+            BigDecimal unitPrice,
+            BigDecimal taxRate,
+            BigDecimal lineAmount
+    ) {}
+
+    public record SupplierPortalPurchaseOrderResponse(
+            Long purchaseOrderId,
+            String poNumber,
+            LocalDate poDate,
+            String status,
+            Long supplierId,
+            String supplierName,
+            String supplierCode,
+            LocalDate accessExpiresOn,
+            PurchaseOrderSupplierDispatchSummaryResponse dispatchSummary,
+            List<SupplierPortalPurchaseOrderLineResponse> lines,
+            List<SupplierDispatchNoticeResponse> dispatchNotices
     ) {}
 
     public record PurchaseOrderResponse(
@@ -47,7 +129,9 @@ public final class ErpPurchaseResponses {
             BigDecimal taxAmount,
             BigDecimal totalAmount,
             String status,
-            List<PurchaseLineResponse> lines
+            List<PurchaseLineResponse> lines,
+            PurchaseOrderSupplierDispatchSummaryResponse dispatchSummary,
+            List<SupplierDispatchNoticeResponse> dispatchNotices
     ) {}
 
     public record PurchaseOrderSummaryResponse(
@@ -84,6 +168,8 @@ public final class ErpPurchaseResponses {
             BigDecimal allocatedAmount,
             BigDecimal outstandingAmount,
             String status,
+            String putawayStatus,
+            LocalDate putawayCompletedOn,
             List<PurchaseLineResponse> lines,
             List<PurchaseReceiptAllocationResponse> allocations
     ) {}
@@ -116,7 +202,8 @@ public final class ErpPurchaseResponses {
             BigDecimal totalAmount,
             BigDecimal allocatedAmount,
             BigDecimal outstandingAmount,
-            String status
+            String status,
+            String putawayStatus
     ) {}
 
     public record SupplierPaymentResponse(

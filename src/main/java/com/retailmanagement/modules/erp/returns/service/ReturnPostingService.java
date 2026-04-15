@@ -104,6 +104,7 @@ public class ReturnPostingService {
                             header.getOrganizationId(),
                             header.getBranchId(),
                             header.getWarehouseId(),
+                            null,
                             line.getProductId(),
                             null,
                             line.getUomId(),
@@ -161,7 +162,7 @@ public class ReturnPostingService {
                     serialNumberRepository.save(serial);
 
                     inventoryPostingService.postMovement(
-                            header.getOrganizationId(), header.getBranchId(), header.getWarehouseId(), line.getProductId(), serial.getBatchId(),
+                            header.getOrganizationId(), header.getBranchId(), header.getWarehouseId(), null, line.getProductId(), serial.getBatchId(),
                             line.getUomId(), BigDecimal.ONE, BigDecimal.ONE, "OUT",
                             ErpInventoryMovementTypes.PURCHASE_RETURN, "purchase_return", header.getId(), header.getReturnNumber(),
                             line.getUnitCost(),
@@ -173,7 +174,7 @@ public class ReturnPostingService {
                     InventoryBatch batch = inventoryBatchRepository.findById(link.getBatchId())
                             .orElseThrow(() -> new ResourceNotFoundException("Batch not found: " + link.getBatchId()));
                     inventoryPostingService.postMovement(
-                            header.getOrganizationId(), header.getBranchId(), header.getWarehouseId(), line.getProductId(), batch.getId(),
+                            header.getOrganizationId(), header.getBranchId(), header.getWarehouseId(), null, line.getProductId(), batch.getId(),
                             line.getUomId(), link.getQuantity(), link.getBaseQuantity(), "OUT",
                             ErpInventoryMovementTypes.PURCHASE_RETURN, "purchase_return", header.getId(), header.getReturnNumber(),
                             line.getUnitCost(),
@@ -185,6 +186,7 @@ public class ReturnPostingService {
                         header.getOrganizationId(),
                         header.getBranchId(),
                         header.getWarehouseId(),
+                        null,
                         line.getProductId(),
                         null,
                         line.getUomId(),
@@ -231,7 +233,7 @@ public class ReturnPostingService {
 
             if (restock) {
                 inventoryPostingService.postMovement(
-                        header.getOrganizationId(), header.getBranchId(), header.getWarehouseId(), line.getProductId(), serial.getBatchId(),
+                        header.getOrganizationId(), header.getBranchId(), header.getWarehouseId(), null, line.getProductId(), serial.getBatchId(),
                         line.getUomId(), BigDecimal.ONE, BigDecimal.ONE, "IN",
                         ErpInventoryMovementTypes.SALES_RETURN, "sales_return", header.getId(), header.getReturnNumber(),
                         line.getUnitCostAtReturn(),
@@ -256,7 +258,7 @@ public class ReturnPostingService {
             InventoryBatch batch = inventoryBatchRepository.findById(link.getBatchId())
                     .orElseThrow(() -> new ResourceNotFoundException("Batch not found: " + link.getBatchId()));
             inventoryPostingService.postMovement(
-                    header.getOrganizationId(), header.getBranchId(), header.getWarehouseId(), line.getProductId(), batch.getId(),
+                    header.getOrganizationId(), header.getBranchId(), header.getWarehouseId(), null, line.getProductId(), batch.getId(),
                     line.getUomId(), link.getQuantity(), link.getBaseQuantity(), "IN",
                     ErpInventoryMovementTypes.SALES_RETURN, "sales_return", header.getId(), header.getReturnNumber(),
                     line.getUnitCostAtReturn(),

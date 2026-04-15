@@ -13,6 +13,7 @@ public final class BankReconciliationResponses {
             Long organizationId,
             Long branchId,
             Long accountId,
+            Long importBatchId,
             LocalDate entryDate,
             LocalDate valueDate,
             String referenceNumber,
@@ -52,5 +53,33 @@ public final class BankReconciliationResponses {
             long unmatchedCount,
             long reconciledCount,
             List<BankStatementEntryResponse> entries
+    ) {}
+
+    public record BankStatementImportBatchResponse(
+            Long id,
+            Long organizationId,
+            Long branchId,
+            Long accountId,
+            String importReference,
+            String sourceType,
+            String sourceReference,
+            String sourceFileName,
+            LocalDate statementFromDate,
+            LocalDate statementToDate,
+            Integer entryCount,
+            BigDecimal totalDebitAmount,
+            BigDecimal totalCreditAmount,
+            String status,
+            LocalDateTime importedAt,
+            Long importedBy,
+            String remarks,
+            List<BankStatementEntryResponse> entries
+    ) {}
+
+    public record AutoReconcileImportBatchResponse(
+            Long importBatchId,
+            long matchedCount,
+            long skippedCount,
+            List<Long> reconciledEntryIds
     ) {}
 }

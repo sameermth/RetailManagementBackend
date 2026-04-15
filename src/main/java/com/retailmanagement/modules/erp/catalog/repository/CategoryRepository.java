@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CategoryRepository extends JpaRepository<Category, Long> {
 
+    java.util.Optional<Category> findByOrganizationIdAndNameIgnoreCase(Long organizationId, String name);
+
     List<Category> findTop30ByOrganizationIdAndIsActiveTrueOrderByNameAsc(Long organizationId);
 
     List<Category> findTop30ByOrganizationIdAndIsActiveTrueAndNameContainingIgnoreCaseOrderByNameAsc(Long organizationId, String name);

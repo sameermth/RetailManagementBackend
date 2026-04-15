@@ -32,6 +32,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -94,7 +95,16 @@ public class AuthServiceImpl implements AuthService {
                 .filter(user -> Boolean.TRUE.equals(user.getActive()))
                 .toList();
         if (memberships.isEmpty()) {
-            throw new BusinessException("User not found");
+            Account account = resolveAccountByLogin(loginRequest.getUsername());
+            account.setLastLoginAt(LocalDateTime.now());
+            accountRepository.save(account);
+
+            ClientType clientType = resolveClientType(loginRequest.getClientType(), userAgent);
+            UserPrincipal principal = authentication.getPrincipal() instanceof UserPrincipal userPrincipal
+                    ? userPrincipal
+                    : (UserPrincipal) customUserDetailsService.loadUserByUsername(loginRequest.getUsername());
+            JwtIssue jwtIssue = issueAccessToken(principal);
+            return toOnboardingJwtResponse(principal, jwtIssue.accessToken(), clientType, jwtIssue.accessTokenExpiresAt());
         }
         User user = resolveMembership(memberships, loginRequest.getOrganizationId());
 
@@ -165,28 +175,16 @@ public class AuthServiceImpl implements AuthService {
     public JwtResponse register(RegisterRequest request) {
         log.info("Registering new user: {}", request.getUsername());
 
-        // Check if username exists
-        if (userRepository.existsByUsername(request.getUsername())) {
+        if (accountRepository.findByLoginIdentifierIgnoreCase(request.getUsername().trim()).isPresent()) {
             throw new BusinessException("Username already exists");
         }
 
-        // Check if email exists
-        if (userRepository.existsByEmail(request.getEmail())) {
+        if (personRepository.findFirstByPrimaryEmailIgnoreCase(request.getEmail().trim()).isPresent()) {
             throw new BusinessException("Email already exists");
         }
 
-        Organization organization = organizationRepository.findAll().stream()
-                .min(Comparator.comparing(Organization::getId))
-                .orElseGet(this::createDefaultOrganization);
-
-        String displayName = buildFullName(request.getFirstName(), request.getLastName(), request.getUsername());
+        String displayName = buildFullName(request.getFirstName(), request.getLastName(), request.getUsername().trim());
         String encodedPassword = passwordEncoder.encode(request.getPassword());
-
-        User user = User.builder()
-                .organizationId(organization.getId())
-                .employeeCode(request.getUsername())
-                .active(true)
-                .build();
 
         Person person = Person.builder()
                 .legalName(displayName)
@@ -205,51 +203,11 @@ public class AuthServiceImpl implements AuthService {
                 .build();
         account = accountRepository.save(account);
 
-        OrganizationPersonProfile organizationPersonProfile = OrganizationPersonProfile.builder()
-                .organizationId(organization.getId())
-                .person(person)
-                .displayName(displayName)
-                .emailForOrg(request.getEmail())
-                .phoneForOrg(request.getPhone())
-                .active(true)
-                .build();
-        organizationPersonProfileRepository.save(organizationPersonProfile);
-
-        user.setPersonId(person.getId());
-        user.setAccountId(account.getId());
-        user.setPerson(person);
-        user.setAccount(account);
-        user.setOrganizationPersonProfile(organizationPersonProfile);
-
-        Set<Role> roles = new HashSet<>();
-        Role userRole = roleRepository.findByCode("VIEWER")
-                .orElseGet(() -> roleRepository.findByCode("OWNER")
-                        .orElseThrow(() -> new BusinessException("Default role not found")));
-        roles.add(userRole);
-        user.setRoles(roles);
-
-        User savedUser = userRepository.save(user);
-        SubscriptionAccessService.SubscriptionSnapshot subscriptionSnapshot = subscriptionAccessService.currentSnapshot(savedUser.getOrganizationId());
-        List<GrantedAuthority> authorities = savedUser.getRoles().stream()
-                .flatMap(role -> role.getPermissions().stream())
-                .map(permission -> (GrantedAuthority) () -> permission.getCode())
-                .collect(Collectors.toList());
-        savedUser.getRoles().forEach(role -> authorities.add(() -> "ROLE_" + role.getCode()));
-        UserPrincipal principal = UserPrincipal.create(savedUser, authorities, subscriptionSnapshot);
+        UserPrincipal principal = buildOnboardingPrincipal(account);
         Authentication authentication = new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        JwtIssue jwtIssue = issueAccessToken(savedUser);
-        RefreshTokenIssue refreshTokenIssue = createRefreshSession(savedUser, ClientType.WEB, null, null, null);
-        return toJwtResponse(
-                savedUser,
-                jwtIssue.accessToken(),
-                subscriptionSnapshot,
-                List.of(savedUser),
-                refreshTokenIssue.refreshToken(),
-                refreshTokenIssue.expiresAt(),
-                ClientType.WEB,
-                jwtIssue.accessTokenExpiresAt()
-        );
+        JwtIssue jwtIssue = issueAccessToken(principal);
+        return toOnboardingJwtResponse(principal, jwtIssue.accessToken(), ClientType.WEB, jwtIssue.accessTokenExpiresAt());
     }
 
     @Override
@@ -331,17 +289,6 @@ public class AuthServiceImpl implements AuthService {
         return merged.isEmpty() ? fallback : merged;
     }
 
-    private Organization createDefaultOrganization() {
-        log.warn("No organizations found during registration; creating a default local organization");
-
-        Organization organization = new Organization();
-        organization.setCode("LOCAL");
-        organization.setName("Local Organization");
-        organization.setIsActive(true);
-
-        return organizationRepository.save(organization);
-    }
-
     private JwtResponse toJwtResponse(User user, String jwt, SubscriptionAccessService.SubscriptionSnapshot subscriptionSnapshot,
                                       List<User> memberships, String refreshToken, LocalDateTime refreshTokenExpiresAt,
                                       ClientType clientType, LocalDateTime accessTokenExpiresAt) {
@@ -367,6 +314,7 @@ public class AuthServiceImpl implements AuthService {
                 .organizationName(organization.getName())
                 .username(user.getUsername())
                 .email(user.getEmail())
+                .onboardingRequired(false)
                 .roles(roles)
                 .permissions(permissions)
                 .subscriptionVersion(subscriptionSnapshot.subscriptionVersion())
@@ -377,18 +325,80 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
+    private JwtResponse toOnboardingJwtResponse(UserPrincipal principal, String jwt, ClientType clientType, LocalDateTime accessTokenExpiresAt) {
+        Set<String> roles = principal.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(authority -> authority.startsWith("ROLE_"))
+                .collect(Collectors.toSet());
+        Set<String> permissions = principal.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(authority -> !authority.startsWith("ROLE_"))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        return JwtResponse.builder()
+                .token(jwt)
+                .refreshToken(null)
+                .accessTokenExpiresAt(accessTokenExpiresAt)
+                .refreshTokenExpiresAt(null)
+                .clientType(clientType == null ? null : clientType.name())
+                .id(null)
+                .organizationId(null)
+                .organizationCode(null)
+                .organizationName(null)
+                .username(principal.getUsername())
+                .email(principal.getEmail())
+                .onboardingRequired(true)
+                .roles(roles)
+                .permissions(permissions)
+                .subscriptionVersion(null)
+                .subscriptionPlanCode(null)
+                .subscriptionStatus("NONE")
+                .subscriptionFeatures(Set.of())
+                .memberships(List.of())
+                .build();
+    }
+
     private JwtIssue issueAccessToken(User user) {
         UserPrincipal refreshedPrincipal = (UserPrincipal) customUserDetailsService
                 .loadUserByUsernameAndOrganization(user.getUsername(), user.getOrganizationId());
+        return issueAccessToken(refreshedPrincipal);
+    }
+
+    private JwtIssue issueAccessToken(UserPrincipal principal) {
         Authentication jwtAuthentication = new UsernamePasswordAuthenticationToken(
-                refreshedPrincipal,
+                principal,
                 null,
-                refreshedPrincipal.getAuthorities()
+                principal.getAuthorities()
         );
         String jwt = tokenProvider.generateToken(jwtAuthentication);
         return new JwtIssue(
                 jwt,
                 LocalDateTime.now().plusNanos((long) tokenProvider.getJwtExpirationMillis() * 1_000_000L)
+        );
+    }
+
+    private Account resolveAccountByLogin(String login) {
+        return accountRepository.findByLoginOrEmailIgnoreCase(login)
+                .orElseThrow(() -> new BusinessException("Account not found"));
+    }
+
+    private UserPrincipal buildOnboardingPrincipal(Account account) {
+        List<GrantedAuthority> authorities = List.of(
+                new SimpleGrantedAuthority("ROLE_ONBOARDING"),
+                new SimpleGrantedAuthority("org.manage"),
+                new SimpleGrantedAuthority("org.view")
+        );
+        boolean active = Boolean.TRUE.equals(account.getActive());
+        boolean accountNonLocked = !Boolean.TRUE.equals(account.getLocked());
+        return UserPrincipal.createAccountOnly(
+                account.getId(),
+                account.getPerson() == null ? null : account.getPerson().getId(),
+                account.getLoginIdentifier(),
+                account.getPerson() == null ? null : account.getPerson().getPrimaryEmail(),
+                account.getPasswordHash(),
+                authorities,
+                active,
+                accountNonLocked
         );
     }
 

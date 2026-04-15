@@ -5,9 +5,11 @@ import com.retailmanagement.common.exceptions.ResourceNotFoundException;
 import com.retailmanagement.modules.erp.approval.dto.ErpApprovalDtos;
 import com.retailmanagement.modules.erp.approval.service.ErpApprovalService;
 import com.retailmanagement.modules.erp.audit.service.AuditEventWriter;
+import com.retailmanagement.modules.erp.catalog.entity.Product;
 import com.retailmanagement.modules.erp.catalog.entity.StoreProduct;
 import com.retailmanagement.modules.erp.catalog.repository.StoreProductRepository;
 import com.retailmanagement.modules.erp.catalog.repository.UomRepository;
+import com.retailmanagement.modules.erp.catalog.service.ProductGovernanceGuard;
 import com.retailmanagement.modules.erp.common.constants.ErpDocumentStatuses;
 import com.retailmanagement.modules.erp.common.constants.ErpInventoryMovementTypes;
 import com.retailmanagement.modules.erp.common.ErpSecurityUtils;
@@ -70,6 +72,7 @@ public class ErpServiceWarrantyService {
     private final CustomerRepository customerRepository;
     private final StoreProductRepository productRepository;
     private final UomRepository uomRepository;
+    private final ProductGovernanceGuard productGovernanceGuard;
     private final SalesInvoiceRepository salesInvoiceRepository;
     private final SalesInvoiceLineRepository salesInvoiceLineRepository;
     private final ProductOwnershipRepository productOwnershipRepository;
@@ -143,6 +146,8 @@ public class ErpServiceWarrantyService {
             if (!organizationId.equals(product.getOrganizationId())) {
                 throw new BusinessException("Product does not belong to organization " + organizationId);
             }
+            Product productMaster = productGovernanceGuard.requireProductMaster(product);
+            productGovernanceGuard.assertTransactionAllowed(productMaster, "service operations");
 
             ServiceTicketItem item = new ServiceTicketItem();
             item.setServiceTicketId(ticket.getId());
@@ -315,6 +320,8 @@ public class ErpServiceWarrantyService {
         if (!organizationId.equals(product.getOrganizationId())) {
             throw new BusinessException("Product does not belong to organization " + organizationId);
         }
+        Product productMaster = productGovernanceGuard.requireProductMaster(product);
+        productGovernanceGuard.assertTransactionAllowed(productMaster, "service operations");
         ProductOwnership ownership = null;
         if (request.productOwnershipId() != null) {
             ownership = productOwnershipRepository.findById(request.productOwnershipId())
@@ -565,6 +572,8 @@ public class ErpServiceWarrantyService {
             if (!organizationId.equals(product.getOrganizationId())) {
                 throw new BusinessException("Product does not belong to organization " + organizationId);
             }
+            Product productMaster = productGovernanceGuard.requireProductMaster(product);
+            productGovernanceGuard.assertTransactionAllowed(productMaster, "service operations");
 
             ProductOwnership ownership = null;
             if (itemRequest.productOwnershipId() != null) {

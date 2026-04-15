@@ -7,4 +7,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface CustomerReceiptRepository extends JpaRepository<CustomerReceipt, Long> {
     List<CustomerReceipt> findTop100ByOrganizationIdOrderByReceiptDateDescIdDesc(Long organizationId);
     List<CustomerReceipt> findByOrganizationIdOrderByReceiptDateDescIdDesc(Long organizationId);
+    List<CustomerReceipt> findByOrganizationIdAndPosSessionIdOrderByReceiptDateDescIdDesc(Long organizationId, Long posSessionId);
 }

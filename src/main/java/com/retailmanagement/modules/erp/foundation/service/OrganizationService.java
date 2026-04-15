@@ -2,12 +2,17 @@ package com.retailmanagement.modules.erp.foundation.service;
 
 import com.retailmanagement.common.exceptions.BusinessException;
 import com.retailmanagement.common.exceptions.ResourceNotFoundException;
+import com.retailmanagement.modules.auth.model.Account;
 import com.retailmanagement.modules.auth.model.OrganizationPersonProfile;
+import com.retailmanagement.modules.auth.model.Person;
 import com.retailmanagement.modules.auth.model.Role;
 import com.retailmanagement.modules.auth.model.User;
+import com.retailmanagement.modules.auth.repository.AccountRepository;
 import com.retailmanagement.modules.auth.repository.OrganizationPersonProfileRepository;
+import com.retailmanagement.modules.auth.repository.PersonRepository;
 import com.retailmanagement.modules.auth.repository.RoleRepository;
 import com.retailmanagement.modules.auth.repository.UserRepository;
+import com.retailmanagement.modules.auth.security.UserPrincipal;
 import com.retailmanagement.modules.erp.common.ErpSecurityUtils;
 import com.retailmanagement.modules.erp.common.security.ErpAccessGuard;
 import com.retailmanagement.modules.erp.foundation.dto.OrganizationDtos;
@@ -25,6 +30,8 @@ public class OrganizationService {
  private final OrganizationRepository repository;
  private final ErpAccessGuard accessGuard;
  private final UserRepository userRepository;
+ private final AccountRepository accountRepository;
+ private final PersonRepository personRepository;
  private final RoleRepository roleRepository;
  private final OrganizationPersonProfileRepository organizationPersonProfileRepository;
  private final SubscriptionAccessService subscriptionAccessService;
@@ -45,16 +52,19 @@ public class OrganizationService {
   return repository.findById(id).orElseThrow(() -> new ResourceNotFoundException("ERP organization not found: "+id));
  }
  public Organization create(Organization organization){
-  User creator = userRepository.findById(ErpSecurityUtils.requirePrincipal().getId())
-          .orElseThrow(() -> new BusinessException("Authenticated user not found"));
+  UserPrincipal principal = ErpSecurityUtils.requirePrincipal();
   Long ownerAccountId = ErpSecurityUtils.currentAccountId()
           .orElseThrow(() -> new BusinessException("Authenticated owner account context is missing"));
-  SubscriptionAccessService.SubscriptionSnapshot subscriptionSnapshot = subscriptionAccessService.currentSnapshot(creator.getOrganizationId());
-  if (!Boolean.TRUE.equals(subscriptionSnapshot.canCreateOrganization())) {
-   String limitMessage = Boolean.TRUE.equals(subscriptionSnapshot.unlimitedOrganizations())
-           ? "Owner subscription does not allow creating additional organizations"
-           : "Owner subscription allows only " + subscriptionSnapshot.maxOrganizations() + " organizations";
-   throw new BusinessException(limitMessage);
+
+  User creatorMembership = principal.getId() == null ? null : userRepository.findById(principal.getId()).orElse(null);
+  if (creatorMembership != null) {
+   SubscriptionAccessService.SubscriptionSnapshot subscriptionSnapshot = subscriptionAccessService.currentSnapshot(creatorMembership.getOrganizationId());
+   if (!Boolean.TRUE.equals(subscriptionSnapshot.canCreateOrganization())) {
+    String limitMessage = Boolean.TRUE.equals(subscriptionSnapshot.unlimitedOrganizations())
+            ? "Owner subscription does not allow creating additional organizations"
+            : "Owner subscription allows only " + subscriptionSnapshot.maxOrganizations() + " organizations";
+    throw new BusinessException(limitMessage);
+   }
   }
 
   organization.setOwnerAccountId(ownerAccountId);
@@ -63,22 +73,40 @@ public class OrganizationService {
   Role ownerRole = roleRepository.findByCode("OWNER")
           .orElseThrow(() -> new BusinessException("Owner role not found"));
 
-  organizationPersonProfileRepository.findByOrganizationIdAndPersonId(savedOrganization.getId(), creator.getPersonId())
+  Account ownerAccount = accountRepository.findById(ownerAccountId)
+          .orElseThrow(() -> new BusinessException("Authenticated owner account not found"));
+  Long personId = principal.getPersonId() != null ? principal.getPersonId() : ownerAccount.getPerson().getId();
+  Person person = personRepository.findById(personId)
+          .orElseThrow(() -> new BusinessException("Authenticated person not found"));
+  String displayName = creatorMembership != null && creatorMembership.getDisplayName() != null
+          ? creatorMembership.getDisplayName()
+          : (person.getLegalName() != null ? person.getLegalName() : principal.getUsername());
+  String email = creatorMembership != null && creatorMembership.getEmail() != null
+          ? creatorMembership.getEmail()
+          : person.getPrimaryEmail();
+  String phone = creatorMembership != null && creatorMembership.getPhone() != null
+          ? creatorMembership.getPhone()
+          : person.getPrimaryPhone();
+  String employeeCode = creatorMembership != null && creatorMembership.getEmployeeCode() != null
+          ? creatorMembership.getEmployeeCode()
+          : principal.getUsername();
+
+  organizationPersonProfileRepository.findByOrganizationIdAndPersonId(savedOrganization.getId(), personId)
           .orElseGet(() -> organizationPersonProfileRepository.save(OrganizationPersonProfile.builder()
                   .organizationId(savedOrganization.getId())
-                  .person(creator.getPerson())
-                  .displayName(creator.getDisplayName())
-                  .emailForOrg(creator.getEmail())
-                  .phoneForOrg(creator.getPhone())
+                  .person(person)
+                  .displayName(displayName)
+                  .emailForOrg(email)
+                  .phoneForOrg(phone)
                   .active(true)
                   .build()));
 
   User membership = new User();
   membership.setOrganizationId(savedOrganization.getId());
-  membership.setPersonId(creator.getPersonId());
+  membership.setPersonId(personId);
   membership.setAccountId(ownerAccountId);
   membership.setRole(ownerRole);
-  membership.setEmployeeCode(creator.getEmployeeCode());
+  membership.setEmployeeCode(employeeCode);
   membership.setDefaultBranchId(null);
   membership.setActive(true);
   userRepository.save(membership);
@@ -94,7 +122,6 @@ public class OrganizationService {
   if (request.phone() != null) organization.setPhone(request.phone());
   if (request.email() != null) organization.setEmail(request.email());
   if (request.gstin() != null) organization.setGstin(request.gstin());
-  if (request.gstThresholdAmount() != null) organization.setGstThresholdAmount(request.gstThresholdAmount());
   if (request.gstThresholdAlertEnabled() != null) organization.setGstThresholdAlertEnabled(request.gstThresholdAlertEnabled());
   if (request.isActive() != null) organization.setIsActive(request.isActive());
   return repository.save(organization);

@@ -30,7 +30,6 @@ public class OrganizationController {
           organization.getEmail(),
           organization.getGstin(),
           organization.getOwnerAccountId(),
-          organization.getGstThresholdAmount(),
           organization.getGstThresholdAlertEnabled(),
           organization.getSubscriptionVersion(),
           organization.getIsActive(),
@@ -47,9 +46,6 @@ public class OrganizationController {
   organization.setPhone(request.phone());
   organization.setEmail(request.email());
   organization.setGstin(request.gstin());
-  if (request.gstThresholdAmount() != null) {
-   organization.setGstThresholdAmount(request.gstThresholdAmount());
-  }
   if (request.gstThresholdAlertEnabled() != null) {
    organization.setGstThresholdAlertEnabled(request.gstThresholdAlertEnabled());
   }

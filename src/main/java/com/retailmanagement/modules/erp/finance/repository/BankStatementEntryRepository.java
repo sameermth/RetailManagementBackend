@@ -10,6 +10,7 @@ public interface BankStatementEntryRepository extends JpaRepository<BankStatemen
     boolean existsByOrganizationIdAndAccountId(Long organizationId, Long accountId);
     List<BankStatementEntry> findByOrganizationIdAndAccountIdOrderByEntryDateDescIdDesc(Long organizationId, Long accountId);
     List<BankStatementEntry> findByOrganizationIdAndAccountIdAndEntryDateBetweenOrderByEntryDateAscIdAsc(Long organizationId, Long accountId, LocalDate fromDate, LocalDate toDate);
+    List<BankStatementEntry> findByImportBatchIdOrderByEntryDateAscIdAsc(Long importBatchId);
     Optional<BankStatementEntry> findByIdAndOrganizationId(Long id, Long organizationId);
     boolean existsByMatchedLedgerEntryId(Long matchedLedgerEntryId);
 }

@@ -25,6 +25,7 @@ public class InventoryPostingService {
             Long organizationId,
             Long branchId,
             Long warehouseId,
+            Long binLocationId,
             Long productId,
             Long batchId,
             Long uomId,
@@ -39,14 +40,15 @@ public class InventoryPostingService {
             String summaryPayload
     ) {
         InventoryBalance balance = inventoryBalanceRepository
-                .findByOrganizationIdAndBranchIdAndWarehouseIdAndProductIdAndBatchId(
-                        organizationId, branchId, warehouseId, productId, batchId
+                .findByOrganizationIdAndBranchIdAndWarehouseIdAndProductIdAndBatchIdAndBinLocationId(
+                        organizationId, branchId, warehouseId, productId, batchId, binLocationId
                 )
                 .orElseGet(() -> {
                     InventoryBalance ib = new InventoryBalance();
                     ib.setOrganizationId(organizationId);
                     ib.setBranchId(branchId);
                     ib.setWarehouseId(warehouseId);
+                    ib.setBinLocationId(binLocationId);
                     ib.setProductId(productId);
                     ib.setBatchId(batchId);
                     ib.setOnHandBaseQuantity(BigDecimal.ZERO);
@@ -78,6 +80,7 @@ public class InventoryPostingService {
         movement.setOrganizationId(organizationId);
         movement.setBranchId(branchId);
         movement.setWarehouseId(warehouseId);
+        movement.setBinLocationId(binLocationId);
         movement.setProductId(productId);
         movement.setMovementType(movementType);
         movement.setReferenceType(referenceType);

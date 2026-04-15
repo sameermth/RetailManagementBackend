@@ -25,10 +25,15 @@ public class InventoryBalanceController {
  public ErpApiResponse<List<InventoryDtos.InventoryBalanceResponse>> byProduct(@RequestParam Long organizationId, @PathVariable Long productId){
    return ErpApiResponse.ok(repository.findByOrganizationIdAndProductId(organizationId, productId).stream().map(this::toResponse).toList());
  }
+ @GetMapping("/bin/{binLocationId}") @Operation(summary = "List inventory balances by bin")
+ @PreAuthorize("hasAuthority('inventory.view')")
+ public ErpApiResponse<List<InventoryDtos.InventoryBalanceResponse>> byBin(@RequestParam Long organizationId, @PathVariable Long binLocationId){
+   return ErpApiResponse.ok(repository.findByOrganizationIdAndBinLocationId(organizationId, binLocationId).stream().map(this::toResponse).toList());
+ }
 
  private InventoryDtos.InventoryBalanceResponse toResponse(InventoryBalance balance) {
   return new InventoryDtos.InventoryBalanceResponse(balance.getId(), balance.getOrganizationId(), balance.getBranchId(),
-          balance.getWarehouseId(), balance.getProductId(), balance.getBatchId(), balance.getOnHandBaseQuantity(),
+          balance.getWarehouseId(), balance.getBinLocationId(), balance.getProductId(), balance.getBatchId(), balance.getOnHandBaseQuantity(),
           balance.getReservedBaseQuantity(), balance.getAvailableBaseQuantity(), balance.getAvgCost(),
           balance.getCreatedAt(), balance.getUpdatedAt());
  }

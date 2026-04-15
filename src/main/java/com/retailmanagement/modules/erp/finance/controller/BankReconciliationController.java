@@ -82,6 +82,7 @@ public class BankReconciliationController {
                 entry.getOrganizationId(),
                 entry.getBranchId(),
                 entry.getAccountId(),
+                entry.getImportBatchId(),
                 entry.getEntryDate(),
                 entry.getValueDate(),
                 entry.getReferenceNumber(),
@@ -94,6 +95,40 @@ public class BankReconciliationController {
                 entry.getMatchedOn(),
                 entry.getMatchedBy(),
                 entry.getRemarks()
+        );
+    }
+
+    @GetMapping("/imports")
+    @Operation(summary = "List bank statement import batches")
+    @PreAuthorize("hasAuthority('accounting.view')")
+    public ErpApiResponse<List<BankReconciliationResponses.BankStatementImportBatchResponse>> listImportBatches(
+            @RequestParam(required = false) Long organizationId,
+            @RequestParam(required = false) Long accountId) {
+        Long orgId = organizationId != null ? organizationId : ErpSecurityUtils.currentOrganizationId().orElse(1L);
+        return ErpApiResponse.ok(bankReconciliationService.listImportBatches(orgId, accountId));
+    }
+
+    @GetMapping("/imports/{id}")
+    @Operation(summary = "Get bank statement import batch")
+    @PreAuthorize("hasAuthority('accounting.view')")
+    public ErpApiResponse<BankReconciliationResponses.BankStatementImportBatchResponse> getImportBatch(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long organizationId) {
+        Long orgId = organizationId != null ? organizationId : ErpSecurityUtils.currentOrganizationId().orElse(1L);
+        return ErpApiResponse.ok(bankReconciliationService.getImportBatch(orgId, id));
+    }
+
+    @PostMapping("/imports/{id}/auto-reconcile")
+    @Operation(summary = "Auto reconcile a bank statement import batch")
+    @PreAuthorize("hasAuthority('accounting.post')")
+    public ErpApiResponse<BankReconciliationResponses.AutoReconcileImportBatchResponse> autoReconcileImportBatch(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long organizationId,
+            @RequestBody(required = false) BankReconciliationDtos.AutoReconcileImportBatchRequest request) {
+        Long orgId = organizationId != null ? organizationId : ErpSecurityUtils.currentOrganizationId().orElse(1L);
+        return ErpApiResponse.ok(
+                bankReconciliationService.autoReconcileImportBatch(orgId, id, request == null ? null : request.remarks()),
+                "Bank statement import batch auto reconciled"
         );
     }
 }

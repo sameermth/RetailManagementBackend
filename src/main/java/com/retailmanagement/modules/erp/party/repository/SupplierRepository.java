@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 @Repository("erpSupplierRepository")
 public interface SupplierRepository extends JpaRepository<Supplier, Long> {
     List<Supplier> findByOrganizationId(Long organizationId);
+    Optional<Supplier> findByOrganizationIdAndSupplierCodeIgnoreCase(Long organizationId, String supplierCode);
     boolean existsByOrganizationIdAndSupplierCode(Long organizationId, String supplierCode);
     boolean existsByOrganizationIdAndSupplierCodeAndIdNot(Long organizationId, String supplierCode, Long id);
     Optional<Supplier> findByOrganizationIdAndId(Long organizationId, Long id);

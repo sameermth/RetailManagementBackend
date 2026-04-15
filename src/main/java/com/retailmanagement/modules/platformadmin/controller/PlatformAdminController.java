@@ -38,6 +38,35 @@ public class PlatformAdminController {
         return ErpApiResponse.ok(platformAdminService.stores());
     }
 
+    @GetMapping("/catalog/products")
+    @Operation(summary = "List shared catalog products with governance state")
+    @PreAuthorize(PLATFORM_ADMIN_AUTHORITY)
+    public ErpApiResponse<List<PlatformAdminDtos.CatalogProductGovernanceResponse>> catalogProducts(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String governanceStatus
+    ) {
+        return ErpApiResponse.ok(platformAdminService.catalogProducts(query, governanceStatus));
+    }
+
+    @GetMapping("/catalog/products/{productId}/impact")
+    @Operation(summary = "Get store impact for a governed catalog product")
+    @PreAuthorize(PLATFORM_ADMIN_AUTHORITY)
+    public ErpApiResponse<PlatformAdminDtos.CatalogProductImpactResponse> catalogProductImpact(
+            @PathVariable Long productId
+    ) {
+        return ErpApiResponse.ok(platformAdminService.catalogProductImpact(productId));
+    }
+
+    @PutMapping("/catalog/products/{productId}/governance")
+    @Operation(summary = "Update shared product governance state")
+    @PreAuthorize(PLATFORM_ADMIN_AUTHORITY)
+    public ErpApiResponse<PlatformAdminDtos.CatalogProductGovernanceResponse> updateCatalogProductGovernance(
+            @PathVariable Long productId,
+            @RequestBody @Valid PlatformAdminDtos.UpdateProductGovernanceRequest request
+    ) {
+        return ErpApiResponse.ok(platformAdminService.updateProductGovernance(productId, request), "Catalog product governance updated");
+    }
+
     @GetMapping("/owner-accounts")
     @Operation(summary = "List owner accounts for store assignment")
     @PreAuthorize(PLATFORM_ADMIN_AUTHORITY)
@@ -61,6 +90,15 @@ public class PlatformAdminController {
             @RequestBody @Valid PlatformAdminDtos.StoreUpsertRequest request
     ) {
         return ErpApiResponse.ok(platformAdminService.createStore(request), "Platform store created");
+    }
+
+    @PostMapping("/stores/onboard")
+    @Operation(summary = "Onboard a new store with owner account, branch, and optional subscription")
+    @PreAuthorize(PLATFORM_ADMIN_AUTHORITY)
+    public ErpApiResponse<PlatformAdminDtos.StoreOnboardingResponse> onboardStore(
+            @RequestBody @Valid PlatformAdminDtos.StoreOnboardingRequest request
+    ) {
+        return ErpApiResponse.ok(platformAdminService.onboardStore(request), "Platform store onboarded");
     }
 
     @PutMapping("/stores/{organizationId}")
@@ -227,6 +265,46 @@ public class PlatformAdminController {
     @PreAuthorize(PLATFORM_ADMIN_AUTHORITY)
     public ErpApiResponse<List<PlatformAdminDtos.FeedbackSummaryResponse>> feedback() {
         return ErpApiResponse.ok(platformAdminService.feedback());
+    }
+
+    @GetMapping("/incidents")
+    @Operation(summary = "List platform incidents and quality complaints")
+    @PreAuthorize(PLATFORM_ADMIN_AUTHORITY)
+    public ErpApiResponse<List<PlatformAdminDtos.PlatformIncidentResponse>> incidents(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String subjectType,
+            @RequestParam(required = false) Long organizationId
+    ) {
+        return ErpApiResponse.ok(platformAdminService.incidents(status, subjectType, organizationId));
+    }
+
+    @PostMapping("/incidents")
+    @Operation(summary = "Create platform incident or complaint")
+    @PreAuthorize(PLATFORM_ADMIN_AUTHORITY)
+    public ErpApiResponse<PlatformAdminDtos.PlatformIncidentResponse> createIncident(
+            @RequestBody @Valid PlatformAdminDtos.CreatePlatformIncidentRequest request
+    ) {
+        return ErpApiResponse.ok(platformAdminService.createIncident(request), "Platform incident created");
+    }
+
+    @PutMapping("/incidents/{incidentId}/status")
+    @Operation(summary = "Update platform incident status")
+    @PreAuthorize(PLATFORM_ADMIN_AUTHORITY)
+    public ErpApiResponse<PlatformAdminDtos.PlatformIncidentResponse> updateIncidentStatus(
+            @PathVariable Long incidentId,
+            @RequestBody @Valid PlatformAdminDtos.UpdatePlatformIncidentStatusRequest request
+    ) {
+        return ErpApiResponse.ok(platformAdminService.updateIncidentStatus(incidentId, request), "Platform incident updated");
+    }
+
+    @PostMapping("/incidents/{incidentId}/apply-governance")
+    @Operation(summary = "Apply catalog governance action from a platform incident")
+    @PreAuthorize(PLATFORM_ADMIN_AUTHORITY)
+    public ErpApiResponse<PlatformAdminDtos.IncidentGovernanceActionResponse> applyIncidentGovernance(
+            @PathVariable Long incidentId,
+            @RequestBody @Valid PlatformAdminDtos.ApplyIncidentGovernanceActionRequest request
+    ) {
+        return ErpApiResponse.ok(platformAdminService.applyIncidentGovernanceAction(incidentId, request), "Platform incident governance applied");
     }
 
     @GetMapping("/notifications")

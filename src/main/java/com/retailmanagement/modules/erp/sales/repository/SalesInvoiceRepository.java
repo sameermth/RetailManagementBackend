@@ -13,6 +13,8 @@ public interface SalesInvoiceRepository extends JpaRepository<SalesInvoice, Long
 
     List<SalesInvoice> findByOrganizationIdOrderByDueDateAscIdAsc(Long organizationId);
 
+    List<SalesInvoice> findByOrganizationIdAndPosSessionIdOrderByInvoiceDateDescIdDesc(Long organizationId, Long posSessionId);
+
     Optional<SalesInvoice> findByIdAndOrganizationId(Long id, Long organizationId);
 
     Optional<SalesInvoice> findByOrganizationIdAndId(Long organizationId, Long id);

@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class InventoryOperationsService {
 
     private final InventoryPostingService inventoryPostingService;
+    private final InventoryBinService inventoryBinService;
     private final StockTransferRepository stockTransferRepository;
     private final StockTransferLineRepository stockTransferLineRepository;
     private final StockAdjustmentRepository stockAdjustmentRepository;
@@ -39,6 +40,7 @@ public class InventoryOperationsService {
             Long organizationId,
             Long branchId,
             Long warehouseId,
+            Long binLocationId,
             Long productId,
             Long uomId,
             BigDecimal quantityDelta,
@@ -46,6 +48,9 @@ public class InventoryOperationsService {
             BigDecimal unitCost,
             String reason
     ) {
+        if (binLocationId != null) {
+            inventoryBinService.requireActiveBin(organizationId, warehouseId, binLocationId);
+        }
         String adjustmentNumber = "ADJ-" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE) + "-" + System.currentTimeMillis();
         StockAdjustment adjustment = new StockAdjustment();
         adjustment.setOrganizationId(organizationId);
@@ -61,6 +66,7 @@ public class InventoryOperationsService {
         line.setStockAdjustmentId(adjustment.getId());
         line.setProductId(productId);
         line.setUomId(uomId);
+        line.setBinLocationId(binLocationId);
         line.setQuantityDelta(quantityDelta);
         line.setBaseQuantityDelta(baseQuantityDelta);
         line.setUnitCost(unitCost);
@@ -114,10 +120,18 @@ public class InventoryOperationsService {
         transfer = stockTransferRepository.save(transfer);
 
         for (TransferLineCommand command : lines) {
+            if (command.fromBinLocationId() != null) {
+                inventoryBinService.requireActiveBin(organizationId, fromWarehouseId, command.fromBinLocationId());
+            }
+            if (command.toBinLocationId() != null) {
+                inventoryBinService.requireActiveBin(organizationId, toWarehouseId, command.toBinLocationId());
+            }
             StockTransferLine line = new StockTransferLine();
             line.setStockTransferId(transfer.getId());
             line.setProductId(command.productId());
             line.setUomId(command.uomId());
+            line.setFromBinLocationId(command.fromBinLocationId());
+            line.setToBinLocationId(command.toBinLocationId());
             line.setQuantity(command.quantity());
             line.setBaseQuantity(command.baseQuantity());
             stockTransferLineRepository.save(line);
@@ -158,6 +172,8 @@ public class InventoryOperationsService {
     public record TransferLineCommand(
             Long productId,
             Long uomId,
+            Long fromBinLocationId,
+            Long toBinLocationId,
             BigDecimal quantity,
             BigDecimal baseQuantity
     ) {}

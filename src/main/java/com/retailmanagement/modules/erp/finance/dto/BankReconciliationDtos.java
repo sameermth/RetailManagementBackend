@@ -15,6 +15,10 @@ public final class BankReconciliationDtos {
             Long organizationId,
             Long branchId,
             @NotNull Long accountId,
+            String sourceType,
+            String sourceReference,
+            String sourceFileName,
+            String remarks,
             @NotEmpty List<@Valid BankStatementLineRequest> lines
     ) {}
 
@@ -36,6 +40,10 @@ public final class BankReconciliationDtos {
 
     public record ReconcileBankStatementRequest(
             @NotNull Long ledgerEntryId,
+            String remarks
+    ) {}
+
+    public record AutoReconcileImportBatchRequest(
             String remarks
     ) {}
 }

@@ -173,10 +173,10 @@ public class InventoryReservationService {
             if (serial.getCurrentWarehouseId() == null || !invoice.getWarehouseId().equals(serial.getCurrentWarehouseId())) {
                 throw new BusinessException("Serial " + serial.getSerialNumber() + " is not in warehouse " + invoice.getWarehouseId());
             }
-            reserveQuantity(invoice.getOrganizationId(), invoice.getBranchId(), invoice.getWarehouseId(), line.getProductId(), null, BigDecimal.ONE);
+            reserveQuantity(invoice.getOrganizationId(), invoice.getBranchId(), invoice.getWarehouseId(), line.getProductId(), serial.getBatchId(), BigDecimal.ONE);
             serial.setStatus(ErpDocumentStatuses.ALLOCATED);
             serialNumberRepository.save(serial);
-            saveReservation(invoice, line, null, serial.getId(), BigDecimal.ONE);
+            saveReservation(invoice, line, serial.getBatchId(), serial.getId(), BigDecimal.ONE);
         }
     }
 

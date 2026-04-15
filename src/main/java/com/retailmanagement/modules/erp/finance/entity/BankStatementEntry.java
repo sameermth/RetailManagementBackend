@@ -23,6 +23,9 @@ public class BankStatementEntry extends ErpOrgBranchScopedEntity {
     @Column(name = "account_id", nullable = false)
     private Long accountId;
 
+    @Column(name = "import_batch_id")
+    private Long importBatchId;
+
     @Column(name = "entry_date", nullable = false)
     private LocalDate entryDate;
 

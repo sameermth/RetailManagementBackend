@@ -95,6 +95,7 @@ public class ServiceReplacementPostingService {
                 replacement.getOrganizationId(),
                 replacement.getBranchId(),
                 replacement.getWarehouseId(),
+                null,
                 replacement.getReplacementProductId(),
                 replacementSerial == null ? null : replacementSerial.getBatchId(),
                 replacement.getReplacementUomId(),

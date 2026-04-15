@@ -72,11 +72,20 @@ public class StoreProduct extends ErpOrgScopedEntity {
     @Column(name = "default_sale_price", precision = 18, scale = 2)
     private BigDecimal defaultSalePrice;
 
+    @Column(name = "default_mrp", precision = 18, scale = 2)
+    private BigDecimal defaultMrp;
+
     @Column(name = "default_warranty_months")
     private Integer defaultWarrantyMonths;
 
     @Column(name = "warranty_terms")
     private String warrantyTerms;
+
+    @Column(name = "is_bundle", nullable = false)
+    private Boolean isBundle = false;
+
+    @Column(name = "bundle_pricing_mode", nullable = false)
+    private String bundlePricingMode = "COMPONENT_SUM";
 
     @Column(name = "is_service_item", nullable = false)
     private Boolean isServiceItem = false;

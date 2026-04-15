@@ -41,6 +41,7 @@ public final class ErpSalesDtos {
             @NotNull Long warehouseId,
             @NotNull Long customerId,
             LocalDate orderDate,
+            LocalDate expectedFulfillmentBy,
             String placeOfSupplyStateCode,
             String remarks,
             @NotEmpty List<@Valid CreateSalesDocumentLineRequest> lines
@@ -62,6 +63,59 @@ public final class ErpSalesDtos {
             List<@Valid ConvertTrackedSalesLineRequest> trackedLines
     ) {}
 
+    public record CreateSalesDispatchRequest(
+            Long organizationId,
+            Long branchId,
+            LocalDate dispatchDate,
+            LocalDate expectedDeliveryDate,
+            String transporterName,
+            String transporterId,
+            String vehicleNumber,
+            String trackingNumber,
+            String deliveryAddress,
+            String remarks,
+            @NotEmpty List<@Valid CreateSalesDispatchLineRequest> lines
+    ) {}
+
+    public record CreateSalesDispatchLineRequest(
+            @NotNull Long salesInvoiceLineId,
+            @NotNull @DecimalMin(value = "0.000001") BigDecimal quantity,
+            @NotNull @DecimalMin(value = "0.000001") BigDecimal baseQuantity,
+            String remarks
+    ) {}
+
+    public record UpdateSalesDispatchStatusRequest(
+            Long organizationId,
+            Long branchId,
+            @NotBlank String status,
+            String remarks
+    ) {}
+
+    public record PickSalesDispatchRequest(
+            Long organizationId,
+            Long branchId,
+            @NotEmpty List<@Valid PickSalesDispatchLineRequest> lines
+    ) {}
+
+    public record PickSalesDispatchLineRequest(
+            @NotNull Long salesDispatchLineId,
+            @NotNull @DecimalMin(value = "0.000001") BigDecimal pickedQuantity,
+            @NotNull @DecimalMin(value = "0.000001") BigDecimal pickedBaseQuantity,
+            Long pickedBinLocationId
+    ) {}
+
+    public record PackSalesDispatchRequest(
+            Long organizationId,
+            Long branchId,
+            @NotEmpty List<@Valid PackSalesDispatchLineRequest> lines
+    ) {}
+
+    public record PackSalesDispatchLineRequest(
+            @NotNull Long salesDispatchLineId,
+            @NotNull @DecimalMin(value = "0.000001") BigDecimal packedQuantity,
+            @NotNull @DecimalMin(value = "0.000001") BigDecimal packedBaseQuantity
+    ) {}
+
     public record CancelSalesDocumentRequest(
             Long organizationId,
             Long branchId,
@@ -79,7 +133,6 @@ public final class ErpSalesDtos {
             @NotNull Long uomId,
             @NotNull @DecimalMin(value = "0.000001") BigDecimal quantity,
             @NotNull @DecimalMin(value = "0.000001") BigDecimal baseQuantity,
-            @DecimalMin(value = "0.00") BigDecimal unitPrice,
             BigDecimal discountAmount,
             String remarks
     ) {}
@@ -89,9 +142,6 @@ public final class ErpSalesDtos {
             @NotNull Long uomId,
             @NotNull @DecimalMin(value = "0.000001") BigDecimal quantity,
             @NotNull @DecimalMin(value = "0.000001") BigDecimal baseQuantity,
-            @DecimalMin(value = "0.00") BigDecimal unitPrice,
-            String priceOverrideReason,
-            @DecimalMin(value = "0.00") BigDecimal taxRate,
             BigDecimal discountAmount,
             List<Long> serialNumberIds,
             List<@Valid BatchSelection> batchSelections,
@@ -113,6 +163,24 @@ public final class ErpSalesDtos {
             String referenceNumber,
             @NotNull @DecimalMin(value = "0.01") BigDecimal amount,
             String remarks
+    ) {}
+
+    public record CreateSalesInvoicePaymentRequestRequest(
+            Long organizationId,
+            Long branchId,
+            LocalDate requestDate,
+            LocalDate dueDate,
+            LocalDate expiresOn,
+            @DecimalMin(value = "0.01") BigDecimal requestedAmount,
+            String providerCode,
+            String channel,
+            String remarks
+    ) {}
+
+    public record CancelSalesInvoicePaymentRequest(
+            Long organizationId,
+            Long branchId,
+            @NotBlank String reason
     ) {}
 
     public record AllocateReceiptRequest(

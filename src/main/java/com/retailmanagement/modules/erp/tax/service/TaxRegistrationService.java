@@ -28,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class TaxRegistrationService {
 
+    private static final BigDecimal DEFAULT_NON_REGISTERED_GST_THRESHOLD = new BigDecimal("4000000.00");
+
     private final TaxRegistrationRepository taxRegistrationRepository;
     private final OrganizationRepository organizationRepository;
     private final BranchRepository branchRepository;
@@ -116,10 +118,12 @@ public class TaxRegistrationService {
         accessGuard.assertOrganizationAccess(organizationId);
         Organization organization = organizationRepository.findById(organizationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Organization not found: " + organizationId));
-        organization.setGstThresholdAmount(request.gstThresholdAmount());
-        organization.setGstThresholdAlertEnabled(Boolean.TRUE.equals(request.gstThresholdAlertEnabled()));
+        if (request.gstThresholdAlertEnabled() != null) {
+            organization.setGstThresholdAlertEnabled(Boolean.TRUE.equals(request.gstThresholdAlertEnabled()));
+        }
         organizationRepository.save(organization);
-        return new TaxDtos.GstThresholdSettingsResponse(organization.getId(), organization.getGstThresholdAmount(), organization.getGstThresholdAlertEnabled());
+        BigDecimal derivedThreshold = deriveThresholdAmount(organizationId, LocalDate.now());
+        return new TaxDtos.GstThresholdSettingsResponse(organization.getId(), derivedThreshold, organization.getGstThresholdAlertEnabled());
     }
 
     @Transactional(readOnly = true)
@@ -137,11 +141,11 @@ public class TaxRegistrationService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         boolean gstRegistered = taxRegistrationRepository.findApplicableRegistration(organizationId, null, targetDate).isPresent();
-        BigDecimal threshold = organization.getGstThresholdAmount();
-        BigDecimal ratio = threshold.signum() == 0
+        BigDecimal threshold = deriveThresholdAmount(organizationId, targetDate);
+        BigDecimal ratio = gstRegistered || threshold.signum() == 0
                 ? BigDecimal.ZERO
                 : turnover.divide(threshold, 4, RoundingMode.HALF_UP);
-        boolean reached = threshold.signum() > 0 && turnover.compareTo(threshold) >= 0;
+        boolean reached = !gstRegistered && threshold.signum() > 0 && turnover.compareTo(threshold) >= 0;
         String level = alertLevel(ratio, gstRegistered, reached);
 
         String message = switch (level) {
@@ -163,6 +167,13 @@ public class TaxRegistrationService {
                 organization.getGstThresholdAlertEnabled(),
                 message
         );
+    }
+
+    private BigDecimal deriveThresholdAmount(Long organizationId, LocalDate effectiveDate) {
+        // This stays backend-derived so UI does not edit the threshold directly.
+        // Until provider-backed taxpayer classification is persisted, use the current
+        // non-registered default policy and keep the alerting preference separate.
+        return DEFAULT_NON_REGISTERED_GST_THRESHOLD;
     }
 
     private void applyRequest(TaxRegistration registration, TaxDtos.UpsertTaxRegistrationRequest request) {

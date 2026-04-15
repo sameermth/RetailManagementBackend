@@ -27,4 +27,10 @@ public class PurchaseReceiptLineBatch extends ErpAuditableEntity {
 
     @Column(name = "base_quantity", nullable = false, precision = 18, scale = 6)
     private BigDecimal baseQuantity;
+
+    @Column(name = "suggested_sale_price", precision = 18, scale = 2)
+    private BigDecimal suggestedSalePrice;
+
+    @Column(name = "mrp", precision = 18, scale = 2)
+    private BigDecimal mrp;
 }

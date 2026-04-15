@@ -25,6 +25,9 @@ public class StockAdjustmentLine extends ErpAuditableEntity {
     @Column(name = "uom_id", nullable = false)
     private Long uomId;
 
+    @Column(name = "bin_location_id")
+    private Long binLocationId;
+
     @Column(name = "quantity_delta", nullable = false, precision = 18, scale = 6)
     private BigDecimal quantityDelta;
 

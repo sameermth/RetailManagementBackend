@@ -39,6 +39,7 @@ public class StockAdjustmentPostingService {
                     adjustment.getOrganizationId(),
                     adjustment.getBranchId(),
                     adjustment.getWarehouseId(),
+                    line.getBinLocationId(),
                     line.getProductId(),
                     null,
                     line.getUomId(),

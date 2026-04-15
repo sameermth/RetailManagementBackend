@@ -37,6 +37,9 @@ public class SalesQuoteLine extends ErpAuditableEntity {
     @Column(name = "unit_price", nullable = false, precision = 18, scale = 2)
     private BigDecimal unitPrice;
 
+    @Column(name = "mrp", precision = 18, scale = 2)
+    private BigDecimal mrp;
+
     @Column(name = "discount_amount", nullable = false, precision = 18, scale = 2)
     private BigDecimal discountAmount = BigDecimal.ZERO;
 

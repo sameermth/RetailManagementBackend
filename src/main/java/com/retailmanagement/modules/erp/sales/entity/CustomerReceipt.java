@@ -20,6 +20,9 @@ public class CustomerReceipt extends ErpOrgBranchScopedEntity {
     @Column(name = "customer_id", nullable = false)
     private Long customerId;
 
+    @Column(name = "pos_session_id")
+    private Long posSessionId;
+
     @Column(name = "receipt_number", nullable = false)
     private String receiptNumber;
 

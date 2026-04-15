@@ -66,6 +66,12 @@ public class PurchaseReceipt extends ErpOrgBranchScopedEntity {
     @Column(name = "posted_at")
     private LocalDateTime postedAt;
 
+    @Column(name = "putaway_status")
+    private String putawayStatus;
+
+    @Column(name = "putaway_completed_at")
+    private LocalDateTime putawayCompletedAt;
+
     @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
 

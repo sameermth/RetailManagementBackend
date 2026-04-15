@@ -7,6 +7,7 @@ import com.retailmanagement.modules.erp.catalog.entity.Brand;
 import com.retailmanagement.modules.erp.catalog.entity.Category;
 import com.retailmanagement.modules.erp.catalog.entity.Product;
 import com.retailmanagement.modules.erp.catalog.entity.StoreProduct;
+import com.retailmanagement.modules.erp.catalog.entity.StoreProductBundleComponent;
 import com.retailmanagement.modules.erp.catalog.entity.TaxGroup;
 import com.retailmanagement.modules.erp.catalog.entity.Uom;
 import com.retailmanagement.modules.erp.catalog.service.CatalogReferenceService;
@@ -47,6 +48,8 @@ public class ProductController {
  @GetMapping("/{id}/prices") @Operation(summary = "List store product prices") @PreAuthorize("hasAuthority('catalog.view')") public ErpApiResponse<List<ProductDtos.StoreProductPriceResponse>> listPrices(@PathVariable Long id, @RequestParam Long organizationId){ return ErpApiResponse.ok(pricingService.listPrices(organizationId, id)); }
  @PostMapping("/{id}/prices") @Operation(summary = "Create store product price") @PreAuthorize("hasAuthority('catalog.manage')") public ErpApiResponse<ProductDtos.StoreProductPriceResponse> createPrice(@PathVariable Long id, @RequestParam Long organizationId, @RequestBody ProductDtos.UpsertStoreProductPriceRequest request){ return ErpApiResponse.ok(pricingService.createPrice(organizationId, id, request), "Store product price created"); }
  @PutMapping("/{id}/prices/{priceId}") @Operation(summary = "Update store product price") @PreAuthorize("hasAuthority('catalog.manage')") public ErpApiResponse<ProductDtos.StoreProductPriceResponse> updatePrice(@PathVariable Long id, @PathVariable Long priceId, @RequestParam Long organizationId, @RequestBody ProductDtos.UpsertStoreProductPriceRequest request){ return ErpApiResponse.ok(pricingService.updatePrice(organizationId, id, priceId, request), "Store product price updated"); }
+ @GetMapping("/{id}/bundle") @Operation(summary = "Get store product bundle components") @PreAuthorize("hasAuthority('catalog.view')") public ErpApiResponse<List<ProductDtos.StoreProductBundleComponentResponse>> getBundle(@PathVariable Long id){ return ErpApiResponse.ok(service.listBundleComponents(id).stream().map(this::toBundleComponentResponse).toList()); }
+ @PutMapping("/{id}/bundle") @Operation(summary = "Replace store product bundle components") @PreAuthorize("hasAuthority('catalog.manage')") public ErpApiResponse<List<ProductDtos.StoreProductBundleComponentResponse>> updateBundle(@PathVariable Long id, @RequestBody ProductDtos.UpsertStoreProductBundleRequest request){ return ErpApiResponse.ok(service.replaceBundleComponents(id, request).stream().map(this::toBundleComponentResponse).toList(), "Store product bundle updated"); }
 
  private ProductDtos.StoreProductResponse toStoreProductResponse(StoreProduct storeProduct, List<StoreProduct> scope) {
   java.util.Set<Long> categoryIds = scope.stream().map(StoreProduct::getCategoryId).collect(java.util.stream.Collectors.toSet());
@@ -60,6 +63,10 @@ public class ProductController {
   java.util.Map<Long, TaxGroup> taxGroups = catalogReferenceService.taxGroupsByIds(taxGroupIds);
   java.util.Map<Long, java.util.List<ProductAttributeDtos.ProductAttributeValueResponse>> attributeValues =
           productAttributeService.valuesByStoreProductIds(storeProduct.getOrganizationId(), storeProductIds);
+  java.util.Map<Long, java.util.List<StoreProductBundleComponent>> bundleComponentsByProduct =
+          storeProductIds.isEmpty()
+                  ? java.util.Map.of()
+                  : service.listBundleComponents(storeProduct.getId()).stream().collect(java.util.stream.Collectors.groupingBy(StoreProductBundleComponent::getStoreProductId));
   Category category = categories.get(storeProduct.getCategoryId());
   Brand brand = brands.get(storeProduct.getBrandId());
   Uom uom = uoms.get(storeProduct.getBaseUomId());
@@ -90,8 +97,14 @@ public class ProductController {
           storeProduct.getMinStockBaseQty(),
           storeProduct.getReorderLevelBaseQty(),
           storeProduct.getDefaultSalePrice(),
+          storeProduct.getDefaultMrp(),
           storeProduct.getDefaultWarrantyMonths(),
           storeProduct.getWarrantyTerms(),
+          storeProduct.getIsBundle(),
+          storeProduct.getBundlePricingMode(),
+          bundleComponentsByProduct.getOrDefault(storeProduct.getId(), java.util.List.of()).stream()
+                  .map(this::toBundleComponentResponse)
+                  .toList(),
           storeProduct.getIsServiceItem(),
           storeProduct.getIsActive(),
           storeProduct.getCreatedAt(),
@@ -164,10 +177,32 @@ public class ProductController {
   if (request.defaultSalePrice() != null) {
    storeProduct.setDefaultSalePrice(request.defaultSalePrice());
   }
+  if (request.defaultMrp() != null) {
+  storeProduct.setDefaultMrp(request.defaultMrp());
+  }
+  storeProduct.setIsBundle(Boolean.TRUE.equals(request.isBundle()));
+  storeProduct.setBundlePricingMode(request.bundlePricingMode());
   storeProduct.setDefaultWarrantyMonths(request.defaultWarrantyMonths());
   storeProduct.setWarrantyTerms(request.warrantyTerms());
   storeProduct.setIsServiceItem(Boolean.TRUE.equals(request.isServiceItem()));
   storeProduct.setIsActive(request.isActive() == null || request.isActive());
   return storeProduct;
+ }
+
+ private ProductDtos.StoreProductBundleComponentResponse toBundleComponentResponse(StoreProductBundleComponent component) {
+  StoreProduct storeProduct = service.get(component.getComponentStoreProductId());
+  return toBundleComponentResponse(component, storeProduct);
+ }
+
+ private ProductDtos.StoreProductBundleComponentResponse toBundleComponentResponse(StoreProductBundleComponent component, StoreProduct storeProduct) {
+  return new ProductDtos.StoreProductBundleComponentResponse(
+          component.getId(),
+          component.getComponentStoreProductId(),
+          storeProduct == null ? null : storeProduct.getSku(),
+          storeProduct == null ? null : storeProduct.getName(),
+          component.getComponentQuantity(),
+          component.getComponentBaseQuantity(),
+          component.getSortOrder()
+  );
  }
 }

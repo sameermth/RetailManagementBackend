@@ -8,6 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -62,4 +63,22 @@ public class Product extends ErpAuditableEntity {
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
+
+    @Column(name = "governance_status", nullable = false)
+    private String governanceStatus = "ACTIVE";
+
+    @Column(name = "quality_review_status", nullable = false)
+    private String qualityReviewStatus = "NORMAL";
+
+    @Column(name = "block_new_store_adoption", nullable = false)
+    private Boolean blockNewStoreAdoption = false;
+
+    @Column(name = "block_transactions", nullable = false)
+    private Boolean blockTransactions = false;
+
+    @Column(name = "governance_reason")
+    private String governanceReason;
+
+    @Column(name = "governance_updated_at")
+    private LocalDateTime governanceUpdatedAt;
 }

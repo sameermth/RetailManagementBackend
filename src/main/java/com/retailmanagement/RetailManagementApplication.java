@@ -20,12 +20,14 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.retailmanagement.modules.auth.repository",
         "com.retailmanagement.modules.notification.repository",
         "com.retailmanagement.modules.report.repository",
+        "com.retailmanagement.modules.platformadmin.repository",
         "com.retailmanagement.modules.erp"
 })
 @EntityScan(basePackages = {
         "com.retailmanagement.modules.auth.model",
         "com.retailmanagement.modules.notification.model",
         "com.retailmanagement.modules.report.model",
+        "com.retailmanagement.modules.platformadmin.entity",
         "com.retailmanagement.modules.erp"
 })
 @EnableScheduling

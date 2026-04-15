@@ -1,6 +1,7 @@
 package com.retailmanagement.modules.erp.catalog.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -29,8 +30,11 @@ public final class ProductDtos {
             BigDecimal minStockBaseQty,
             BigDecimal reorderLevelBaseQty,
             BigDecimal defaultSalePrice,
+            BigDecimal defaultMrp,
             Integer defaultWarrantyMonths,
             String warrantyTerms,
+            Boolean isBundle,
+            String bundlePricingMode,
             Boolean isServiceItem,
             Boolean isActive
     ) {}
@@ -48,8 +52,11 @@ public final class ProductDtos {
             BigDecimal minStockBaseQty,
             BigDecimal reorderLevelBaseQty,
             BigDecimal defaultSalePrice,
+            BigDecimal defaultMrp,
             Integer defaultWarrantyMonths,
             String warrantyTerms,
+            Boolean isBundle,
+            String bundlePricingMode,
             Boolean isActive
     ) {}
 
@@ -79,12 +86,38 @@ public final class ProductDtos {
             BigDecimal minStockBaseQty,
             BigDecimal reorderLevelBaseQty,
             BigDecimal defaultSalePrice,
+            BigDecimal defaultMrp,
             Integer defaultWarrantyMonths,
             String warrantyTerms,
+            Boolean isBundle,
+            String bundlePricingMode,
+            List<StoreProductBundleComponentResponse> bundleComponents,
             Boolean isServiceItem,
             Boolean isActive,
             LocalDateTime createdAt,
             LocalDateTime updatedAt
+    ) {}
+
+    public record UpsertStoreProductBundleRequest(
+            @NotNull Long organizationId,
+            @NotEmpty List<StoreProductBundleComponentRequest> components
+    ) {}
+
+    public record StoreProductBundleComponentRequest(
+            @NotNull Long componentStoreProductId,
+            @NotNull BigDecimal componentQuantity,
+            @NotNull BigDecimal componentBaseQuantity,
+            Integer sortOrder
+    ) {}
+
+    public record StoreProductBundleComponentResponse(
+            Long id,
+            Long componentStoreProductId,
+            String componentSku,
+            String componentName,
+            BigDecimal componentQuantity,
+            BigDecimal componentBaseQuantity,
+            Integer sortOrder
     ) {}
 
     public record UpsertStoreProductPriceRequest(

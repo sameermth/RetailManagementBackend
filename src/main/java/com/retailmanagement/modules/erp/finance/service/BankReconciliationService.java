@@ -7,10 +7,12 @@ import com.retailmanagement.modules.erp.common.security.ErpAccessGuard;
 import com.retailmanagement.modules.erp.finance.dto.BankReconciliationDtos;
 import com.retailmanagement.modules.erp.finance.dto.BankReconciliationResponses;
 import com.retailmanagement.modules.erp.finance.entity.Account;
+import com.retailmanagement.modules.erp.finance.entity.BankStatementImportBatch;
 import com.retailmanagement.modules.erp.finance.entity.BankStatementEntry;
 import com.retailmanagement.modules.erp.finance.entity.LedgerEntry;
 import com.retailmanagement.modules.erp.finance.entity.Voucher;
 import com.retailmanagement.modules.erp.finance.repository.AccountRepository;
+import com.retailmanagement.modules.erp.finance.repository.BankStatementImportBatchRepository;
 import com.retailmanagement.modules.erp.finance.repository.BankStatementEntryRepository;
 import com.retailmanagement.modules.erp.finance.repository.LedgerEntryRepository;
 import com.retailmanagement.modules.erp.finance.repository.VoucherRepository;
@@ -30,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class BankReconciliationService {
 
+    private final BankStatementImportBatchRepository bankStatementImportBatchRepository;
     private final BankStatementEntryRepository bankStatementEntryRepository;
     private final AccountRepository accountRepository;
     private final LedgerEntryRepository ledgerEntryRepository;
@@ -39,7 +42,24 @@ public class BankReconciliationService {
     public List<BankStatementEntry> importStatement(Long organizationId, Long branchId, BankReconciliationDtos.ImportBankStatementRequest request) {
         accessGuard.assertBranchAccess(organizationId, branchId);
         Account account = requireBankAccount(organizationId, request.accountId());
+        BankStatementImportBatch batch = new BankStatementImportBatch();
+        batch.setOrganizationId(organizationId);
+        batch.setBranchId(branchId);
+        batch.setAccountId(account.getId());
+        batch.setImportReference("BSTMT-" + LocalDate.now() + "-" + System.currentTimeMillis());
+        batch.setSourceType(trimToNull(request.sourceType()) == null ? "MANUAL" : request.sourceType().trim().toUpperCase());
+        batch.setSourceReference(trimToNull(request.sourceReference()));
+        batch.setSourceFileName(trimToNull(request.sourceFileName()));
+        batch.setRemarks(trimToNull(request.remarks()));
+        batch.setImportedAt(LocalDateTime.now());
+        batch.setImportedBy(ErpSecurityUtils.currentUserId().orElse(1L));
+        batch = bankStatementImportBatchRepository.save(batch);
+
         List<BankStatementEntry> saved = new ArrayList<>();
+        BigDecimal totalDebit = BigDecimal.ZERO;
+        BigDecimal totalCredit = BigDecimal.ZERO;
+        LocalDate statementFromDate = null;
+        LocalDate statementToDate = null;
         for (BankReconciliationDtos.BankStatementLineRequest line : request.lines()) {
             BigDecimal debit = safe(line.debitAmount());
             BigDecimal credit = safe(line.creditAmount());
@@ -50,6 +70,7 @@ public class BankReconciliationService {
             entry.setOrganizationId(organizationId);
             entry.setBranchId(branchId);
             entry.setAccountId(account.getId());
+            entry.setImportBatchId(batch.getId());
             entry.setEntryDate(line.entryDate());
             entry.setValueDate(line.valueDate());
             entry.setReferenceNumber(trimToNull(line.referenceNumber()));
@@ -58,8 +79,40 @@ public class BankReconciliationService {
             entry.setCreditAmount(credit);
             entry.setRemarks(trimToNull(line.remarks()));
             saved.add(bankStatementEntryRepository.save(entry));
+            totalDebit = totalDebit.add(debit);
+            totalCredit = totalCredit.add(credit);
+            statementFromDate = statementFromDate == null || line.entryDate().isBefore(statementFromDate) ? line.entryDate() : statementFromDate;
+            statementToDate = statementToDate == null || line.entryDate().isAfter(statementToDate) ? line.entryDate() : statementToDate;
         }
+        batch.setStatementFromDate(statementFromDate);
+        batch.setStatementToDate(statementToDate);
+        batch.setEntryCount(saved.size());
+        batch.setTotalDebitAmount(totalDebit);
+        batch.setTotalCreditAmount(totalCredit);
+        bankStatementImportBatchRepository.save(batch);
         return saved;
+    }
+
+    @Transactional(readOnly = true)
+    public List<BankReconciliationResponses.BankStatementImportBatchResponse> listImportBatches(Long organizationId, Long accountId) {
+        accessGuard.assertOrganizationAccess(organizationId);
+        if (accountId != null) {
+            requireBankAccount(organizationId, accountId);
+        }
+        List<BankStatementImportBatch> batches = accountId == null
+                ? bankStatementImportBatchRepository.findTop100ByOrganizationIdOrderByImportedAtDescIdDesc(organizationId)
+                : bankStatementImportBatchRepository.findTop100ByOrganizationIdAndAccountIdOrderByImportedAtDescIdDesc(organizationId, accountId);
+        return batches.stream()
+                .map(batch -> toBatchResponse(batch, false))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public BankReconciliationResponses.BankStatementImportBatchResponse getImportBatch(Long organizationId, Long importBatchId) {
+        accessGuard.assertOrganizationAccess(organizationId);
+        BankStatementImportBatch batch = bankStatementImportBatchRepository.findByIdAndOrganizationId(importBatchId, organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Bank statement import batch not found: " + importBatchId));
+        return toBatchResponse(batch, true);
     }
 
     @Transactional(readOnly = true)
@@ -184,6 +237,48 @@ public class BankReconciliationService {
         return bankStatementEntryRepository.save(entry);
     }
 
+    public BankReconciliationResponses.AutoReconcileImportBatchResponse autoReconcileImportBatch(Long organizationId,
+                                                                                                  Long importBatchId,
+                                                                                                  String remarks) {
+        accessGuard.assertOrganizationAccess(organizationId);
+        BankStatementImportBatch batch = bankStatementImportBatchRepository.findByIdAndOrganizationId(importBatchId, organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Bank statement import batch not found: " + importBatchId));
+        List<BankStatementEntry> entries = bankStatementEntryRepository.findByImportBatchIdOrderByEntryDateAscIdAsc(batch.getId());
+        long matchedCount = 0;
+        long skippedCount = 0;
+        List<Long> reconciledIds = new ArrayList<>();
+        for (BankStatementEntry entry : entries) {
+            if (isReconciled(entry)) {
+                skippedCount++;
+                continue;
+            }
+            List<BankReconciliationResponses.BankReconciliationCandidateResponse> exactMatches = candidates(organizationId, entry.getId()).stream()
+                    .filter(BankReconciliationResponses.BankReconciliationCandidateResponse::exactAmountMatch)
+                    .toList();
+            if (exactMatches.size() == 1) {
+                reconcile(organizationId, entry.getId(), new BankReconciliationDtos.ReconcileBankStatementRequest(
+                        exactMatches.getFirst().ledgerEntryId(),
+                        remarks
+                ));
+                matchedCount++;
+                reconciledIds.add(entry.getId());
+            } else {
+                skippedCount++;
+            }
+        }
+        batch.setStatus(matchedCount > 0 ? "PARTIALLY_RECONCILED" : batch.getStatus());
+        if (matchedCount > 0 && skippedCount == 0) {
+            batch.setStatus("RECONCILED");
+        }
+        bankStatementImportBatchRepository.save(batch);
+        return new BankReconciliationResponses.AutoReconcileImportBatchResponse(
+                batch.getId(),
+                matchedCount,
+                skippedCount,
+                reconciledIds
+        );
+    }
+
     private Account requireBankAccount(Long organizationId, Long accountId) {
         Account account = accountRepository.findByIdAndOrganizationId(accountId, organizationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Account not found: " + accountId));
@@ -202,6 +297,7 @@ public class BankReconciliationService {
                 entry.getOrganizationId(),
                 entry.getBranchId(),
                 entry.getAccountId(),
+                entry.getImportBatchId(),
                 entry.getEntryDate(),
                 entry.getValueDate(),
                 entry.getReferenceNumber(),
@@ -214,6 +310,32 @@ public class BankReconciliationService {
                 entry.getMatchedOn(),
                 entry.getMatchedBy(),
                 entry.getRemarks()
+        );
+    }
+
+    private BankReconciliationResponses.BankStatementImportBatchResponse toBatchResponse(BankStatementImportBatch batch, boolean includeEntries) {
+        List<BankReconciliationResponses.BankStatementEntryResponse> entries = includeEntries
+                ? bankStatementEntryRepository.findByImportBatchIdOrderByEntryDateAscIdAsc(batch.getId()).stream().map(this::toResponse).toList()
+                : List.of();
+        return new BankReconciliationResponses.BankStatementImportBatchResponse(
+                batch.getId(),
+                batch.getOrganizationId(),
+                batch.getBranchId(),
+                batch.getAccountId(),
+                batch.getImportReference(),
+                batch.getSourceType(),
+                batch.getSourceReference(),
+                batch.getSourceFileName(),
+                batch.getStatementFromDate(),
+                batch.getStatementToDate(),
+                batch.getEntryCount(),
+                batch.getTotalDebitAmount(),
+                batch.getTotalCreditAmount(),
+                batch.getStatus(),
+                batch.getImportedAt(),
+                batch.getImportedBy(),
+                batch.getRemarks(),
+                entries
         );
     }
 

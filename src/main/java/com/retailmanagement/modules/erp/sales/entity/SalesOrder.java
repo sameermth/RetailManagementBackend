@@ -32,6 +32,9 @@ public class SalesOrder extends ErpOrgBranchScopedEntity {
     @Column(name = "order_date", nullable = false)
     private LocalDate orderDate;
 
+    @Column(name = "expected_fulfillment_by")
+    private LocalDate expectedFulfillmentBy;
+
     @Column(name = "seller_tax_registration_id")
     private Long sellerTaxRegistrationId;
 

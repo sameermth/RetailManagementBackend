@@ -5,13 +5,13 @@ services:
     image: postgres:18
     container_name: retail-db
     environment:
-      POSTGRES_DB: retail_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_DB: retail_management_db
+      POSTGRES_USER: retail_admin
+      POSTGRES_PASSWORD: admin
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./init-schema.sql:/docker-entrypoint-initdb.d/init-schema.sql
 
   app:
     build: .
@@ -19,9 +19,13 @@ services:
     depends_on:
       - postgres
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/retail_db
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: password
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/retail_management_db?currentSchema=retail_management_service
+      SPRING_LIQUIBASE_DEFAULT_SCHEMA: retail_management_service
+      SPRING_LIQUIBASE_LIQUIBASE_SCHEMA: retail_management_service
+      SPRING_DATASOURCE_USERNAME: retail_admin
+      SPRING_DATASOURCE_PASSWORD: admin
+      JWT_SECRET: mySecretKeyForJWTGenerationWithAtLeast32CharactersLength
+      SMTP_PASSWORD: jeaxpuwdxdwgtacy
     ports:
       - "8080:8080"
     volumes:

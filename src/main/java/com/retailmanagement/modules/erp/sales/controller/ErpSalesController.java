@@ -8,7 +8,9 @@ import com.retailmanagement.modules.erp.sales.dto.ErpSalesDtos;
 import com.retailmanagement.modules.erp.sales.dto.ErpSalesResponses;
 import com.retailmanagement.modules.erp.sales.entity.CustomerReceipt;
 import com.retailmanagement.modules.erp.sales.entity.SalesInvoice;
+import com.retailmanagement.modules.erp.sales.entity.SalesDispatch;
 import com.retailmanagement.modules.erp.sales.service.ErpSalesService;
+import com.retailmanagement.modules.erp.sales.service.SalesDispatchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.*;
 public class ErpSalesController {
 
     private final ErpSalesService erpSalesService;
+    private final SalesDispatchService salesDispatchService;
     private final ErpDocumentService erpDocumentService;
 
     @GetMapping("/quotes")
@@ -196,6 +199,144 @@ public class ErpSalesController {
         return ErpApiResponse.ok(erpSalesService.createInvoice(orgId, branchId, request), "Sales invoice created");
     }
 
+    @GetMapping("/payment-requests")
+    @Operation(summary = "List invoice payment requests")
+    @PreAuthorize("hasAnyAuthority('sales.view','payment.receive')")
+    public ErpApiResponse<List<ErpSalesResponses.SalesInvoicePaymentRequestResponse>> listPaymentRequests(
+            @RequestParam(required = false) Long organizationId) {
+        Long orgId = organizationId != null ? organizationId : ErpSecurityUtils.currentOrganizationId().orElse(1L);
+        return ErpApiResponse.ok(
+                erpSalesService.listPaymentRequests(orgId).stream().map(erpSalesService::toPaymentRequestResponse).toList()
+        );
+    }
+
+    @GetMapping("/payment-gateway/providers")
+    @Operation(summary = "List available payment gateway providers")
+    @PreAuthorize("hasAnyAuthority('sales.view','payment.receive')")
+    public ErpApiResponse<List<ErpSalesResponses.PaymentGatewayProviderResponse>> listPaymentGatewayProviders() {
+        return ErpApiResponse.ok(erpSalesService.listPaymentGatewayProviders());
+    }
+
+    @GetMapping("/payment-requests/{id}")
+    @Operation(summary = "Get invoice payment request")
+    @PreAuthorize("hasAnyAuthority('sales.view','payment.receive')")
+    public ErpApiResponse<ErpSalesResponses.SalesInvoicePaymentRequestResponse> getPaymentRequest(@PathVariable Long id) {
+        return ErpApiResponse.ok(erpSalesService.toPaymentRequestResponse(erpSalesService.getPaymentRequest(id)));
+    }
+
+    @GetMapping("/invoices/{id}/payment-requests")
+    @Operation(summary = "List payment requests for invoice")
+    @PreAuthorize("hasAnyAuthority('sales.view','payment.receive')")
+    public ErpApiResponse<List<ErpSalesResponses.SalesInvoicePaymentRequestResponse>> listInvoicePaymentRequests(@PathVariable Long id) {
+        return ErpApiResponse.ok(
+                erpSalesService.listInvoicePaymentRequests(id).stream().map(erpSalesService::toPaymentRequestResponse).toList()
+        );
+    }
+
+    @PostMapping("/invoices/{id}/payment-requests")
+    @Operation(summary = "Create payment request for invoice")
+    @PreAuthorize("hasAuthority('payment.receive')")
+    public ErpApiResponse<ErpSalesResponses.SalesInvoicePaymentRequestResponse> createPaymentRequest(
+            @PathVariable Long id,
+            @RequestBody @Valid ErpSalesDtos.CreateSalesInvoicePaymentRequestRequest request) {
+        Long orgId = request.organizationId() != null ? request.organizationId() : ErpSecurityUtils.currentOrganizationId().orElse(1L);
+        Long branchId = request.branchId() != null ? request.branchId() : ErpSecurityUtils.currentBranchId().orElse(1L);
+        return ErpApiResponse.ok(
+                erpSalesService.toPaymentRequestResponse(erpSalesService.createPaymentRequest(orgId, branchId, id, request)),
+                "Invoice payment request created"
+        );
+    }
+
+    @PostMapping("/payment-requests/{id}/cancel")
+    @Operation(summary = "Cancel invoice payment request")
+    @PreAuthorize("hasAuthority('payment.receive')")
+    public ErpApiResponse<ErpSalesResponses.SalesInvoicePaymentRequestResponse> cancelPaymentRequest(
+            @PathVariable Long id,
+            @RequestBody @Valid ErpSalesDtos.CancelSalesInvoicePaymentRequest request) {
+        return ErpApiResponse.ok(
+                erpSalesService.toPaymentRequestResponse(erpSalesService.cancelPaymentRequest(id, request)),
+                "Invoice payment request cancelled"
+        );
+    }
+
+    @PostMapping("/payment-requests/{id}/sync-provider-status")
+    @Operation(summary = "Sync invoice payment request status with configured gateway provider")
+    @PreAuthorize("hasAuthority('payment.receive')")
+    public ErpApiResponse<ErpSalesResponses.SalesInvoicePaymentRequestResponse> syncPaymentRequestProviderStatus(@PathVariable Long id) {
+        return ErpApiResponse.ok(
+                erpSalesService.toPaymentRequestResponse(erpSalesService.syncPaymentRequestProviderStatus(id)),
+                "Invoice payment request provider status synchronized"
+        );
+    }
+
+    @GetMapping("/dispatches")
+    @Operation(summary = "List sales dispatch documents")
+    @PreAuthorize("hasAuthority('sales.view')")
+    public ErpApiResponse<List<ErpSalesResponses.SalesDispatchSummaryResponse>> listDispatches(@RequestParam(required = false) Long organizationId,
+                                                                                               @RequestParam(required = false) Long salesInvoiceId) {
+        Long orgId = organizationId != null ? organizationId : ErpSecurityUtils.currentOrganizationId().orElse(1L);
+        return ErpApiResponse.ok(
+                salesDispatchService.listDispatches(orgId, salesInvoiceId).stream().map(this::toSalesDispatchSummary).toList()
+        );
+    }
+
+    @GetMapping("/dispatches/{id}")
+    @Operation(summary = "Get sales dispatch by id")
+    @PreAuthorize("hasAuthority('sales.view')")
+    public ErpApiResponse<ErpSalesResponses.SalesDispatchResponse> getDispatch(@PathVariable Long id) {
+        return ErpApiResponse.ok(salesDispatchService.getDispatch(id));
+    }
+
+    @GetMapping("/dispatches/{id}/pdf")
+    @Operation(summary = "Download sales dispatch PDF")
+    @PreAuthorize("hasAuthority('sales.view')")
+    public ResponseEntity<ByteArrayResource> downloadDispatchPdf(@PathVariable Long id) {
+        ErpSalesResponses.SalesDispatchResponse dispatch = salesDispatchService.getDispatch(id);
+        return pdfResponse(erpDocumentService.generateSalesDispatchPdf(id), dispatch.dispatchNumber() + ".pdf");
+    }
+
+    @PostMapping("/dispatches/{id}/send")
+    @Operation(summary = "Email sales dispatch PDF")
+    @PreAuthorize("hasAuthority('sales.view')")
+    public ErpApiResponse<Void> sendDispatchPdf(@PathVariable Long id, @RequestBody(required = false) ErpDocumentDtos.SendDocumentRequest request) {
+        erpDocumentService.sendSalesDispatch(id, request);
+        return ErpApiResponse.ok(null, "Sales dispatch emailed");
+    }
+
+    @PostMapping("/invoices/{id}/dispatches")
+    @Operation(summary = "Create sales dispatch for invoice")
+    @PreAuthorize("hasAuthority('sales.create')")
+    public ErpApiResponse<ErpSalesResponses.SalesDispatchResponse> createDispatch(@PathVariable Long id,
+                                                                                  @RequestBody @Valid ErpSalesDtos.CreateSalesDispatchRequest request) {
+        Long orgId = request.organizationId() != null ? request.organizationId() : ErpSecurityUtils.currentOrganizationId().orElse(1L);
+        Long branchId = request.branchId() != null ? request.branchId() : ErpSecurityUtils.currentBranchId().orElse(1L);
+        return ErpApiResponse.ok(salesDispatchService.createDispatch(id, orgId, branchId, request), "Sales dispatch created");
+    }
+
+    @PostMapping("/dispatches/{id}/status")
+    @Operation(summary = "Update sales dispatch status")
+    @PreAuthorize("hasAuthority('sales.create')")
+    public ErpApiResponse<ErpSalesResponses.SalesDispatchResponse> updateDispatchStatus(@PathVariable Long id,
+                                                                                         @RequestBody @Valid ErpSalesDtos.UpdateSalesDispatchStatusRequest request) {
+        return ErpApiResponse.ok(salesDispatchService.updateDispatchStatus(id, request), "Sales dispatch status updated");
+    }
+
+    @PostMapping("/dispatches/{id}/pick")
+    @Operation(summary = "Pick sales dispatch lines")
+    @PreAuthorize("hasAuthority('sales.create')")
+    public ErpApiResponse<ErpSalesResponses.SalesDispatchResponse> pickDispatch(@PathVariable Long id,
+                                                                                 @RequestBody @Valid ErpSalesDtos.PickSalesDispatchRequest request) {
+        return ErpApiResponse.ok(salesDispatchService.pickDispatch(id, request), "Sales dispatch picked");
+    }
+
+    @PostMapping("/dispatches/{id}/pack")
+    @Operation(summary = "Pack sales dispatch lines")
+    @PreAuthorize("hasAuthority('sales.create')")
+    public ErpApiResponse<ErpSalesResponses.SalesDispatchResponse> packDispatch(@PathVariable Long id,
+                                                                                 @RequestBody @Valid ErpSalesDtos.PackSalesDispatchRequest request) {
+        return ErpApiResponse.ok(salesDispatchService.packDispatch(id, request), "Sales dispatch packed");
+    }
+
     @GetMapping("/receipts")
     @Operation(summary = "List customer receipts")
     @PreAuthorize("hasAuthority('sales.view')")
@@ -241,7 +382,8 @@ public class ErpSalesController {
                 invoice.getWarehouseId(), invoice.getCustomerId(), invoice.getInvoiceNumber(), invoice.getInvoiceDate(),
                 invoice.getDueDate(), invoice.getSellerGstin(), invoice.getCustomerGstin(), invoice.getPlaceOfSupplyStateCode(),
                 invoice.getSubtotal(), invoice.getDiscountAmount(), invoice.getTaxAmount(), invoice.getTotalAmount(),
-                null, null, invoice.getStatus());
+                null, null, invoice.getStatus(), salesDispatchService.buildInvoiceDispatchSummary(invoice.getId()),
+                erpSalesService.buildInvoicePaymentSummary(invoice.getId()));
     }
 
     private ErpSalesResponses.SalesQuoteSummaryResponse toSalesQuoteSummary(com.retailmanagement.modules.erp.sales.entity.SalesQuote quote) {
@@ -272,6 +414,7 @@ public class ErpSalesController {
                 order.getSourceQuoteId(),
                 order.getOrderNumber(),
                 order.getOrderDate(),
+                order.getExpectedFulfillmentBy(),
                 order.getTotalAmount(),
                 order.getConvertedSalesInvoiceId(),
                 order.getStatus()
@@ -282,6 +425,25 @@ public class ErpSalesController {
         return new ErpSalesResponses.CustomerReceiptResponse(receipt.getId(), receipt.getOrganizationId(), receipt.getBranchId(),
                 receipt.getCustomerId(), receipt.getReceiptNumber(), receipt.getReceiptDate(), receipt.getPaymentMethod(),
                 receipt.getReferenceNumber(), receipt.getAmount(), receipt.getStatus(), receipt.getRemarks());
+    }
+
+    private ErpSalesResponses.SalesDispatchSummaryResponse toSalesDispatchSummary(SalesDispatch dispatch) {
+        ErpSalesResponses.SalesDispatchResponse response = salesDispatchService.getDispatch(dispatch.getId());
+        return new ErpSalesResponses.SalesDispatchSummaryResponse(
+                response.id(),
+                response.organizationId(),
+                response.branchId(),
+                response.salesInvoiceId(),
+                response.invoiceNumber(),
+                response.dispatchNumber(),
+                response.dispatchDate(),
+                response.expectedDeliveryDate(),
+                response.status(),
+                response.transporterName(),
+                response.trackingNumber(),
+                response.dispatchedAt(),
+                response.deliveredAt()
+        );
     }
 
     private ResponseEntity<ByteArrayResource> pdfResponse(byte[] pdf, String fileName) {

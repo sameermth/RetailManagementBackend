@@ -27,12 +27,20 @@ public class InventoryQueryService {
         return inventoryBalanceRepository.findByOrganizationIdAndWarehouseId(organizationId, warehouseId);
     }
 
+    public List<InventoryBalance> balancesByBin(Long organizationId, Long binLocationId) {
+        return inventoryBalanceRepository.findByOrganizationIdAndBinLocationId(organizationId, binLocationId);
+    }
+
     public List<InventoryBalance> balancesByProduct(Long organizationId, Long productId) {
         return inventoryBalanceRepository.findByOrganizationIdAndProductId(organizationId, productId);
     }
 
     public List<StockMovement> movementsByWarehouse(Long organizationId, Long warehouseId) {
         return stockMovementRepository.findTop100ByOrganizationIdAndWarehouseIdOrderByMovementAtDesc(organizationId, warehouseId);
+    }
+
+    public List<StockMovement> movementsByBin(Long organizationId, Long binLocationId) {
+        return stockMovementRepository.findTop100ByOrganizationIdAndBinLocationIdOrderByMovementAtDesc(organizationId, binLocationId);
     }
 
     public List<StockMovement> movementsByProduct(Long organizationId, Long productId) {

@@ -25,6 +25,12 @@ public class StockTransferLine extends ErpAuditableEntity {
     @Column(name = "uom_id", nullable = false)
     private Long uomId;
 
+    @Column(name = "from_bin_location_id")
+    private Long fromBinLocationId;
+
+    @Column(name = "to_bin_location_id")
+    private Long toBinLocationId;
+
     @Column(nullable = false, precision = 18, scale = 6)
     private BigDecimal quantity;
 

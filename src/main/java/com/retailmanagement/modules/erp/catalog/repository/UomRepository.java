@@ -11,6 +11,10 @@ public interface UomRepository extends JpaRepository<Uom, Long> {
 
     Optional<Uom> findById(Long id);
 
+    Optional<Uom> findByCodeIgnoreCase(String code);
+
+    Optional<Uom> findByNameIgnoreCase(String name);
+
     List<Uom> findTop30ByIsActiveTrueOrderByCodeAsc();
 
     List<Uom> findTop30ByIsActiveTrueAndCodeContainingIgnoreCaseOrIsActiveTrueAndNameContainingIgnoreCaseOrderByCodeAsc(

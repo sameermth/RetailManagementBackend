@@ -1,2 +1,277 @@
 databaseChangeLog:
-  # Add new migrations here after the consolidated bootstrap baseline.
+  - changeSet:
+      id: post-bootstrap-001-add-report-storage
+      author: sameer
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            tableExists:
+              tableName: reports
+      changes:
+        - sqlFile:
+            path: post-bootstrap/001_add_report_storage.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for report storage migration';"
+  - changeSet:
+      id: post-bootstrap-002-add-governance-incidents-and-stock-count
+      author: sameer
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            columnExists:
+              tableName: product
+              columnName: governance_status
+      changes:
+        - sqlFile:
+            path: post-bootstrap/002_add_governance_incidents_and_stock_count.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for governance and stock count migration';"
+  - changeSet:
+      id: post-bootstrap-003-sync-identity-sequences
+      author: sameer
+      changes:
+        - sqlFile:
+            path: post-bootstrap/003_sync_identity_sequences.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for identity sequence sync migration';"
+  - changeSet:
+      id: post-bootstrap-004-add-receipt-pricing-layers
+      author: sameer
+      validCheckSum:
+        - "9:c0ae8a5f5fa40e5a953e34e50ce899c3"
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            columnExists:
+              tableName: inventory_batch
+              columnName: batch_type
+      changes:
+        - sqlFile:
+            path: post-bootstrap/004_add_receipt_pricing_layers.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for receipt pricing layer migration';"
+  - changeSet:
+      id: post-bootstrap-005-add-sales-document-validity-windows
+      author: sameer
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            columnExists:
+              tableName: sales_order
+              columnName: expected_fulfillment_by
+      changes:
+        - sqlFile:
+            path: post-bootstrap/005_add_sales_document_validity_windows.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for sales document validity window migration';"
+  - changeSet:
+      id: post-bootstrap-006-add-missing-sales-line-mrp-columns
+      author: sameer
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            columnExists:
+              tableName: sales_quote_line
+              columnName: mrp
+      changes:
+        - sqlFile:
+            path: post-bootstrap/006_add_missing_sales_line_mrp_columns.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for sales line MRP column migration';"
+  - changeSet:
+      id: post-bootstrap-007-add-tax-compliance-document-storage
+      author: sameer
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            tableExists:
+              tableName: tax_compliance_document
+      changes:
+        - sqlFile:
+            path: post-bootstrap/007_add_tax_compliance_document_storage.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for tax compliance document migration';"
+  - changeSet:
+      id: post-bootstrap-008-add-sales-dispatch-foundation
+      author: sameer
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            tableExists:
+              tableName: sales_dispatch
+      changes:
+        - sqlFile:
+            path: post-bootstrap/008_add_sales_dispatch_foundation.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for sales dispatch foundation migration';"
+  - changeSet:
+      id: post-bootstrap-009-add-payment-requests-and-bank-import-batches
+      author: sameer
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            tableExists:
+              tableName: sales_invoice_payment_request
+      changes:
+        - sqlFile:
+            path: post-bootstrap/009_add_payment_requests_and_bank_import_batches.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for payment request and bank import batch migration';"
+  - changeSet:
+      id: post-bootstrap-010-add-import-history
+      author: sameer
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            tableExists:
+              tableName: import_job
+      changes:
+        - sqlFile:
+            path: post-bootstrap/010_add_import_history.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for import history migration';"
+  - changeSet:
+      id: post-bootstrap-011-add-pos-foundation
+      author: sameer
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            tableExists:
+              tableName: pos_session
+      changes:
+        - sqlFile:
+            path: post-bootstrap/011_add_pos_foundation.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for POS foundation migration';"
+  - changeSet:
+      id: post-bootstrap-012-add-tax-compliance-submission-lifecycle
+      author: sameer
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            columnExists:
+              tableName: tax_compliance_document
+              columnName: submitted_at
+      changes:
+        - sqlFile:
+            path: post-bootstrap/012_add_tax_compliance_submission_lifecycle.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for tax compliance submission lifecycle migration';"
+  - changeSet:
+      id: post-bootstrap-013-add-payment-gateway-provider-fields
+      author: sameer
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            columnExists:
+              tableName: sales_invoice_payment_request
+              columnName: provider_reference
+      changes:
+        - sqlFile:
+            path: post-bootstrap/013_add_payment_gateway_provider_fields.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for payment gateway provider field migration';"
+  - changeSet:
+      id: post-bootstrap-014-add-supplier-purchase-portal
+      author: sameer
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            tableExists:
+              tableName: purchase_order_supplier_access
+      changes:
+        - sqlFile:
+            path: post-bootstrap/014_add_supplier_purchase_portal.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for supplier purchase portal migration';"
+  - changeSet:
+      id: post-bootstrap-015-add-inventory-bin-foundation
+      author: sameer
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            tableExists:
+              tableName: warehouse_bin_location
+      changes:
+        - sqlFile:
+            path: post-bootstrap/015_add_inventory_bin_foundation.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for inventory bin foundation migration';"
+  - changeSet:
+      id: post-bootstrap-016-add-fulfillment-bundle-foundation
+      author: sameer
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            columnExists:
+              tableName: sales_dispatch
+              columnName: picked_at
+      changes:
+        - sqlFile:
+            path: post-bootstrap/016_add_fulfillment_bundle_foundation.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+      rollback:
+        - sql:
+            sql: "SELECT 'Manual rollback required for fulfillment and bundle foundation migration';"

@@ -7,6 +7,8 @@ public final class ErpInventoryMovementTypes {
     public static final String ADJUSTMENT_OUT = "ADJUSTMENT_OUT";
     public static final String TRANSFER_IN = "TRANSFER_IN";
     public static final String TRANSFER_OUT = "TRANSFER_OUT";
+    public static final String PUTAWAY_IN = "PUTAWAY_IN";
+    public static final String PUTAWAY_OUT = "PUTAWAY_OUT";
     public static final String PURCHASE_RECEIPT = "PURCHASE_RECEIPT";
     public static final String SALES_INVOICE = "SALES_INVOICE";
     public static final String SALES_RETURN = "SALES_RETURN";

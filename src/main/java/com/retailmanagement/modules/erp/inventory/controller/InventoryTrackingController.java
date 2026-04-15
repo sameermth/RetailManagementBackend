@@ -37,6 +37,8 @@ public class InventoryTrackingController {
     private InventoryDtos.InventoryBatchResponse toResponse(InventoryBatch batch) {
         return new InventoryDtos.InventoryBatchResponse(batch.getId(), batch.getOrganizationId(), batch.getProductId(),
                 batch.getBatchNumber(), batch.getManufacturerBatchNumber(), batch.getManufacturedOn(), batch.getExpiryOn(),
+                batch.getBatchType(), batch.getSourceDocumentType(), batch.getSourceDocumentId(), batch.getSourceDocumentLineId(),
+                batch.getPurchaseUnitCost(), batch.getSuggestedSalePrice(), batch.getMrp(),
                 batch.getStatus(), batch.getCreatedAt(), batch.getUpdatedAt());
     }
 

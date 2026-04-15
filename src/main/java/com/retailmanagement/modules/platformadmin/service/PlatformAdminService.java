@@ -5,16 +5,24 @@ import com.retailmanagement.common.exceptions.ResourceNotFoundException;
 import com.retailmanagement.modules.auth.dto.response.EmployeeManagementResponses;
 import com.retailmanagement.modules.auth.model.Account;
 import com.retailmanagement.modules.auth.model.OrganizationPersonProfile;
+import com.retailmanagement.modules.auth.model.Person;
 import com.retailmanagement.modules.auth.model.Role;
 import com.retailmanagement.modules.auth.model.User;
 import com.retailmanagement.modules.auth.model.UserBranchAccess;
 import com.retailmanagement.modules.auth.repository.AccountRepository;
 import com.retailmanagement.modules.auth.repository.OrganizationPersonProfileRepository;
+import com.retailmanagement.modules.auth.repository.PersonRepository;
 import com.retailmanagement.modules.auth.repository.RoleRepository;
 import com.retailmanagement.modules.auth.repository.UserBranchAccessRepository;
 import com.retailmanagement.modules.auth.repository.UserRepository;
 import com.retailmanagement.modules.erp.audit.entity.AuditEvent;
 import com.retailmanagement.modules.erp.audit.repository.AuditEventRepository;
+import com.retailmanagement.modules.erp.catalog.entity.Product;
+import com.retailmanagement.modules.erp.catalog.entity.StoreProduct;
+import com.retailmanagement.modules.erp.catalog.repository.ProductRepository;
+import com.retailmanagement.modules.erp.catalog.repository.StoreProductRepository;
+import com.retailmanagement.modules.erp.foundation.dto.BranchDtos;
+import com.retailmanagement.modules.erp.foundation.entity.Branch;
 import com.retailmanagement.modules.erp.foundation.entity.Organization;
 import com.retailmanagement.modules.erp.foundation.repository.BranchRepository;
 import com.retailmanagement.modules.erp.foundation.repository.OrganizationRepository;
@@ -39,9 +47,11 @@ import com.retailmanagement.modules.erp.subscription.repository.SubscriptionPlan
 import com.retailmanagement.modules.erp.subscription.service.SubscriptionManagementService;
 import com.retailmanagement.modules.notification.model.Notification;
 import com.retailmanagement.modules.notification.repository.NotificationRepository;
+import com.retailmanagement.modules.platformadmin.entity.PlatformIncident;
 import com.retailmanagement.modules.report.model.ReportSchedule;
 import com.retailmanagement.modules.report.repository.ReportScheduleRepository;
 import com.retailmanagement.modules.platformadmin.dto.PlatformAdminDtos;
+import com.retailmanagement.modules.platformadmin.repository.PlatformIncidentRepository;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -55,6 +65,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,9 +78,12 @@ public class PlatformAdminService {
     private final OrganizationRepository organizationRepository;
     private final BranchRepository branchRepository;
     private final WarehouseRepository warehouseRepository;
+    private final ProductRepository productRepository;
+    private final StoreProductRepository storeProductRepository;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final AccountRepository accountRepository;
+    private final PersonRepository personRepository;
     private final OrganizationPersonProfileRepository organizationPersonProfileRepository;
     private final UserBranchAccessRepository userBranchAccessRepository;
     private final SubscriptionManagementService subscriptionManagementService;
@@ -83,8 +97,10 @@ public class PlatformAdminService {
     private final ServiceVisitRepository serviceVisitRepository;
     private final ReportScheduleRepository reportScheduleRepository;
     private final NotificationRepository notificationRepository;
+    private final PlatformIncidentRepository platformIncidentRepository;
     private final AuditEventRepository auditEventRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final PasswordEncoder passwordEncoder;
 
     public PlatformAdminDtos.OverviewResponse overview() {
         List<Organization> organizations = organizationRepository.findAll();
@@ -140,32 +156,59 @@ public class PlatformAdminService {
 
     @Transactional
     public PlatformAdminDtos.StoreSummaryResponse createStore(PlatformAdminDtos.StoreUpsertRequest request) {
-        String code = request.code().trim().toUpperCase();
-        if (organizationRepository.findByCode(code).isPresent()) {
-            throw new BusinessException("Organization code already exists: " + code);
-        }
         Account ownerAccount = accountRepository.findById(request.ownerAccountId())
                 .orElseThrow(() -> new ResourceNotFoundException("Owner account not found: " + request.ownerAccountId()));
-        Organization organization = new Organization();
-        organization.setName(request.name().trim());
-        organization.setCode(code);
-        organization.setLegalName(trimToNull(request.legalName()));
-        organization.setPhone(trimToNull(request.phone()));
-        organization.setEmail(trimToNull(request.email()));
-        organization.setGstin(trimToNull(request.gstin()));
-        organization.setOwnerAccountId(ownerAccount.getId());
-        if (request.gstThresholdAmount() != null) {
-            organization.setGstThresholdAmount(request.gstThresholdAmount());
-        }
-        if (request.gstThresholdAlertEnabled() != null) {
-            organization.setGstThresholdAlertEnabled(request.gstThresholdAlertEnabled());
-        }
-        if (request.isActive() != null) {
-            organization.setIsActive(request.isActive());
-        }
-        Organization saved = organizationRepository.save(organization);
+        Organization saved = createOrganization(
+                request.name(),
+                request.code(),
+                request.legalName(),
+                request.phone(),
+                request.email(),
+                request.gstin(),
+                request.gstThresholdAmount(),
+                request.gstThresholdAlertEnabled(),
+                request.isActive(),
+                ownerAccount
+        );
         ensureOwnerMembership(saved, ownerAccount);
         return toStoreSummary(saved);
+    }
+
+    @Transactional
+    public PlatformAdminDtos.StoreOnboardingResponse onboardStore(PlatformAdminDtos.StoreOnboardingRequest request) {
+        Account ownerAccount = createOwnerAccount(request.owner());
+        Organization organization = createOrganization(
+                request.store().name(),
+                request.store().code(),
+                request.store().legalName(),
+                request.store().phone(),
+                request.store().email(),
+                request.store().gstin(),
+                request.store().gstThresholdAmount(),
+                request.store().gstThresholdAlertEnabled(),
+                request.store().isActive(),
+                ownerAccount
+        );
+        User ownerMembership = ensureOwnerMembership(organization, ownerAccount);
+
+        Branch defaultBranch = null;
+        if (request.branch() != null) {
+            defaultBranch = createBranch(organization.getId(), request.branch());
+            ownerMembership.setDefaultBranchId(defaultBranch.getId());
+            ownerMembership = userRepository.save(ownerMembership);
+            replaceBranchAccess(ownerMembership.getId(), List.of(defaultBranch.getId()), defaultBranch.getId());
+        }
+
+        if (request.subscription() != null) {
+            subscriptionManagementService.activateSubscription(organization.getId(), request.subscription());
+        }
+
+        return new PlatformAdminDtos.StoreOnboardingResponse(
+                toStoreSummary(organization),
+                toOwnerAccountReference(ownerAccount),
+                defaultBranch == null ? null : toBranchResponse(defaultBranch),
+                toSubscriptionSummary(organization)
+        );
     }
 
     @Transactional
@@ -223,6 +266,166 @@ public class PlatformAdminService {
     ) {
         subscriptionManagementService.changePlan(organizationId, request);
         return toSubscriptionSummary(requireOrganization(organizationId));
+    }
+
+    public List<PlatformAdminDtos.CatalogProductGovernanceResponse> catalogProducts(String query, String governanceStatus) {
+        String normalizedQuery = trimToNull(query);
+        String normalizedGovernanceStatus = trimToNull(governanceStatus);
+        return productRepository.findAll().stream()
+                .filter(product -> matchesCatalogProductQuery(product, normalizedQuery))
+                .filter(product -> normalizedGovernanceStatus == null
+                        || normalizedGovernanceStatus.equalsIgnoreCase(defaultProductGovernanceStatus(product)))
+                .sorted(Comparator.comparing(Product::getName, String.CASE_INSENSITIVE_ORDER))
+                .map(this::toCatalogProductGovernance)
+                .toList();
+    }
+
+    public PlatformAdminDtos.CatalogProductImpactResponse catalogProductImpact(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
+        List<StoreProduct> linkedStores = storeProductRepository.findByProductId(productId).stream()
+                .sorted(Comparator
+                        .comparing(StoreProduct::getOrganizationId)
+                        .thenComparing(StoreProduct::getSku, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                .toList();
+        Map<Long, Organization> organizations = organizationRepository.findAllById(
+                        linkedStores.stream().map(StoreProduct::getOrganizationId).filter(Objects::nonNull).distinct().toList()
+                ).stream()
+                .collect(Collectors.toMap(Organization::getId, org -> org));
+        return new PlatformAdminDtos.CatalogProductImpactResponse(
+                product.getId(),
+                product.getName(),
+                defaultProductGovernanceStatus(product),
+                Boolean.TRUE.equals(product.getBlockNewStoreAdoption()),
+                Boolean.TRUE.equals(product.getBlockTransactions()),
+                linkedStores.size(),
+                linkedStores.stream()
+                        .map(storeProduct -> {
+                            Organization organization = organizations.get(storeProduct.getOrganizationId());
+                            return new PlatformAdminDtos.CatalogProductImpactStoreResponse(
+                                    storeProduct.getId(),
+                                    storeProduct.getOrganizationId(),
+                                    organization == null ? null : organization.getCode(),
+                                    organization == null ? null : organization.getName(),
+                                    storeProduct.getSku(),
+                                    storeProduct.getName(),
+                                    storeProduct.getIsActive()
+                            );
+                        })
+                        .toList()
+        );
+    }
+
+    @Transactional
+    public PlatformAdminDtos.CatalogProductGovernanceResponse updateProductGovernance(
+            Long productId,
+            PlatformAdminDtos.UpdateProductGovernanceRequest request
+    ) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
+        applyGovernanceValues(
+                product,
+                request.governanceStatus(),
+                request.qualityReviewStatus(),
+                request.blockNewStoreAdoption(),
+                request.blockTransactions(),
+                request.governanceReason()
+        );
+        return toCatalogProductGovernance(productRepository.save(product));
+    }
+
+    public List<PlatformAdminDtos.PlatformIncidentResponse> incidents(String status, String subjectType, Long organizationId) {
+        String normalizedStatus = trimToNull(status);
+        String normalizedSubjectType = trimToNull(subjectType);
+        return platformIncidentRepository.findAllByOrderByOpenedAtDescIdDesc().stream()
+                .filter(incident -> organizationId == null || Objects.equals(organizationId, incident.getOrganizationId()))
+                .filter(incident -> normalizedStatus == null || normalizedStatus.equalsIgnoreCase(incident.getStatus()))
+                .filter(incident -> normalizedSubjectType == null || normalizedSubjectType.equalsIgnoreCase(incident.getSubjectType()))
+                .map(this::toPlatformIncidentResponse)
+                .toList();
+    }
+
+    @Transactional
+    public PlatformAdminDtos.PlatformIncidentResponse createIncident(PlatformAdminDtos.CreatePlatformIncidentRequest request) {
+        validateIncidentReferences(request);
+        PlatformIncident incident = new PlatformIncident();
+        incident.setIncidentNumber(generateIncidentNumber());
+        incident.setOrganizationId(request.organizationId());
+        incident.setSubjectType(request.subjectType().trim().toUpperCase());
+        incident.setIncidentType(request.incidentType().trim().toUpperCase());
+        incident.setSeverity(request.severity().trim().toUpperCase());
+        incident.setStatus("OPEN");
+        incident.setTitle(request.title().trim());
+        incident.setDescription(trimToNull(request.description()));
+        incident.setProductId(request.productId());
+        incident.setStoreProductId(request.storeProductId());
+        incident.setServiceTicketId(request.serviceTicketId());
+        incident.setWarrantyClaimId(request.warrantyClaimId());
+        incident.setReportedBy(trimToNull(request.reportedBy()));
+        incident.setRecommendedAction(trimToNull(request.recommendedAction()));
+        incident.setOpenedAt(LocalDateTime.now());
+        return toPlatformIncidentResponse(platformIncidentRepository.save(incident));
+    }
+
+    @Transactional
+    public PlatformAdminDtos.PlatformIncidentResponse updateIncidentStatus(
+            Long incidentId,
+            PlatformAdminDtos.UpdatePlatformIncidentStatusRequest request
+    ) {
+        PlatformIncident incident = platformIncidentRepository.findById(incidentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Platform incident not found: " + incidentId));
+        incident.setStatus(request.status().trim().toUpperCase());
+        incident.setActionTaken(trimToNull(request.actionTaken()));
+        incident.setResolutionNotes(trimToNull(request.resolutionNotes()));
+        if (isClosedStatus(incident.getStatus())) {
+            incident.setResolvedAt(LocalDateTime.now());
+        } else {
+            incident.setResolvedAt(null);
+        }
+        return toPlatformIncidentResponse(platformIncidentRepository.save(incident));
+    }
+
+    @Transactional
+    public PlatformAdminDtos.IncidentGovernanceActionResponse applyIncidentGovernanceAction(
+            Long incidentId,
+            PlatformAdminDtos.ApplyIncidentGovernanceActionRequest request
+    ) {
+        PlatformIncident incident = platformIncidentRepository.findById(incidentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Platform incident not found: " + incidentId));
+        if (incident.getProductId() == null) {
+            throw new BusinessException("Platform incident is not linked to a catalog product");
+        }
+        Long productId = incident.getProductId();
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
+
+        GovernancePreset preset = governancePreset(request.actionType());
+        String governanceReason = trimToNull(request.governanceReason());
+        if (governanceReason == null) {
+            governanceReason = incident.getTitle();
+        }
+        applyGovernanceValues(
+                product,
+                preset.governanceStatus(),
+                preset.qualityReviewStatus(),
+                preset.blockNewStoreAdoption(),
+                preset.blockTransactions(),
+                governanceReason
+        );
+        product = productRepository.save(product);
+
+        incident.setActionTaken(actionLabel(request.actionType()));
+        incident.setResolutionNotes(trimToNull(request.resolutionNotes()));
+        incident.setStatus(defaultIfBlank(request.incidentStatus(), "ACTIONED"));
+        if (isClosedStatus(incident.getStatus())) {
+            incident.setResolvedAt(LocalDateTime.now());
+        }
+        incident = platformIncidentRepository.save(incident);
+
+        return new PlatformAdminDtos.IncidentGovernanceActionResponse(
+                toPlatformIncidentResponse(incident),
+                toCatalogProductGovernance(product)
+        );
     }
 
     @Transactional
@@ -716,6 +919,17 @@ public class PlatformAdminService {
         };
     }
 
+    private boolean matchesCatalogProductQuery(Product product, String query) {
+        if (query == null) {
+            return true;
+        }
+        String normalized = query.toLowerCase();
+        return containsIgnoreCase(product.getName(), normalized)
+                || containsIgnoreCase(product.getBrandName(), normalized)
+                || containsIgnoreCase(product.getCategoryName(), normalized)
+                || containsIgnoreCase(product.getHsnCode(), normalized);
+    }
+
     private PlatformAdminDtos.StoreSummaryResponse toStoreSummary(Organization organization) {
         AccountSubscription subscription = organization.getOwnerAccountId() == null
                 ? null
@@ -746,6 +960,75 @@ public class PlatformAdminService {
                 account.getPerson() == null ? null : account.getPerson().getPrimaryEmail(),
                 account.getPerson() == null ? null : account.getPerson().getPrimaryPhone(),
                 account.getActive()
+        );
+    }
+
+    private PlatformAdminDtos.CatalogProductGovernanceResponse toCatalogProductGovernance(Product product) {
+        return new PlatformAdminDtos.CatalogProductGovernanceResponse(
+                product.getId(),
+                product.getName(),
+                product.getBrandName(),
+                product.getCategoryName(),
+                product.getHsnCode(),
+                product.getIsServiceItem(),
+                product.getIsActive(),
+                defaultProductGovernanceStatus(product),
+                product.getQualityReviewStatus() == null ? "NORMAL" : product.getQualityReviewStatus(),
+                Boolean.TRUE.equals(product.getBlockNewStoreAdoption()),
+                Boolean.TRUE.equals(product.getBlockTransactions()),
+                product.getGovernanceReason(),
+                product.getGovernanceUpdatedAt(),
+                platformIncidentRepository.countByProductId(product.getId())
+        );
+    }
+
+    private String defaultProductGovernanceStatus(Product product) {
+        return product.getGovernanceStatus() == null ? "ACTIVE" : product.getGovernanceStatus();
+    }
+
+    private PlatformAdminDtos.PlatformIncidentResponse toPlatformIncidentResponse(PlatformIncident incident) {
+        return new PlatformAdminDtos.PlatformIncidentResponse(
+                incident.getId(),
+                incident.getIncidentNumber(),
+                incident.getOrganizationId(),
+                incident.getSubjectType(),
+                incident.getIncidentType(),
+                incident.getSeverity(),
+                incident.getStatus(),
+                incident.getTitle(),
+                incident.getDescription(),
+                incident.getProductId(),
+                incident.getStoreProductId(),
+                incident.getServiceTicketId(),
+                incident.getWarrantyClaimId(),
+                incident.getReportedBy(),
+                incident.getRecommendedAction(),
+                incident.getActionTaken(),
+                incident.getResolutionNotes(),
+                incident.getOpenedAt(),
+                incident.getResolvedAt(),
+                incident.getCreatedAt(),
+                incident.getUpdatedAt()
+        );
+    }
+
+    private BranchDtos.BranchResponse toBranchResponse(Branch branch) {
+        return new BranchDtos.BranchResponse(
+                branch.getId(),
+                branch.getOrganizationId(),
+                branch.getCode(),
+                branch.getName(),
+                branch.getPhone(),
+                branch.getEmail(),
+                branch.getAddressLine1(),
+                branch.getAddressLine2(),
+                branch.getCity(),
+                branch.getState(),
+                branch.getPostalCode(),
+                branch.getCountry(),
+                branch.getIsActive(),
+                branch.getCreatedAt(),
+                branch.getUpdatedAt()
         );
     }
 
@@ -795,6 +1078,81 @@ public class PlatformAdminService {
         );
     }
 
+    private void validateIncidentReferences(PlatformAdminDtos.CreatePlatformIncidentRequest request) {
+        if (request.productId() == null
+                && request.storeProductId() == null
+                && request.serviceTicketId() == null
+                && request.warrantyClaimId() == null) {
+            throw new BusinessException("Incident must reference a product, store product, service ticket, or warranty claim");
+        }
+        if (request.productId() != null) {
+            productRepository.findById(request.productId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + request.productId()));
+        }
+        if (request.storeProductId() != null) {
+            StoreProduct storeProduct = storeProductRepository.findById(request.storeProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Store product not found: " + request.storeProductId()));
+            if (request.organizationId() != null && !request.organizationId().equals(storeProduct.getOrganizationId())) {
+                throw new BusinessException("Store product does not belong to the selected organization");
+            }
+        }
+        if (request.serviceTicketId() != null) {
+            ServiceTicket ticket = serviceTicketRepository.findById(request.serviceTicketId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Service ticket not found: " + request.serviceTicketId()));
+            if (request.organizationId() != null && !request.organizationId().equals(ticket.getOrganizationId())) {
+                throw new BusinessException("Service ticket does not belong to the selected organization");
+            }
+        }
+        if (request.warrantyClaimId() != null) {
+            WarrantyClaim claim = warrantyClaimRepository.findById(request.warrantyClaimId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Warranty claim not found: " + request.warrantyClaimId()));
+            if (request.organizationId() != null && !request.organizationId().equals(claim.getOrganizationId())) {
+                throw new BusinessException("Warranty claim does not belong to the selected organization");
+            }
+        }
+    }
+
+    private void applyGovernanceValues(
+            Product product,
+            String governanceStatus,
+            String qualityReviewStatus,
+            Boolean blockNewStoreAdoption,
+            Boolean blockTransactions,
+            String governanceReason
+    ) {
+        product.setGovernanceStatus(governanceStatus.trim().toUpperCase());
+        product.setQualityReviewStatus(qualityReviewStatus.trim().toUpperCase());
+        product.setBlockNewStoreAdoption(Boolean.TRUE.equals(blockNewStoreAdoption));
+        product.setBlockTransactions(Boolean.TRUE.equals(blockTransactions));
+        product.setGovernanceReason(trimToNull(governanceReason));
+        product.setGovernanceUpdatedAt(LocalDateTime.now());
+    }
+
+    private GovernancePreset governancePreset(String actionType) {
+        String normalizedAction = actionType.trim().toUpperCase();
+        return switch (normalizedAction) {
+            case "RESTRICT_PRODUCT" -> new GovernancePreset("RESTRICTED", "UNDER_REVIEW", true, false);
+            case "DISCONTINUE_PRODUCT" -> new GovernancePreset("DISCONTINUED", "UNDER_REVIEW", true, false);
+            case "BLOCK_PRODUCT" -> new GovernancePreset("BLOCKED", "FAILED", true, true);
+            case "RECALL_PRODUCT" -> new GovernancePreset("RECALLED", "FAILED", true, true);
+            case "CLEAR_PRODUCT_RESTRICTIONS" -> new GovernancePreset("ACTIVE", "NORMAL", false, false);
+            default -> throw new BusinessException("Unsupported governance action: " + actionType);
+        };
+    }
+
+    private String actionLabel(String actionType) {
+        return actionType.trim().toUpperCase().replace('_', ' ');
+    }
+
+    private String defaultIfBlank(String value, String fallback) {
+        String normalized = trimToNull(value);
+        return normalized == null ? fallback : normalized.toUpperCase();
+    }
+
+    private String generateIncidentNumber() {
+        return "INC-" + LocalDate.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE) + "-" + System.currentTimeMillis();
+    }
+
     private void applyPlanChanges(SubscriptionPlan plan, PlatformAdminDtos.SubscriptionPlanUpsertRequest request) {
         plan.setCode(request.code().trim().toUpperCase());
         plan.setName(request.name().trim());
@@ -818,6 +1176,95 @@ public class PlatformAdminService {
     private User requireUser(Long organizationId, Long userId) {
         return userRepository.findByIdAndOrganizationId(userId, organizationId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+    }
+
+    private Organization createOrganization(
+            String name,
+            String codeValue,
+            String legalName,
+            String phone,
+            String email,
+            String gstin,
+            java.math.BigDecimal gstThresholdAmount,
+            Boolean gstThresholdAlertEnabled,
+            Boolean isActive,
+            Account ownerAccount
+    ) {
+        String code = codeValue.trim().toUpperCase();
+        if (organizationRepository.findByCode(code).isPresent()) {
+            throw new BusinessException("Organization code already exists: " + code);
+        }
+        Organization organization = new Organization();
+        organization.setName(name.trim());
+        organization.setCode(code);
+        organization.setLegalName(trimToNull(legalName));
+        organization.setPhone(trimToNull(phone));
+        organization.setEmail(trimToNull(email));
+        organization.setGstin(trimToNull(gstin));
+        organization.setOwnerAccountId(ownerAccount.getId());
+        if (gstThresholdAmount != null) {
+            organization.setGstThresholdAmount(gstThresholdAmount);
+        }
+        if (gstThresholdAlertEnabled != null) {
+            organization.setGstThresholdAlertEnabled(gstThresholdAlertEnabled);
+        }
+        if (isActive != null) {
+            organization.setIsActive(isActive);
+        }
+        return organizationRepository.save(organization);
+    }
+
+    private Account createOwnerAccount(PlatformAdminDtos.OwnerAccountCreateRequest request) {
+        String loginIdentifier = request.loginIdentifier().trim();
+        if (accountRepository.findByLoginIdentifierIgnoreCase(loginIdentifier).isPresent()) {
+            throw new BusinessException("Login identifier already exists: " + loginIdentifier);
+        }
+
+        String email = trimToNull(request.email());
+        if (email != null && personRepository.findFirstByPrimaryEmailIgnoreCase(email).isPresent()) {
+            throw new BusinessException("Owner email already exists: " + email);
+        }
+
+        String phone = trimToNull(request.phone());
+        if (phone != null && personRepository.findFirstByPrimaryPhone(phone).isPresent()) {
+            throw new BusinessException("Owner phone already exists: " + phone);
+        }
+
+        Person person = Person.builder()
+                .legalName(request.fullName().trim())
+                .primaryEmail(email)
+                .primaryPhone(phone)
+                .status("ACTIVE")
+                .build();
+        person = personRepository.save(person);
+
+        Account account = Account.builder()
+                .person(person)
+                .loginIdentifier(loginIdentifier)
+                .passwordHash(passwordEncoder.encode(request.password()))
+                .active(request.active() == null || request.active())
+                .locked(false)
+                .build();
+        return accountRepository.save(account);
+    }
+
+    private Branch createBranch(Long organizationId, PlatformAdminDtos.StoreBranchSeedRequest request) {
+        Branch branch = new Branch();
+        branch.setOrganizationId(organizationId);
+        branch.setCode(request.code().trim().toUpperCase());
+        branch.setName(request.name().trim());
+        branch.setPhone(trimToNull(request.phone()));
+        branch.setEmail(trimToNull(request.email()));
+        branch.setAddressLine1(trimToNull(request.addressLine1()));
+        branch.setAddressLine2(trimToNull(request.addressLine2()));
+        branch.setCity(trimToNull(request.city()));
+        branch.setState(trimToNull(request.state()));
+        branch.setPostalCode(trimToNull(request.postalCode()));
+        branch.setCountry(trimToNull(request.country()));
+        if (request.isActive() != null) {
+            branch.setIsActive(request.isActive());
+        }
+        return branchRepository.save(branch);
     }
 
     private Role resolveRole(String roleCode) {
@@ -876,7 +1323,7 @@ public class PlatformAdminService {
         throw new BusinessException("Unable to generate employee code for organization " + organizationId);
     }
 
-    private void ensureOwnerMembership(Organization organization, Account ownerAccount) {
+    private User ensureOwnerMembership(Organization organization, Account ownerAccount) {
         Role ownerRole = roleRepository.findByCode("OWNER")
                 .orElseThrow(() -> new ResourceNotFoundException("Owner role not found"));
         organizationPersonProfileRepository.findByOrganizationIdAndPersonId(organization.getId(), ownerAccount.getPerson().getId())
@@ -888,7 +1335,7 @@ public class PlatformAdminService {
                         .phoneForOrg(ownerAccount.getPerson().getPrimaryPhone())
                         .active(true)
                         .build()));
-        userRepository.findByLoginAndOrganizationId(ownerAccount.getLoginIdentifier(), organization.getId())
+        return userRepository.findByLoginAndOrganizationId(ownerAccount.getLoginIdentifier(), organization.getId())
                 .orElseGet(() -> {
                     User membership = new User();
                     membership.setOrganizationId(organization.getId());
@@ -987,4 +1434,11 @@ public class PlatformAdminService {
         }
         return value.trim();
     }
+
+    private record GovernancePreset(
+            String governanceStatus,
+            String qualityReviewStatus,
+            Boolean blockNewStoreAdoption,
+            Boolean blockTransactions
+    ) {}
 }

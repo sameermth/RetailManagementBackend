@@ -71,6 +71,23 @@ public class ErpPurchaseController {
         return ErpApiResponse.ok(erpPurchaseService.createPurchaseOrder(orgId, branchId, request), "Purchase order created");
     }
 
+    @PostMapping("/orders/{id}/supplier-access-link")
+    @Operation(summary = "Generate supplier portal access link for purchase order")
+    @PreAuthorize("hasAuthority('purchase.view')")
+    public ErpApiResponse<ErpPurchaseResponses.PurchaseOrderSupplierAccessResponse> generateSupplierAccessLink(
+            @PathVariable Long id,
+            @RequestBody(required = false) ErpPurchaseDtos.GenerateSupplierPurchaseOrderAccessRequest request
+    ) {
+        return ErpApiResponse.ok(erpPurchaseService.generateSupplierAccess(id, request), "Supplier access link generated");
+    }
+
+    @GetMapping("/orders/{id}/supplier-dispatches")
+    @Operation(summary = "List supplier dispatch notices for purchase order")
+    @PreAuthorize("hasAuthority('purchase.view')")
+    public ErpApiResponse<List<ErpPurchaseResponses.SupplierDispatchNoticeResponse>> listSupplierDispatchNotices(@PathVariable Long id) {
+        return ErpApiResponse.ok(erpPurchaseService.listSupplierDispatchNotices(id));
+    }
+
     @GetMapping("/receipts")
     @Operation(summary = "List purchase receipts")
     @PreAuthorize("hasAuthority('purchase.view')")
@@ -109,6 +126,14 @@ public class ErpPurchaseController {
         Long orgId = request.organizationId() != null ? request.organizationId() : ErpSecurityUtils.currentOrganizationId().orElse(1L);
         Long branchId = request.branchId() != null ? request.branchId() : ErpSecurityUtils.currentBranchId().orElse(1L);
         return ErpApiResponse.ok(erpPurchaseService.createPurchaseReceipt(orgId, branchId, request), "Purchase receipt created");
+    }
+
+    @PostMapping("/receipts/{id}/putaway")
+    @Operation(summary = "Put away purchase receipt stock into warehouse bins")
+    @PreAuthorize("hasAnyAuthority('purchase.post','inventory.receive')")
+    public ErpApiResponse<ErpPurchaseResponses.PurchaseReceiptResponse> putawayPurchaseReceipt(@PathVariable Long id,
+                                                                                                @RequestBody @Valid ErpPurchaseDtos.PutawayPurchaseReceiptRequest request) {
+        return ErpApiResponse.ok(erpPurchaseService.putawayPurchaseReceipt(id, request), "Purchase receipt putaway posted");
     }
 
     @GetMapping("/supplier-payments")
@@ -162,7 +187,7 @@ public class ErpPurchaseController {
         return new ErpPurchaseResponses.PurchaseReceiptSummaryResponse(receipt.getId(), receipt.getOrganizationId(), receipt.getBranchId(),
                 receipt.getWarehouseId(), receipt.getSupplierId(), receipt.getReceiptNumber(), receipt.getReceiptDate(), receipt.getDueDate(),
                 receipt.getSellerGstin(), receipt.getSupplierGstin(), receipt.getPlaceOfSupplyStateCode(), receipt.getSubtotal(),
-                receipt.getTaxAmount(), receipt.getTotalAmount(), null, null, receipt.getStatus());
+                receipt.getTaxAmount(), receipt.getTotalAmount(), null, null, receipt.getStatus(), receipt.getPutawayStatus());
     }
 
     private ErpPurchaseResponses.SupplierPaymentResponse toSupplierPaymentResponse(SupplierPayment payment) {

@@ -44,11 +44,13 @@ public class JwtTokenProvider {
         Map<String, Object> claims = new HashMap<>();
         claims.put("roles", roles);
         if (principal != null) {
+            claims.put("accountId", principal.getAccountId());
             claims.put("organizationId", principal.getOrganizationId());
             claims.put("subscriptionVersion", principal.getSubscriptionVersion());
             claims.put("subscriptionPlanCode", principal.getSubscriptionPlanCode());
             claims.put("subscriptionStatus", principal.getSubscriptionStatus());
             claims.put("subscriptionFeatures", principal.getSubscriptionFeatures());
+            claims.put("onboardingRequired", principal.getOnboardingRequired());
         }
 
         return Jwts.builder()
@@ -83,6 +85,15 @@ public class JwtTokenProvider {
 
     public boolean isSubscriptionContextValid(String token, UserPrincipal principal) {
         Claims claims = getClaims(token);
+        Boolean onboardingRequired = claims.get("onboardingRequired", Boolean.class);
+        if (Boolean.TRUE.equals(onboardingRequired)) {
+            Number accountId = claims.get("accountId", Number.class);
+            return principal != null
+                    && Boolean.TRUE.equals(principal.getOnboardingRequired())
+                    && accountId != null
+                    && principal.getAccountId() != null
+                    && principal.getAccountId().equals(accountId.longValue());
+        }
         Number orgId = claims.get("organizationId", Number.class);
         Number subscriptionVersion = claims.get("subscriptionVersion", Number.class);
         if (principal == null) {

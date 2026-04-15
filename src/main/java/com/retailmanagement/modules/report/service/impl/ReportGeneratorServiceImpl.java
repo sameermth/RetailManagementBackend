@@ -76,6 +76,13 @@ public class ReportGeneratorServiceImpl implements ReportGeneratorService {
 
     @Override
     public ReportResponse generateReport(ReportRequest request, Long userId) {
+        if (request.getReportType() == null) {
+            throw new BusinessException("Report type is required");
+        }
+        if (request.getFormat() == null) {
+            request.setFormat(ReportFormat.PDF);
+        }
+
         log.info("Generating report of type: {} for user: {}", request.getReportType(), userId);
 
         User user = userRepository.findById(userId)

@@ -38,6 +38,7 @@ public class InventoryOperationsController {
                 orgId,
                 branchId,
                 request.warehouseId(),
+                request.binLocationId(),
                 request.productId(),
                 request.uomId(),
                 request.quantityDelta(),
@@ -64,6 +65,8 @@ public class InventoryOperationsController {
                         .map(line -> new InventoryOperationsService.TransferLineCommand(
                                 line.productId(),
                                 line.uomId(),
+                                line.fromBinLocationId(),
+                                line.toBinLocationId(),
                                 line.quantity(),
                                 line.baseQuantity()
                         ))
@@ -76,6 +79,7 @@ public class InventoryOperationsController {
             Long organizationId,
             Long branchId,
             @NotNull Long warehouseId,
+            Long binLocationId,
             @NotNull Long productId,
             @NotNull Long uomId,
             @NotNull BigDecimal quantityDelta,
@@ -95,6 +99,8 @@ public class InventoryOperationsController {
     public record StockTransferLineRequest(
             @NotNull Long productId,
             @NotNull Long uomId,
+            Long fromBinLocationId,
+            Long toBinLocationId,
             @NotNull BigDecimal quantity,
             @NotNull BigDecimal baseQuantity
     ) {}
@@ -102,12 +108,12 @@ public class InventoryOperationsController {
     private InventoryDtos.StockAdjustmentResponse toResponse(StockAdjustment adjustment) {
         return new InventoryDtos.StockAdjustmentResponse(adjustment.getId(), adjustment.getOrganizationId(), adjustment.getBranchId(),
                 adjustment.getWarehouseId(), adjustment.getAdjustmentNumber(), adjustment.getAdjustmentDate(), adjustment.getReason(),
-                adjustment.getStatus(), adjustment.getCreatedAt(), adjustment.getUpdatedAt());
+                adjustment.getStatus(), 1L, adjustment.getCreatedAt(), adjustment.getUpdatedAt());
     }
 
     private InventoryDtos.StockTransferResponse toResponse(StockTransfer transfer) {
         return new InventoryDtos.StockTransferResponse(transfer.getId(), transfer.getOrganizationId(), transfer.getBranchId(),
                 transfer.getFromWarehouseId(), transfer.getToWarehouseId(), transfer.getTransferNumber(), transfer.getTransferDate(),
-                transfer.getStatus(), transfer.getCreatedAt(), transfer.getUpdatedAt());
+                transfer.getStatus(), null, transfer.getCreatedAt(), transfer.getUpdatedAt());
     }
 }

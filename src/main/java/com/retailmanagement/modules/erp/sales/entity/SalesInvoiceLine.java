@@ -15,6 +15,7 @@ public class SalesInvoiceLine extends ErpAuditableEntity {
  @Column(nullable=false, precision=18, scale=6) private BigDecimal quantity;
  @Column(name="base_quantity", nullable=false, precision=18, scale=6) private BigDecimal baseQuantity;
  @Column(name="unit_price", nullable=false, precision=18, scale=2) private BigDecimal unitPrice;
+ @Column(name="mrp", precision=18, scale=2) private BigDecimal mrp;
  @Column(name="discount_amount", nullable=false, precision=18, scale=2) private BigDecimal discountAmount;
  @Column(name="tax_rate", nullable=false, precision=18, scale=2) private BigDecimal taxRate;
  @Column(name="taxable_amount", nullable=false, precision=18, scale=2) private BigDecimal taxableAmount = BigDecimal.ZERO;

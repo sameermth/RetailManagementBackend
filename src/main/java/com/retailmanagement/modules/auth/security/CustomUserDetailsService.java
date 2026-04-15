@@ -1,6 +1,8 @@
 package com.retailmanagement.modules.auth.security;
 
 import com.retailmanagement.modules.auth.model.User;
+import com.retailmanagement.modules.auth.model.Account;
+import com.retailmanagement.modules.auth.repository.AccountRepository;
 import com.retailmanagement.modules.auth.repository.UserBranchAccessRepository;
 import com.retailmanagement.modules.auth.repository.UserRepository;
 import com.retailmanagement.modules.erp.subscription.service.SubscriptionAccessService;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -22,15 +25,25 @@ import java.util.stream.Collectors;
 public class CustomUserDetailsService implements UserDetailsService {
 
     private final UserRepository userRepository;
+    private final AccountRepository accountRepository;
     private final UserBranchAccessRepository userBranchAccessRepository;
     private final SubscriptionAccessService subscriptionAccessService;
 
     @Override
     @Transactional
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + username));
-        return toPrincipal(user);
+        return userRepository.findByUsername(username)
+                .<UserDetails>map(this::toPrincipal)
+                .orElseGet(() -> accountRepository.findByLoginOrEmailIgnoreCase(username)
+                        .map(this::toOnboardingPrincipal)
+                        .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + username)));
+    }
+
+    @Transactional
+    public UserDetails loadOnboardingUserByUsername(String username) throws UsernameNotFoundException {
+        return accountRepository.findByLoginOrEmailIgnoreCase(username)
+                .<UserDetails>map(this::toOnboardingPrincipal)
+                .orElseThrow(() -> new UsernameNotFoundException("Account not found with username: " + username));
     }
 
     @Transactional
@@ -53,5 +66,25 @@ public class CustomUserDetailsService implements UserDetailsService {
         });
 
         return UserPrincipal.create(user, authorities, subscriptionAccessService.currentSnapshot(user.getOrganizationId()));
+    }
+
+    private UserDetails toOnboardingPrincipal(Account account) {
+        List<GrantedAuthority> authorities = new ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority("ROLE_ONBOARDING"));
+        authorities.add(new SimpleGrantedAuthority("org.manage"));
+        authorities.add(new SimpleGrantedAuthority("org.view"));
+
+        boolean active = Boolean.TRUE.equals(account.getActive());
+        boolean accountNonLocked = !Boolean.TRUE.equals(account.getLocked());
+        return UserPrincipal.createAccountOnly(
+                account.getId(),
+                account.getPerson() == null ? null : account.getPerson().getId(),
+                account.getLoginIdentifier(),
+                account.getPerson() == null ? null : account.getPerson().getPrimaryEmail(),
+                account.getPasswordHash(),
+                authorities,
+                active,
+                accountNonLocked
+        );
     }
 }

@@ -5,7 +5,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 public final class TaxDtos {
     private TaxDtos() {}
@@ -39,10 +41,7 @@ public final class TaxDtos {
             Boolean isActive
     ) {}
 
-    public record GstThresholdSettingsRequest(
-            @NotNull @DecimalMin("0.00") BigDecimal gstThresholdAmount,
-            Boolean gstThresholdAlertEnabled
-    ) {}
+    public record GstThresholdSettingsRequest(Boolean gstThresholdAlertEnabled) {}
 
     public record GstThresholdSettingsResponse(
             Long organizationId,
@@ -72,5 +71,89 @@ public final class TaxDtos {
             String effectiveRegistrationScope,
             boolean hasScopeConflict,
             List<String> scopeWarnings
+    ) {}
+
+    public record GstinLookupAddressResponse(
+            String addressLine1,
+            String addressLine2,
+            String location,
+            String district,
+            String state,
+            String stateCode,
+            String postalCode,
+            String country
+    ) {}
+
+    public record GstinLookupResponse(
+            String gstin,
+            boolean validFormat,
+            boolean eligibleForNonGstFallback,
+            String providerCode,
+            String providerName,
+            String lookupStatus,
+            String legalName,
+            String tradeName,
+            String constitutionOfBusiness,
+            String taxpayerType,
+            String registrationStatus,
+            Boolean active,
+            LocalDate registrationDate,
+            LocalDate cancellationDate,
+            GstinLookupAddressResponse address,
+            String message,
+            LocalDateTime fetchedAt
+    ) {}
+
+    public record TaxComplianceDraftRequest(
+            String transporterName,
+            String transporterId,
+            String transportMode,
+            String vehicleNumber,
+            BigDecimal distanceKm,
+            String dispatchAddress,
+            String shipToAddress,
+            String notes
+    ) {}
+
+    public record TaxComplianceDocumentSummaryResponse(
+            Long id,
+            Long organizationId,
+            Long branchId,
+            String sourceType,
+            Long sourceId,
+            String documentType,
+            String providerCode,
+            String status,
+            boolean eligibleForSubmission,
+            String externalReference,
+            String acknowledgementNumber,
+            LocalDateTime acknowledgementDateTime,
+            LocalDateTime generatedAt,
+            LocalDateTime submittedAt,
+            LocalDateTime lastSyncedAt,
+            String errorMessage
+    ) {}
+
+    public record TaxComplianceDocumentResponse(
+            Long id,
+            Long organizationId,
+            Long branchId,
+            String sourceType,
+            Long sourceId,
+            String documentType,
+            String providerCode,
+            String providerName,
+            String status,
+            boolean eligibleForSubmission,
+            List<String> warnings,
+            String externalReference,
+            String acknowledgementNumber,
+            LocalDateTime acknowledgementDateTime,
+            LocalDateTime generatedAt,
+            LocalDateTime submittedAt,
+            LocalDateTime lastSyncedAt,
+            String errorMessage,
+            Map<String, Object> payload,
+            Map<String, Object> providerResponse
     ) {}
 }

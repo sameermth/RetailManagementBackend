@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 public class UserPrincipal implements UserDetails {
     private Long id;
     private Long accountId;
+    private Long personId;
     private String username;
     private String email;
     private Long organizationId;
@@ -33,6 +34,7 @@ public class UserPrincipal implements UserDetails {
     private String subscriptionPlanCode;
     private String subscriptionStatus;
     private java.util.Set<String> subscriptionFeatures;
+    private Boolean onboardingRequired;
     @JsonIgnore
     private String password;
     private Collection<? extends GrantedAuthority> authorities;
@@ -49,6 +51,7 @@ public class UserPrincipal implements UserDetails {
         return UserPrincipal.builder()
                 .id(user.getId())
                 .accountId(user.getAccountId())
+                .personId(user.getPersonId())
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .organizationId(user.getOrganizationId())
@@ -60,6 +63,7 @@ public class UserPrincipal implements UserDetails {
                 .subscriptionPlanCode(subscriptionSnapshot == null ? null : subscriptionSnapshot.planCode())
                 .subscriptionStatus(subscriptionSnapshot == null ? "NONE" : subscriptionSnapshot.status())
                 .subscriptionFeatures(subscriptionSnapshot == null ? java.util.Set.of() : subscriptionSnapshot.featureCodes())
+                .onboardingRequired(false)
                 .password(user.getPassword())
                 .authorities(authorities)
                 .active(Boolean.TRUE.equals(user.getActive()) && accountActive)
@@ -78,6 +82,37 @@ public class UserPrincipal implements UserDetails {
         });
 
         return create(user, authorities, subscriptionSnapshot);
+    }
+
+    public static UserPrincipal createAccountOnly(
+            Long accountId,
+            Long personId,
+            String username,
+            String email,
+            String password,
+            Collection<? extends GrantedAuthority> authorities,
+            boolean active,
+            boolean accountNonLocked
+    ) {
+        return UserPrincipal.builder()
+                .id(null)
+                .accountId(accountId)
+                .personId(personId)
+                .username(username)
+                .email(email)
+                .organizationId(null)
+                .defaultBranchId(null)
+                .accessibleBranchIds(Set.of())
+                .subscriptionVersion(null)
+                .subscriptionPlanCode(null)
+                .subscriptionStatus("NONE")
+                .subscriptionFeatures(Set.of())
+                .onboardingRequired(true)
+                .password(password)
+                .authorities(authorities)
+                .active(active)
+                .accountNonLocked(accountNonLocked)
+                .build();
     }
 
     @Override

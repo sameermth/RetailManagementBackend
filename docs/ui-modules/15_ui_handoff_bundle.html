@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Retail Management UI Handoff Bundle</title>
+  <style>
+    :root {
+      --bg: #f6f3eb;
+      --card: #fffdf8;
+      --ink: #1f2937;
+      --muted: #6b7280;
+      --line: #e5dfd1;
+      --accent: #0f766e;
+      --accent-soft: #dff4ef;
+      --warn: #92400e;
+      --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top right, rgba(15,118,110,0.10), transparent 22%),
+        linear-gradient(180deg, #fbf8f0 0%, var(--bg) 100%);
+      line-height: 1.55;
+    }
+    .wrap {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 40px 20px 72px;
+    }
+    .hero {
+      background: linear-gradient(135deg, #0f766e 0%, #155e75 100%);
+      color: white;
+      border-radius: 24px;
+      padding: 32px;
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+    }
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+    }
+    .hero p {
+      margin: 0;
+      max-width: 800px;
+      color: rgba(255,255,255,0.92);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin: 24px 0;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+    h2 {
+      margin-top: 36px;
+      margin-bottom: 12px;
+      font-size: 1.35rem;
+    }
+    h3 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 1.05rem;
+    }
+    p.lead {
+      color: var(--muted);
+      margin-top: 0;
+    }
+    ul, ol {
+      margin-top: 8px;
+      padding-left: 20px;
+    }
+    li { margin: 6px 0; }
+    .pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+    .modules a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .modules a:hover { text-decoration: underline; }
+    .note {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-radius: 16px;
+      padding: 16px;
+      color: var(--warn);
+    }
+    .two-col {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+    }
+    code {
+      background: #f3f4f6;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-size: 0.92em;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>Retail Management UI Handoff Bundle</h1>
+      <p>
+        Cross-module handoff for design, product, and frontend teams. Use this page as the stakeholder-friendly entry point,
+        then open the linked module documents for full UX detail, form fields, and screen-to-API mapping.
+      </p>
+    </section>
+
+    <div class="grid">
+      <div class="card">
+        <h3>Use This For</h3>
+        <ul>
+          <li>information architecture reviews</li>
+          <li>screen planning</li>
+          <li>role-based dashboard decisions</li>
+          <li>implementation kickoff</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Shared Principles</h3>
+        <ul>
+          <li>keep gated features visible but disabled</li>
+          <li>prefer guided steppers for long business flows</li>
+          <li>treat document detail as a rich workspace</li>
+          <li>keep org context visible everywhere</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Primary Navigation</h3>
+        <p class="lead">ERP app</p>
+        <div>
+          <span class="pill">Dashboard</span>
+          <span class="pill">Sales</span>
+          <span class="pill">Purchases</span>
+          <span class="pill">Inventory</span>
+          <span class="pill">Service</span>
+          <span class="pill">Finance</span>
+        </div>
+      </div>
+    </div>
+
+    <h2>Top User Journeys</h2>
+    <div class="two-col">
+      <div class="card">
+        <h3>Signup To First Organization</h3>
+        <ol>
+          <li>User signs up</li>
+          <li>Backend returns onboarding response</li>
+          <li>UI routes to organization registration</li>
+          <li>User creates first organization</li>
+          <li>UI switches organization</li>
+          <li>User enters setup-oriented dashboard</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h3>Platform Admin Store Onboarding</h3>
+        <ol>
+          <li>Create owner identity</li>
+          <li>Create store</li>
+          <li>Optionally create first branch</li>
+          <li>Optionally activate subscription</li>
+          <li>Land on store detail</li>
+          <li>Move into team, subscription, or catalog setup</li>
+        </ol>
+      </div>
+    </div>
+
+    <h2>Reusable UX Patterns</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Searchable Picker</h3>
+        <p>Use async search for customers, suppliers, products, owner accounts, roles, categories, brands, UOM, and tax groups.</p>
+      </div>
+      <div class="card">
+        <h3>Document Workspace</h3>
+        <p>Quote, order, invoice, PO, receipt, and return screens should use summary header, item table, totals, links, PDF actions, and activity.</p>
+      </div>
+      <div class="card">
+        <h3>Allocation Drawer</h3>
+        <p>Keep payment summary, open documents, editable allocation values, and remaining balance visible together.</p>
+      </div>
+      <div class="card">
+        <h3>Guided Stepper</h3>
+        <p>Best for onboarding, product creation, invoice creation, purchase receipt creation, and service agreement setup.</p>
+      </div>
+    </div>
+
+    <h2>Module Pack</h2>
+    <div class="card modules">
+      <ol>
+        <li><a href="./01_auth_identity.md">Auth and Identity</a></li>
+        <li><a href="./02_foundation_org_branch_warehouse.md">Organization, Branch, Warehouse</a></li>
+        <li><a href="./03_platform_admin.md">Platform Admin</a></li>
+        <li><a href="./04_catalog_hsn_attributes.md">Catalog, HSN, and Attributes</a></li>
+        <li><a href="./05_customers_suppliers.md">Customers and Suppliers</a></li>
+        <li><a href="./06_purchases.md">Purchases</a></li>
+        <li><a href="./07_sales.md">Sales</a></li>
+        <li><a href="./08_inventory.md">Inventory</a></li>
+        <li><a href="./09_returns.md">Returns</a></li>
+        <li><a href="./10_service_warranty_agreements.md">Service, Warranty, and Agreements</a></li>
+        <li><a href="./11_finance_expenses.md">Finance and Expenses</a></li>
+        <li><a href="./12_subscriptions_and_tax.md">Subscriptions and Tax</a></li>
+        <li><a href="./13_approvals_workflow_audit.md">Approvals, Workflow, and Audit</a></li>
+        <li><a href="./14_dashboard_reports_notifications.md">Dashboard, Reports, and Notifications</a></li>
+      </ol>
+    </div>
+
+    <h2>Desktop And Mobile Rules</h2>
+    <div class="two-col">
+      <div class="card">
+        <h3>Desktop</h3>
+        <ul>
+          <li>prefer table-first layouts for operational modules</li>
+          <li>keep sticky filters and sticky totals where flows are item-heavy</li>
+          <li>use tabs for deep entity workspaces</li>
+          <li>use drawers for quick context rather than route churn</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Mobile</h3>
+        <ul>
+          <li>prioritize lookup, capture, summary, and approval flows</li>
+          <li>replace dense tables with expandable cards</li>
+          <li>use full-screen pickers for async search</li>
+          <li>keep primary action pinned at bottom in steppers</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>Implementation Checklist</h2>
+    <div class="card">
+      <ol>
+        <li>Read the module doc before wireframing.</li>
+        <li>Confirm role, entry point, and primary CTA.</li>
+        <li>Use the <code>Key Forms And Backend Fields</code> section for form design.</li>
+        <li>Use the <code>Screen To API Map</code> section for integration wiring.</li>
+        <li>Keep permission gating and subscription gating visually distinct.</li>
+        <li>Use backend PDF endpoints for document preview/download flows.</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      PDF export was not generated locally because this machine does not currently have a PDF renderer such as
+      <code>pandoc</code> or <code>wkhtmltopdf</code> installed. This HTML file is the shareable browser version for now.
+    </div>
+  </div>
+</body>
+</html>

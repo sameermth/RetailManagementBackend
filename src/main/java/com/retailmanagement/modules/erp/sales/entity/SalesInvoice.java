@@ -11,6 +11,7 @@ public class SalesInvoice extends ErpOrgBranchScopedEntity {
  @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;
  @Column(name="warehouse_id", nullable=false) private Long warehouseId;
  @Column(name="customer_id", nullable=false) private Long customerId;
+ @Column(name="pos_session_id") private Long posSessionId;
  @Column(name="price_list_id") private Long priceListId;
  @Column(name="source_quote_id") private Long sourceQuoteId;
  @Column(name="source_order_id") private Long sourceOrderId;

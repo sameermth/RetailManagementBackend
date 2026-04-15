@@ -5,6 +5,8 @@ import com.retailmanagement.common.exceptions.ResourceNotFoundException;
 import com.retailmanagement.modules.report.dto.request.ReportRequest;
 import com.retailmanagement.modules.report.dto.request.ScheduleReportRequest;
 import com.retailmanagement.modules.report.dto.response.ReportScheduleResponse;
+import com.retailmanagement.modules.report.enums.ReportFormat;
+import com.retailmanagement.modules.report.enums.ReportType;
 import com.retailmanagement.modules.report.model.ReportSchedule;
 import com.retailmanagement.modules.report.repository.ReportScheduleRepository;
 import com.retailmanagement.modules.report.service.ReportGeneratorService;
@@ -248,20 +250,24 @@ public class ReportScheduleServiceImpl implements ReportScheduleService {
         }
 
         try {
+            LocalDateTime executionTime = LocalDateTime.now();
+            ReportType reportType = resolveReportType(schedule);
+            ReportFormat format = resolveFormat(schedule);
+
             // Create report request from schedule
             ReportRequest reportRequest = new ReportRequest();
-            reportRequest.setReportName(schedule.getScheduleName() + "_" + LocalDateTime.now());
-            reportRequest.setReportType(schedule.getReportType());
-            reportRequest.setFormat(schedule.getFormat());
+            reportRequest.setReportName(resolveScheduleName(schedule) + "_" + executionTime);
+            reportRequest.setReportType(reportType);
+            reportRequest.setFormat(format);
             reportRequest.setParameters(schedule.getParameters());
-            reportRequest.setStartDate(schedule.getLastRunDate());
-            reportRequest.setEndDate(LocalDateTime.now());
+            reportRequest.setStartDate(resolveExecutionStartDate(schedule, executionTime));
+            reportRequest.setEndDate(resolveExecutionEndDate(schedule, executionTime));
 
             // Generate report
             reportGeneratorService.generateReport(reportRequest, schedule.getCreatedBy().getId());
 
             // Update schedule stats
-            schedule.setLastRunDate(LocalDateTime.now());
+            schedule.setLastRunDate(executionTime);
             schedule.setSuccessCount(schedule.getSuccessCount() + 1);
             schedule.setNextRunDate(calculateNextRunDate(schedule));
 
@@ -320,6 +326,48 @@ public class ReportScheduleServiceImpl implements ReportScheduleService {
     @Override
     public boolean isScheduleIdUnique(String scheduleId) {
         return !scheduleRepository.existsByScheduleId(scheduleId);
+    }
+
+    private ReportType resolveReportType(ReportSchedule schedule) {
+        if (schedule.getReportType() != null) {
+            return schedule.getReportType();
+        }
+        throw new BusinessException("Report type is missing or unsupported for schedule " + schedule.getScheduleId());
+    }
+
+    private ReportFormat resolveFormat(ReportSchedule schedule) {
+        return schedule.getFormat() != null ? schedule.getFormat() : ReportFormat.PDF;
+    }
+
+    private String resolveScheduleName(ReportSchedule schedule) {
+        if (schedule.getScheduleName() != null && !schedule.getScheduleName().isBlank()) {
+            return schedule.getScheduleName();
+        }
+        return schedule.getScheduleId();
+    }
+
+    private LocalDateTime resolveExecutionStartDate(ReportSchedule schedule, LocalDateTime executionTime) {
+        if (schedule.getLastRunDate() != null) {
+            return schedule.getLastRunDate();
+        }
+        if (schedule.getStartDate() != null) {
+            return schedule.getStartDate();
+        }
+        return switch (schedule.getFrequency()) {
+            case "DAILY" -> executionTime.minusDays(1);
+            case "WEEKLY" -> executionTime.minusWeeks(1);
+            case "MONTHLY" -> executionTime.minusMonths(1);
+            case "QUARTERLY" -> executionTime.minusMonths(3);
+            case "YEARLY" -> executionTime.minusYears(1);
+            default -> executionTime.minusDays(1);
+        };
+    }
+
+    private LocalDateTime resolveExecutionEndDate(ReportSchedule schedule, LocalDateTime executionTime) {
+        if (schedule.getEndDate() != null && schedule.getEndDate().isBefore(executionTime)) {
+            return schedule.getEndDate();
+        }
+        return executionTime;
     }
 
     private ReportScheduleResponse convertToResponse(ReportSchedule schedule) {

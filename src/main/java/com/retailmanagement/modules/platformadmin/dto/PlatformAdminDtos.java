@@ -1,5 +1,7 @@
 package com.retailmanagement.modules.platformadmin.dto;
 
+import com.retailmanagement.modules.erp.foundation.dto.BranchDtos;
+import com.retailmanagement.modules.erp.subscription.dto.SubscriptionDtos;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -139,6 +141,108 @@ public final class PlatformAdminDtos {
             String errorMessage
     ) {}
 
+    public record CatalogProductGovernanceResponse(
+            Long productId,
+            String name,
+            String brandName,
+            String categoryName,
+            String hsnCode,
+            Boolean serviceItem,
+            Boolean active,
+            String governanceStatus,
+            String qualityReviewStatus,
+            Boolean blockNewStoreAdoption,
+            Boolean blockTransactions,
+            String governanceReason,
+            LocalDateTime governanceUpdatedAt,
+            long incidentCount
+    ) {}
+
+    public record UpdateProductGovernanceRequest(
+            @NotBlank String governanceStatus,
+            @NotBlank String qualityReviewStatus,
+            @NotNull Boolean blockNewStoreAdoption,
+            @NotNull Boolean blockTransactions,
+            String governanceReason
+    ) {}
+
+    public record CatalogProductImpactStoreResponse(
+            Long storeProductId,
+            Long organizationId,
+            String organizationCode,
+            String organizationName,
+            String sku,
+            String name,
+            Boolean active
+    ) {}
+
+    public record CatalogProductImpactResponse(
+            Long productId,
+            String name,
+            String governanceStatus,
+            Boolean blockNewStoreAdoption,
+            Boolean blockTransactions,
+            long linkedStoreCount,
+            List<CatalogProductImpactStoreResponse> linkedStores
+    ) {}
+
+    public record PlatformIncidentResponse(
+            Long id,
+            String incidentNumber,
+            Long organizationId,
+            String subjectType,
+            String incidentType,
+            String severity,
+            String status,
+            String title,
+            String description,
+            Long productId,
+            Long storeProductId,
+            Long serviceTicketId,
+            Long warrantyClaimId,
+            String reportedBy,
+            String recommendedAction,
+            String actionTaken,
+            String resolutionNotes,
+            LocalDateTime openedAt,
+            LocalDateTime resolvedAt,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt
+    ) {}
+
+    public record CreatePlatformIncidentRequest(
+            Long organizationId,
+            @NotBlank String subjectType,
+            @NotBlank String incidentType,
+            @NotBlank String severity,
+            @NotBlank String title,
+            String description,
+            Long productId,
+            Long storeProductId,
+            Long serviceTicketId,
+            Long warrantyClaimId,
+            String reportedBy,
+            String recommendedAction
+    ) {}
+
+    public record UpdatePlatformIncidentStatusRequest(
+            @NotBlank String status,
+            String actionTaken,
+            String resolutionNotes
+    ) {}
+
+    public record ApplyIncidentGovernanceActionRequest(
+            @NotBlank String actionType,
+            String governanceReason,
+            String resolutionNotes,
+            String incidentStatus
+    ) {}
+
+    public record IncidentGovernanceActionResponse(
+            PlatformIncidentResponse incident,
+            CatalogProductGovernanceResponse product
+    ) {}
+
     public record AuditActivityResponse(
             Long id,
             Long organizationId,
@@ -181,6 +285,55 @@ public final class PlatformAdminDtos {
             BigDecimal gstThresholdAmount,
             Boolean gstThresholdAlertEnabled,
             Boolean isActive
+    ) {}
+
+    public record StoreOnboardingStoreRequest(
+            @NotBlank String name,
+            @NotBlank String code,
+            String legalName,
+            String phone,
+            String email,
+            String gstin,
+            BigDecimal gstThresholdAmount,
+            Boolean gstThresholdAlertEnabled,
+            Boolean isActive
+    ) {}
+
+    public record OwnerAccountCreateRequest(
+            @NotBlank String loginIdentifier,
+            @NotBlank String password,
+            @NotBlank String fullName,
+            String email,
+            String phone,
+            Boolean active
+    ) {}
+
+    public record StoreBranchSeedRequest(
+            @NotBlank String code,
+            @NotBlank String name,
+            String phone,
+            String email,
+            String addressLine1,
+            String addressLine2,
+            String city,
+            String state,
+            String postalCode,
+            String country,
+            Boolean isActive
+    ) {}
+
+    public record StoreOnboardingRequest(
+            @NotNull @Valid OwnerAccountCreateRequest owner,
+            @NotNull @Valid StoreOnboardingStoreRequest store,
+            @Valid StoreBranchSeedRequest branch,
+            @Valid SubscriptionDtos.ActivateOrganizationSubscriptionRequest subscription
+    ) {}
+
+    public record StoreOnboardingResponse(
+            StoreSummaryResponse store,
+            OwnerAccountReferenceResponse ownerAccount,
+            BranchDtos.BranchResponse defaultBranch,
+            SubscriptionSummaryResponse subscription
     ) {}
 
     public record StoreStatusUpdateRequest(

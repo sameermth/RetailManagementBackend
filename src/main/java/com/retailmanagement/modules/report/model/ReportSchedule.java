@@ -121,6 +121,9 @@ public class ReportSchedule {
         this.reportType = reportTypeFromCode(reportTypeCode);
         this.scheduleName = stringValue(config.get("scheduleName"));
         this.format = enumValue(config.get("format"), ReportFormat.class);
+        if (this.format == null) {
+            this.format = ReportFormat.PDF;
+        }
         this.cronExpression = stringValue(config.get("cronExpression"));
         this.startDate = dateTimeValue(config.get("startDate"));
         this.endDate = dateTimeValue(config.get("endDate"));
@@ -215,7 +218,7 @@ public class ReportSchedule {
             case "DAILY_SALES_SUMMARY" -> ReportType.SALES_SUMMARY;
             case "DAILY_SALES_DETAILED" -> ReportType.SALES_DETAILED;
             case "INVENTORY_REPORT", "INVENTORY_SUMMARY_REPORT" -> ReportType.INVENTORY_SUMMARY;
-            case "LOW_STOCK_ALERT", "LOW_STOCK_ALERT_REPORT" -> ReportType.LOW_STOCK_REPORT;
+            case "LOW_STOCK_ALERT", "LOW_STOCK_ALERT_REPORT", "LOW_STOCK_SUMMARY" -> ReportType.LOW_STOCK_REPORT;
             case "PURCHASE_REPORT", "PURCHASE_SUMMARY_REPORT" -> ReportType.PURCHASE_SUMMARY;
             case "CUSTOMER_DUES_REPORT" -> ReportType.CUSTOMER_DUES;
             case "GST_REPORT", "GST_SUMMARY", "TAX_SUMMARY" -> ReportType.TAX_REPORT;

@@ -10,6 +10,7 @@ import lombok.Getter; import lombok.Setter;
 public class StockMovement extends ErpOrgBranchScopedEntity {
  @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;
  @Column(name="warehouse_id", nullable=false) private Long warehouseId;
+ @Column(name="bin_location_id") private Long binLocationId;
  @Column(name="product_id", nullable=false) private Long productId;
  @Column(name="movement_type", nullable=false) private String movementType;
  @Column(name="reference_type", nullable=false) private String referenceType;

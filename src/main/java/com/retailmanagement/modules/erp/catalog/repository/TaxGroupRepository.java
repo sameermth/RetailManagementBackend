@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface TaxGroupRepository extends JpaRepository<TaxGroup, Long> {
     Optional<TaxGroup> findByIdAndOrganizationId(Long id, Long organizationId);
 
+    Optional<TaxGroup> findByOrganizationIdAndCodeIgnoreCase(Long organizationId, String code);
+
     List<TaxGroup> findByOrganizationIdAndIsActiveTrueAndCgstRateAndSgstRateAndIgstRateAndCessRate(
             Long organizationId,
             BigDecimal cgstRate,

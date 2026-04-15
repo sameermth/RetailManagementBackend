@@ -33,6 +33,13 @@ public class StockMovementController {
         return ErpApiResponse.ok(inventoryQueryService.movementsByProduct(organizationId, productId).stream().map(this::toResponse).toList());
     }
 
+    @GetMapping("/bin/{binLocationId}")
+    @Operation(summary = "List stock movements by bin")
+    @PreAuthorize("hasAuthority('inventory.view')")
+    public ErpApiResponse<List<InventoryDtos.StockMovementResponse>> byBin(@RequestParam Long organizationId, @PathVariable Long binLocationId) {
+        return ErpApiResponse.ok(inventoryQueryService.movementsByBin(organizationId, binLocationId).stream().map(this::toResponse).toList());
+    }
+
     @GetMapping("/reference/{referenceType}/{referenceId}")
     @Operation(summary = "List stock movements by reference")
     @PreAuthorize("hasAuthority('inventory.view')")
@@ -46,7 +53,7 @@ public class StockMovementController {
 
     private InventoryDtos.StockMovementResponse toResponse(StockMovement movement) {
         return new InventoryDtos.StockMovementResponse(movement.getId(), movement.getOrganizationId(), movement.getBranchId(),
-                movement.getWarehouseId(), movement.getProductId(), movement.getMovementType(), movement.getReferenceType(),
+                movement.getWarehouseId(), movement.getBinLocationId(), movement.getProductId(), movement.getMovementType(), movement.getReferenceType(),
                 movement.getReferenceId(), movement.getReferenceNumber(), movement.getDirection(), movement.getUomId(),
                 movement.getQuantity(), movement.getBaseQuantity(), movement.getUnitCost(), movement.getTotalCost(),
                 movement.getMovementAt(), movement.getCreatedAt(), movement.getUpdatedAt());
