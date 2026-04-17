@@ -1,21 +1,109 @@
-ALTER TABLE "sales_dispatch" ADD COLUMN IF NOT EXISTS "picked_at" TIMESTAMP WITH TIME ZONE;
-ALTER TABLE "sales_dispatch_line" ADD COLUMN IF NOT EXISTS "picked_quantity" NUMERIC(18, 6);
-ALTER TABLE "sales_dispatch_line" ADD COLUMN IF NOT EXISTS "picked_base_quantity" NUMERIC(18, 6);
-ALTER TABLE "sales_dispatch_line" ADD COLUMN IF NOT EXISTS "picked_bin_location_id" BIGINT;
-ALTER TABLE "sales_dispatch_line" ADD COLUMN IF NOT EXISTS "packed_quantity" NUMERIC(18, 6);
-ALTER TABLE "sales_dispatch_line" ADD COLUMN IF NOT EXISTS "packed_base_quantity" NUMERIC(18, 6);
-ALTER TABLE "sales_dispatch_line" ADD CONSTRAINT "sales_dispatch_line_picked_bin_location_fkey" FOREIGN KEY ("picked_bin_location_id") REFERENCES "warehouse_bin_location" ("id") ON UPDATE NO ACTION ON DELETE SET NULL;
+DO $$
+BEGIN
+    ALTER TABLE "sales_dispatch" ADD COLUMN "picked_at" TIMESTAMP WITH TIME ZONE;
+EXCEPTION
+    WHEN duplicate_column THEN RAISE NOTICE 'column picked_at already exists in sales_dispatch';
+END $$;
 
-ALTER TABLE "purchase_receipt" ADD COLUMN IF NOT EXISTS "putaway_status" VARCHAR(30);
-ALTER TABLE "purchase_receipt" ADD COLUMN IF NOT EXISTS "putaway_completed_at" TIMESTAMP WITH TIME ZONE;
+DO $$
+BEGIN
+    ALTER TABLE "sales_dispatch_line" ADD COLUMN "picked_quantity" NUMERIC(18, 6);
+EXCEPTION
+    WHEN duplicate_column THEN RAISE NOTICE 'column picked_quantity already exists in sales_dispatch_line';
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE "sales_dispatch_line" ADD COLUMN "picked_base_quantity" NUMERIC(18, 6);
+EXCEPTION
+    WHEN duplicate_column THEN RAISE NOTICE 'column picked_base_quantity already exists in sales_dispatch_line';
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE "sales_dispatch_line" ADD COLUMN "picked_bin_location_id" BIGINT;
+EXCEPTION
+    WHEN duplicate_column THEN RAISE NOTICE 'column picked_bin_location_id already exists in sales_dispatch_line';
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE "sales_dispatch_line" ADD COLUMN "packed_quantity" NUMERIC(18, 6);
+EXCEPTION
+    WHEN duplicate_column THEN RAISE NOTICE 'column packed_quantity already exists in sales_dispatch_line';
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE "sales_dispatch_line" ADD COLUMN "packed_base_quantity" NUMERIC(18, 6);
+EXCEPTION
+    WHEN duplicate_column THEN RAISE NOTICE 'column packed_base_quantity already exists in sales_dispatch_line';
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE "sales_dispatch_line" ADD CONSTRAINT "sales_dispatch_line_picked_bin_location_fkey" FOREIGN KEY ("picked_bin_location_id") REFERENCES "warehouse_bin_location" ("id") ON UPDATE NO ACTION ON DELETE SET NULL;
+EXCEPTION
+    WHEN duplicate_object THEN RAISE NOTICE 'constraint sales_dispatch_line_picked_bin_location_fkey already exists in sales_dispatch_line';
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE "purchase_receipt" ADD COLUMN "putaway_status" VARCHAR(30);
+EXCEPTION
+    WHEN duplicate_column THEN RAISE NOTICE 'column putaway_status already exists in purchase_receipt';
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE "purchase_receipt" ADD COLUMN "putaway_completed_at" TIMESTAMP WITH TIME ZONE;
+EXCEPTION
+    WHEN duplicate_column THEN RAISE NOTICE 'column putaway_completed_at already exists in purchase_receipt';
+END $$;
+
 UPDATE "purchase_receipt" SET "putaway_status" = COALESCE("putaway_status", 'PUTAWAY_PENDING');
-ALTER TABLE "purchase_receipt_line" ADD COLUMN IF NOT EXISTS "putaway_bin_location_id" BIGINT;
-ALTER TABLE "purchase_receipt_line" ADD COLUMN IF NOT EXISTS "putaway_quantity" NUMERIC(18, 6);
-ALTER TABLE "purchase_receipt_line" ADD COLUMN IF NOT EXISTS "putaway_base_quantity" NUMERIC(18, 6);
-ALTER TABLE "purchase_receipt_line" ADD CONSTRAINT "purchase_receipt_line_putaway_bin_location_fkey" FOREIGN KEY ("putaway_bin_location_id") REFERENCES "warehouse_bin_location" ("id") ON UPDATE NO ACTION ON DELETE SET NULL;
 
-ALTER TABLE "store_product" ADD COLUMN IF NOT EXISTS "is_bundle" BOOLEAN DEFAULT FALSE NOT NULL;
-ALTER TABLE "store_product" ADD COLUMN IF NOT EXISTS "bundle_pricing_mode" VARCHAR(30) DEFAULT 'COMPONENT_SUM' NOT NULL;
+DO $$
+BEGIN
+    ALTER TABLE "purchase_receipt_line" ADD COLUMN "putaway_bin_location_id" BIGINT;
+EXCEPTION
+    WHEN duplicate_column THEN RAISE NOTICE 'column putaway_bin_location_id already exists in purchase_receipt_line';
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE "purchase_receipt_line" ADD COLUMN "putaway_quantity" NUMERIC(18, 6);
+EXCEPTION
+    WHEN duplicate_column THEN RAISE NOTICE 'column putaway_quantity already exists in purchase_receipt_line';
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE "purchase_receipt_line" ADD COLUMN "putaway_base_quantity" NUMERIC(18, 6);
+EXCEPTION
+    WHEN duplicate_column THEN RAISE NOTICE 'column putaway_base_quantity already exists in purchase_receipt_line';
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE "purchase_receipt_line" ADD CONSTRAINT "purchase_receipt_line_putaway_bin_location_fkey" FOREIGN KEY ("putaway_bin_location_id") REFERENCES "warehouse_bin_location" ("id") ON UPDATE NO ACTION ON DELETE SET NULL;
+EXCEPTION
+    WHEN duplicate_object THEN RAISE NOTICE 'constraint purchase_receipt_line_putaway_bin_location_fkey already exists in purchase_receipt_line';
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE "store_product" ADD COLUMN "is_bundle" BOOLEAN DEFAULT FALSE NOT NULL;
+EXCEPTION
+    WHEN duplicate_column THEN RAISE NOTICE 'column is_bundle already exists in store_product';
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE "store_product" ADD COLUMN "bundle_pricing_mode" VARCHAR(30) DEFAULT 'COMPONENT_SUM' NOT NULL;
+EXCEPTION
+    WHEN duplicate_column THEN RAISE NOTICE 'column bundle_pricing_mode already exists in store_product';
+END $$;
 
 CREATE TABLE IF NOT EXISTS "store_product_bundle_component" (
     "id" BIGINT GENERATED BY DEFAULT AS IDENTITY NOT NULL,
@@ -34,8 +122,38 @@ CREATE TABLE IF NOT EXISTS "store_product_bundle_component" (
 
 CREATE INDEX IF NOT EXISTS "idx_store_product_bundle_component_bundle" ON "store_product_bundle_component" ("organization_id", "store_product_id", "sort_order");
 CREATE INDEX IF NOT EXISTS "idx_store_product_bundle_component_component" ON "store_product_bundle_component" ("organization_id", "component_store_product_id");
-ALTER TABLE "store_product_bundle_component" ADD CONSTRAINT "store_product_bundle_component_org_fkey" FOREIGN KEY ("organization_id") REFERENCES "organization" ("id") ON UPDATE NO ACTION ON DELETE CASCADE;
-ALTER TABLE "store_product_bundle_component" ADD CONSTRAINT "store_product_bundle_component_store_product_fkey" FOREIGN KEY ("store_product_id") REFERENCES "store_product" ("id") ON UPDATE NO ACTION ON DELETE CASCADE;
-ALTER TABLE "store_product_bundle_component" ADD CONSTRAINT "store_product_bundle_component_component_store_product_fkey" FOREIGN KEY ("component_store_product_id") REFERENCES "store_product" ("id") ON UPDATE NO ACTION ON DELETE RESTRICT;
-ALTER TABLE "store_product_bundle_component" ADD CONSTRAINT "store_product_bundle_component_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "app_user" ("id") ON UPDATE NO ACTION ON DELETE SET NULL;
-ALTER TABLE "store_product_bundle_component" ADD CONSTRAINT "store_product_bundle_component_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "app_user" ("id") ON UPDATE NO ACTION ON DELETE SET NULL;
+
+DO $$
+BEGIN
+    ALTER TABLE "store_product_bundle_component" ADD CONSTRAINT "store_product_bundle_component_org_fkey" FOREIGN KEY ("organization_id") REFERENCES "organization" ("id") ON UPDATE NO ACTION ON DELETE CASCADE;
+EXCEPTION
+    WHEN duplicate_object THEN RAISE NOTICE 'constraint store_product_bundle_component_org_fkey already exists';
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE "store_product_bundle_component" ADD CONSTRAINT "store_product_bundle_component_store_product_fkey" FOREIGN KEY ("store_product_id") REFERENCES "store_product" ("id") ON UPDATE NO ACTION ON DELETE CASCADE;
+EXCEPTION
+    WHEN duplicate_object THEN RAISE NOTICE 'constraint store_product_bundle_component_store_product_fkey already exists';
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE "store_product_bundle_component" ADD CONSTRAINT "store_product_bundle_component_component_store_product_fkey" FOREIGN KEY ("component_store_product_id") REFERENCES "store_product" ("id") ON UPDATE NO ACTION ON DELETE RESTRICT;
+EXCEPTION
+    WHEN duplicate_object THEN RAISE NOTICE 'constraint store_product_bundle_component_component_store_product_fkey already exists';
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE "store_product_bundle_component" ADD CONSTRAINT "store_product_bundle_component_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "app_user" ("id") ON UPDATE NO ACTION ON DELETE SET NULL;
+EXCEPTION
+    WHEN duplicate_object THEN RAISE NOTICE 'constraint store_product_bundle_component_created_by_fkey already exists';
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE "store_product_bundle_component" ADD CONSTRAINT "store_product_bundle_component_updated_by_fkey" FOREIGN KEY ("updated_by") REFERENCES "app_user" ("id") ON UPDATE NO ACTION ON DELETE SET NULL;
+EXCEPTION
+    WHEN duplicate_object THEN RAISE NOTICE 'constraint store_product_bundle_component_updated_by_fkey already exists';
+END $$;
