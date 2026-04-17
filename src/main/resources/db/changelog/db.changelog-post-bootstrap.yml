@@ -275,3 +275,13 @@ databaseChangeLog:
       rollback:
         - sql:
             sql: "SELECT 'Manual rollback required for fulfillment and bundle foundation migration';"
+
+  - changeSet:
+      id: post-bootstrap-017-update-notification-schema
+      author: sameer
+      changes:
+        - sqlFile:
+            path: post-bootstrap/016_add_fulfillment_bundle_foundation.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
