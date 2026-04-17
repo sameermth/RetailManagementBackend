@@ -112,3 +112,23 @@ databaseChangeLog:
             relativeToChangelogFile: true
             splitStatements: false
             endDelimiter: ";"
+
+  - changeSet:
+      id: post-bootstrap-018-create-notification-templates-table
+      author: sameer
+      changes:
+        - sqlFile:
+            path: post-bootstrap/018_create_notification_templates_table.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
+
+  - changeSet:
+      id: post-bootstrap-019-sync-remaining-schema
+      author: sameer
+      changes:
+        - sqlFile:
+            path: post-bootstrap/019_sync_remaining_schema.sql
+            relativeToChangelogFile: true
+            splitStatements: false
+            endDelimiter: ";"
