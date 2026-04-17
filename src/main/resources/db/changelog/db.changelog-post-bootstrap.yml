@@ -104,7 +104,7 @@ databaseChangeLog:
             sql: "SELECT 'Manual rollback required for sales line MRP column migration';"
 
   - changeSet:
-      id: post-bootstrap-017-update-notification-schema
+      id: post-bootstrap-017-update-notification-schema-updated
       author: sameer
       changes:
         - sqlFile:
