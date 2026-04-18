@@ -214,42 +214,20 @@ Current endpoints:
 SPRING_PROFILES_ACTIVE=local ./gradlew bootRun
 ```
 
-### Local HTTPS (Optional)
+### SSL for Upper Environments
 
-Local profile now supports HTTPS through environment variables (disabled by default).
-
-1. Create a local development keystore:
-
-```bash
-mkdir -p .certs
-keytool -genkeypair \
-  -alias retail-local \
-  -keyalg RSA \
-  -keysize 2048 \
-  -storetype PKCS12 \
-  -keystore .certs/retail-local.p12 \
-  -validity 3650 \
-  -storepass changeit \
-  -keypass changeit \
-  -dname "CN=localhost, OU=Retail, O=Retail Management, L=Local, S=Local, C=IN"
-```
-
-2. Start backend with HTTPS enabled:
+Local profile is intentionally HTTP-only (`server.ssl.enabled=false`) to keep development simple.
+For upper environments that terminate TLS at the app/container level, enable SSL via environment variables:
 
 ```bash
-SPRING_PROFILES_ACTIVE=local \
-SERVER_PORT=8443 \
-SERVER_SSL_ENABLED=true \
-SERVER_SSL_KEY_STORE=file:./.certs/retail-local.p12 \
-SERVER_SSL_KEY_STORE_PASSWORD=changeit \
-SERVER_SSL_KEY_STORE_TYPE=PKCS12 \
-SERVER_SSL_KEY_ALIAS=retail-local \
-./gradlew bootRun
+SERVER_SSL_ENABLED=true
+SERVER_SSL_KEY_STORE=file:/path/to/keystore.p12
+SERVER_SSL_KEY_STORE_PASSWORD=<password>
+SERVER_SSL_KEY_STORE_TYPE=PKCS12
+SERVER_SSL_KEY_ALIAS=<alias>
+# Optional if key password differs from store password
+SERVER_SSL_KEY_PASSWORD=<key-password>
 ```
-
-3. Access locally:
-   - Swagger UI: `https://localhost:8443/swagger-ui/index.html`
-   - OpenAPI JSON: `https://localhost:8443/v3/api-docs`
 
 ## Database Bootstrap and Environments
 
