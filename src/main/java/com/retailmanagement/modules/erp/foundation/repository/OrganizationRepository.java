@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface OrganizationRepository extends JpaRepository<Organization, Long> {
     Optional<Organization> findByCode(String code);
+    boolean existsByCodeIgnoreCase(String code);
+    boolean existsByCodeIgnoreCaseAndIdNot(String code, Long id);
     List<Organization> findByIdIn(Collection<Long> ids);
     long countByOwnerAccountIdAndIsActiveTrue(Long ownerAccountId);
     List<Organization> findByOwnerAccountId(Long ownerAccountId);

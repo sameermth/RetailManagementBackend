@@ -6,6 +6,7 @@ import com.retailmanagement.modules.erp.foundation.entity.Organization;
 import com.retailmanagement.modules.erp.foundation.service.OrganizationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,7 +18,7 @@ public class OrganizationController {
  private final OrganizationService service;
  @GetMapping @Operation(summary = "List accessible organizations") @PreAuthorize("hasAuthority('org.view')") public ErpApiResponse<List<OrganizationDtos.OrganizationResponse>> list(){ return ErpApiResponse.ok(service.list().stream().map(this::toResponse).toList()); }
  @GetMapping("/{id}") @Operation(summary = "Get organization by id") @PreAuthorize("hasAuthority('org.view')") public ErpApiResponse<OrganizationDtos.OrganizationResponse> get(@PathVariable Long id){ return ErpApiResponse.ok(toResponse(service.get(id))); }
- @PostMapping @Operation(summary = "Create organization") @PreAuthorize("hasAuthority('org.manage')") public ErpApiResponse<OrganizationDtos.OrganizationResponse> create(@RequestBody OrganizationDtos.CreateOrganizationRequest request){ return ErpApiResponse.ok(toResponse(service.create(toEntity(request))), "ERP organization created"); }
+ @PostMapping @Operation(summary = "Create organization") @PreAuthorize("hasAuthority('org.manage')") public ErpApiResponse<OrganizationDtos.OrganizationResponse> create(@Valid @RequestBody OrganizationDtos.CreateOrganizationRequest request){ return ErpApiResponse.ok(toResponse(service.create(toEntity(request))), "ERP organization created"); }
  @PutMapping("/{id}") @Operation(summary = "Update organization") @PreAuthorize("hasAuthority('org.manage')") public ErpApiResponse<OrganizationDtos.OrganizationResponse> update(@PathVariable Long id, @RequestBody OrganizationDtos.UpdateOrganizationRequest request){ return ErpApiResponse.ok(toResponse(service.update(id, request)), "ERP organization updated"); }
 
  private OrganizationDtos.OrganizationResponse toResponse(Organization organization) {
