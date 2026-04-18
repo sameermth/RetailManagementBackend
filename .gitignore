@@ -1,3 +1,6 @@
 /build/
 /.gradle/
 /.idea/
+/.certs/
+*.p12
+*.jks
