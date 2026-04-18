@@ -243,4 +243,5 @@ SERVER_SSL_KEY_PASSWORD=<key-password>
 
 - Swagger UI: `http://localhost:8080/swagger-ui/index.html`
 - OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+- Platform-level flowchart: `docs/platform_level_flowchart.md`
 - Detailed backend data flow blueprint: `docs/backend_data_flow_blueprint.html`
