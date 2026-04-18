@@ -52,6 +52,21 @@ public class OrganizationService {
   return repository.findById(id).orElseThrow(() -> new ResourceNotFoundException("ERP organization not found: "+id));
  }
  public Organization create(Organization organization){
+  String requestedCode = organization.getCode() == null ? null : organization.getCode().trim();
+  if (requestedCode == null || requestedCode.isEmpty()) {
+   throw new BusinessException("Organization code is required");
+  }
+  if (repository.existsByCodeIgnoreCase(requestedCode)) {
+   throw new BusinessException("Organization code already exists: " + requestedCode);
+  }
+  organization.setCode(requestedCode.toUpperCase());
+  if (organization.getName() != null) {
+   organization.setName(organization.getName().trim());
+  }
+  if (organization.getLegalName() != null) {
+   organization.setLegalName(organization.getLegalName().trim());
+  }
+
   UserPrincipal principal = ErpSecurityUtils.requirePrincipal();
   Long ownerAccountId = ErpSecurityUtils.currentAccountId()
           .orElseThrow(() -> new BusinessException("Authenticated owner account context is missing"));
@@ -117,7 +132,16 @@ public class OrganizationService {
  public Organization update(Long id, OrganizationDtos.UpdateOrganizationRequest request) {
   Organization organization = get(id);
   if (request.name() != null) organization.setName(request.name());
-  if (request.code() != null) organization.setCode(request.code());
+  if (request.code() != null) {
+   String requestedCode = request.code().trim();
+   if (requestedCode.isEmpty()) {
+    throw new BusinessException("Organization code cannot be blank");
+   }
+   if (repository.existsByCodeIgnoreCaseAndIdNot(requestedCode, id)) {
+    throw new BusinessException("Organization code already exists: " + requestedCode);
+   }
+   organization.setCode(requestedCode.toUpperCase());
+  }
   if (request.legalName() != null) organization.setLegalName(request.legalName());
   if (request.phone() != null) organization.setPhone(request.phone());
   if (request.email() != null) organization.setEmail(request.email());
