@@ -10,7 +10,7 @@ public final class OrganizationDtos {
 
     public record CreateOrganizationRequest(
             @NotBlank String name,
-            @NotBlank String code,
+            String code,
             String legalName,
             String phone,
             String email,
