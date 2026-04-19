@@ -19,6 +19,7 @@ import com.retailmanagement.modules.erp.foundation.dto.OrganizationDtos;
 import com.retailmanagement.modules.erp.foundation.entity.Organization;
 import com.retailmanagement.modules.erp.foundation.repository.OrganizationRepository;
 import com.retailmanagement.modules.erp.subscription.service.SubscriptionAccessService;
+import java.util.Locale;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -52,14 +53,13 @@ public class OrganizationService {
   return repository.findById(id).orElseThrow(() -> new ResourceNotFoundException("ERP organization not found: "+id));
  }
  public Organization create(Organization organization){
-  String requestedCode = organization.getCode() == null ? null : organization.getCode().trim();
-  if (requestedCode == null || requestedCode.isEmpty()) {
-   throw new BusinessException("Organization code is required");
-  }
-  if (repository.existsByCodeIgnoreCase(requestedCode)) {
+  String requestedCode = normalizeCode(organization.getCode());
+  if (requestedCode == null) {
+   requestedCode = generateOrganizationCode();
+  } else if (repository.existsByCodeIgnoreCase(requestedCode)) {
    throw new BusinessException("Organization code already exists: " + requestedCode);
   }
-  organization.setCode(requestedCode.toUpperCase());
+  organization.setCode(requestedCode);
   if (organization.getName() != null) {
    organization.setName(organization.getName().trim());
   }
@@ -133,14 +133,14 @@ public class OrganizationService {
   Organization organization = get(id);
   if (request.name() != null) organization.setName(request.name());
   if (request.code() != null) {
-   String requestedCode = request.code().trim();
-   if (requestedCode.isEmpty()) {
+   String requestedCode = normalizeCode(request.code());
+   if (requestedCode == null) {
     throw new BusinessException("Organization code cannot be blank");
    }
    if (repository.existsByCodeIgnoreCaseAndIdNot(requestedCode, id)) {
     throw new BusinessException("Organization code already exists: " + requestedCode);
    }
-   organization.setCode(requestedCode.toUpperCase());
+   organization.setCode(requestedCode);
   }
   if (request.legalName() != null) organization.setLegalName(request.legalName());
   if (request.phone() != null) organization.setPhone(request.phone());
@@ -149,5 +149,29 @@ public class OrganizationService {
   if (request.gstThresholdAlertEnabled() != null) organization.setGstThresholdAlertEnabled(request.gstThresholdAlertEnabled());
   if (request.isActive() != null) organization.setIsActive(request.isActive());
   return repository.save(organization);
+ }
+
+ private String normalizeCode(String code) {
+  if (code == null) {
+   return null;
+  }
+  String normalized = code.trim();
+  if (normalized.isEmpty()) {
+   return null;
+  }
+  return normalized.toUpperCase(Locale.ROOT);
+ }
+
+ private String generateOrganizationCode() {
+  long nextSeed = repository.findTopByOrderByIdDesc()
+          .map(existing -> existing.getId() + 1)
+          .orElse(1L);
+  for (int offset = 0; offset < 1000; offset++) {
+   String candidate = String.format("ORG%06d", nextSeed + offset);
+   if (!repository.existsByCodeIgnoreCase(candidate)) {
+    return candidate;
+   }
+  }
+  throw new BusinessException("Unable to auto-generate organization code. Please retry.");
  }
 }
